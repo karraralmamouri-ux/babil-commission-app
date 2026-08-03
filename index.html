@@ -18,7 +18,7 @@ details{background:var(--panel);border:1px solid var(--line);border-radius:var(-
 .tabs{display:flex;gap:5px}.tab{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:10px 20px;border-radius:9px 9px 0 0;cursor:pointer;font-weight:800;font-size:12px}.tab.active{background:var(--panel2);color:var(--text);border-bottom-color:var(--panel2)}.panel{display:none;background:var(--panel2);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:12px;overflow:auto}.panel.active{display:block}
 table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{color:var(--muted);font-size:10px;padding:9px 5px;border-bottom:1px solid var(--line);white-space:nowrap}td{padding:6px 5px;text-align:center;border-bottom:1px solid rgba(255,255,255,.045);vertical-align:middle}td:first-child,th:first-child{text-align:right}.name{background:transparent;border:1px solid transparent;color:var(--text);padding:6px;width:100%;border-radius:6px;text-align:right}.name:focus,.name:hover{background:var(--panel);border-color:var(--line);outline:0}.qty{width:55px;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:5px;border-radius:5px;text-align:center}.step{width:24px;height:25px;padding:0;background:var(--panel);color:var(--muted);border:1px solid var(--line);border-radius:4px;cursor:pointer}.qwrap{display:inline-flex;align-items:center;gap:2px}.tier{background:var(--panel);color:var(--text);border:1px solid var(--line);padding:5px;border-radius:6px;font-size:10px}.money{color:var(--gold);font-family:Consolas,monospace;font-weight:800}.smallbtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:5px;padding:4px 7px;cursor:pointer;font-size:10px}.smallbtn:hover{color:var(--gold);border-color:var(--gold)}tfoot td{border-top:2px solid var(--line);font-weight:800;padding:11px}.zoneActions{display:flex;justify-content:space-between;gap:8px;margin-top:12px;flex-wrap:wrap}
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:20;align-items:center;justify-content:center;padding:15px}.modal.open{display:flex}.modalbox{width:min(850px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.modalhead{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px}.modalhead h2{margin:0;font-size:18px}.close{background:transparent;border:0;color:var(--muted);font-size:22px;cursor:pointer}.detailgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.detailcard{background:var(--panel2);padding:10px;border-radius:8px}.detailcard b{display:block;font-size:16px}.formgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.formgrid label{font-size:11px;color:var(--muted)}.formgrid input,.formgrid select{width:100%;margin-top:4px}
-.toast{position:fixed;bottom:20px;left:20px;background:var(--panel2);border:1px solid var(--gold);color:var(--text);padding:10px 14px;border-radius:8px;display:none;z-index:50;font-size:12px}.toast.show{display:block}
+.audit-old{color:var(--red)}.audit-new{color:var(--green)}.toast{position:fixed;bottom:20px;left:20px;background:var(--panel2);border:1px solid var(--gold);color:var(--text);padding:10px 14px;border-radius:8px;display:none;z-index:50;font-size:12px}.toast.show{display:block}
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls{width:100%}.btn{padding:8px 9px}}
 </style>
 </head>
@@ -27,8 +27,14 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 <header class="mast">
  <div><div class="eyebrow">HRINS • RESELLER FINANCE</div><h1>لوحة عمولات الوكلاء</h1><div class="muted" style="font-size:11px">إدارة العمولات • الصرف • الأرشيف • الأداء الشهري</div></div>
  <div class="controls">
-  <span class="muted" style="font-size:11px">الشهر:</span><select id="monthSelect" class="select" onchange="loadSelectedMonth()"></select>
+  <span class="muted" style="font-size:11px">الشهر:</span>
+  <input id="monthInput" class="input" value="08/2026" placeholder="MM/YYYY" style="width:105px;text-align:center" title="اكتب الشهر بصيغة MM/YYYY">
+  <button class="btn" onclick="applyMonthInput()">تطبيق</button>
+  <select id="monthSelect" class="select" onchange="loadSelectedMonth()"></select>
+  <span class="muted" style="font-size:11px">المستخدم:</span>
+  <input id="userInput" class="input" value="كرار" placeholder="اسم المستخدم" style="width:110px">
   <button class="btn gold" onclick="saveCurrentMonth()">💾 حفظ الشهر</button><button class="btn" onclick="startNewMonth()">✨ شهر جديد</button>
+  <button class="btn" onclick="openAuditLog()">🧾 سجل التعديلات</button>
   <button class="btn danger" onclick="resetData()">🔄 استعادة الأصل</button>
  </div>
 </header>
@@ -74,6 +80,22 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  البيانات تحفظ تلقائياً في المتصفح. للأمان استخدم «تصدير الكل» كنسخة احتياطية دورية.
 </footer>
 </div>
+
+<div id="auditModal" class="modal" onclick="if(event.target===this)closeAuditLog()"><div class="modalbox" style="width:min(1200px,100%)">
+ <div class="modalhead"><h2>🧾 سجل التعديلات</h2><button class="close" onclick="closeAuditLog()">×</button></div>
+ <div class="toolbar" style="margin-bottom:12px">
+   <input id="auditSearch" class="search" placeholder="🔍 ابحث باسم المستخدم أو الوكيل أو التعديل..." oninput="renderAuditLog()">
+   <select id="auditUserFilter" class="select" onchange="renderAuditLog()"><option value="all">كل المستخدمين</option></select>
+   <select id="auditActionFilter" class="select" onchange="renderAuditLog()"><option value="all">كل العمليات</option></select>
+   <button class="btn" onclick="exportAuditLog()">📤 تصدير السجل</button>
+   <button class="btn danger" onclick="clearAuditLog()">🗑️ مسح السجل</button>
+ </div>
+ <div id="auditStats" class="muted" style="font-size:11px;margin-bottom:10px"></div>
+ <div style="overflow:auto"><table style="min-width:1000px">
+   <thead><tr><th>التاريخ والوقت</th><th>المستخدم</th><th>الشهر</th><th>المنطقة</th><th>الوكيل</th><th>العملية</th><th>الحقل</th><th>قبل</th><th>بعد</th></tr></thead>
+   <tbody id="auditBody"></tbody>
+ </table></div>
+</div></div>
 
 <div id="modal" class="modal" onclick="if(event.target===this)closeModal()"><div class="modalbox">
  <div class="modalhead"><h2 id="modalTitle">تفاصيل الوكيل</h2><button class="close" onclick="closeModal()">×</button></div>
@@ -122,22 +144,115 @@ new:[
 {name:'FDT-104',p35:184,p45:2,p65:0,customTier:'auto',paid:0},{name:'FDT-105',p35:286,p45:2,p65:1,customTier:'auto',paid:0},
 {name:'FDT-106',p35:215,p45:3,p65:0,customTier:'auto',paid:0},{name:'FDT-107',p35:154,p45:4,p65:0,customTier:'auto',paid:0}]
 };
-let state={month:'08/2026',data:clone(defaultData),tiers:clone(defaultTiers),archive:{},undo:null};
+let state={month:'08/2026',data:clone(defaultData),tiers:clone(defaultTiers),archive:{},auditLog:[],undo:null,user:'كرار'};
 
 function clone(x){return JSON.parse(JSON.stringify(x))}
 function fmt(n){return Math.round(Number(n)||0).toLocaleString('en-US')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function save(){localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive}));localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data))}
+function save(){
+ state.user=(document.getElementById('userInput')?.value||state.user||'مستخدم').trim()||'مستخدم';
+ localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog,user:state.user}));
+ localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data));
+}
 function load(){
  try{
   const x=JSON.parse(localStorage.getItem(STORAGE)||'null');
-  if(x){state={...state,...x};return}
+  if(x){state={...state,...x};state.auditLog=Array.isArray(x.auditLog)?x.auditLog:[];state.user=x.user||'كرار';return}
   const oldData=JSON.parse(localStorage.getItem(LEGACY_DATA)||'null');
   const oldArchive=JSON.parse(localStorage.getItem(LEGACY_ARCHIVE)||'{}');
   if(oldData)state.data=oldData;
   if(oldArchive)state.archive=oldArchive;
  }catch(e){console.warn(e)}
 }
+function currentUser(){
+ const el=document.getElementById('userInput');
+ const u=(el?.value||state.user||'مستخدم').trim();
+ state.user=u||'مستخدم';
+ return state.user;
+}
+function audit(action,zone,agent,field,oldValue,newValue,extra=''){
+ const oldText=oldValue===undefined||oldValue===null?'':String(oldValue);
+ const newText=newValue===undefined||newValue===null?'':String(newValue);
+ if(oldText===newText && action==='تعديل')return;
+ state.auditLog=Array.isArray(state.auditLog)?state.auditLog:[];
+ state.auditLog.unshift({
+   id:Date.now()+Math.random(),
+   at:new Date().toISOString(),
+   user:currentUser(),
+   month:state.month,
+   zone:zone||'',
+   agent:agent||'',
+   action:action||'تعديل',
+   field:field||'',
+   oldValue:oldText,
+   newValue:newText,
+   extra:extra||''
+ });
+ if(state.auditLog.length>5000)state.auditLog=state.auditLog.slice(0,5000);
+}
+function fieldLabel(f){
+ return {name:'اسم الوكيل',p35:'P35',p45:'P45',p65:'P65',customTier:'الفئة',paid:'المدفوع',paymentDate:'تاريخ الصرف' ,
+   tierP35:'سعر T1/T2/T3 - P35',tierP45:'سعر T1/T2/T3 - P45',tierP65:'سعر T1/T2/T3 - P65'}[f]||f||'-';
+}
+function displayValue(v){return v===undefined||v===null||v===''?'—':String(v)}
+function auditDate(iso){
+ try{return new Intl.DateTimeFormat('ar-IQ',{dateStyle:'short',timeStyle:'medium'}).format(new Date(iso))}
+ catch(e){return iso}
+}
+function openAuditLog(){document.getElementById('auditModal').classList.add('open');renderAuditLog()}
+function closeAuditLog(){document.getElementById('auditModal').classList.remove('open')}
+function renderAuditLog(){
+ const search=(document.getElementById('auditSearch')?.value||'').trim().toLowerCase();
+ const uf=document.getElementById('auditUserFilter')?.value||'all';
+ const af=document.getElementById('auditActionFilter')?.value||'all';
+ const logs=Array.isArray(state.auditLog)?state.auditLog:[];
+ const users=[...new Set(logs.map(x=>x.user).filter(Boolean))];
+ const actions=[...new Set(logs.map(x=>x.action).filter(Boolean))];
+ const us=document.getElementById('auditUserFilter');
+ if(us){const cur=us.value;us.innerHTML='<option value="all">كل المستخدمين</option>'+users.map(u=>`<option value="${esc(u)}">${esc(u)}</option>`).join('');us.value=users.includes(cur)?cur:'all'}
+ const as=document.getElementById('auditActionFilter');
+ if(as){const cur=as.value;as.innerHTML='<option value="all">كل العمليات</option>'+actions.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');as.value=actions.includes(cur)?cur:'all'}
+ const filtered=logs.filter(x=>{
+   const hay=[x.user,x.agent,x.field,x.oldValue,x.newValue,x.month,x.zone,x.action,x.extra].join(' ').toLowerCase();
+   return (!search||hay.includes(search))&&(uf==='all'||x.user===uf)&&(af==='all'||x.action===af);
+ });
+ document.getElementById('auditStats').textContent=`إجمالي السجلات: ${logs.length.toLocaleString('en-US')} • الظاهر: ${filtered.length.toLocaleString('en-US')}`;
+ document.getElementById('auditBody').innerHTML=filtered.map(x=>`<tr>
+   <td style="white-space:nowrap">${esc(auditDate(x.at))}</td>
+   <td><b>${esc(x.user)}</b></td><td>${esc(x.month)}</td>
+   <td>${esc(x.zone==='old'?'OLD':x.zone==='new'?'NEW':x.zone||'—')}</td>
+   <td>${esc(x.agent||'—')}</td><td><span class="badge ${x.action==='حذف'?'bpending':x.action==='إضافة'?'bpaid':'bpartial'}">${esc(x.action)}</span></td>
+   <td>${esc(fieldLabel(x.field))}</td><td>${esc(displayValue(x.oldValue))}</td><td>${esc(displayValue(x.newValue))}</td>
+ </tr>`).join('')||'<tr><td colspan="9" class="muted">لا توجد تعديلات مسجلة.</td></tr>';
+}
+function exportAuditLog(){
+ const rows=(state.auditLog||[]).map(x=>({DateTime:auditDate(x.at),User:x.user,Month:x.month,Zone:x.zone,Agent:x.agent,Action:x.action,Field:fieldLabel(x.field),Before:x.oldValue,After:x.newValue}));
+ if(!rows.length){toast('لا يوجد سجل لتصديره');return}
+ downloadCSV(rows,`audit_log_${state.month.replace('/','-')}.csv`);
+}
+function clearAuditLog(){
+ if(!(state.auditLog||[]).length){toast('السجل فارغ');return}
+ if(!confirm('مسح سجل التعديلات بالكامل؟ لا يمكن التراجع عن هذه العملية.'))return;
+ state.auditLog=[];save();renderAuditLog();toast('تم مسح سجل التعديلات');
+}
+function applyMonthInput(){
+ const raw=(document.getElementById('monthInput').value||'').trim();
+ const m=raw.match(/^(0?[1-9]|1[0-2])[\\/\\-](\\d{4})$/);
+ if(!m){alert('اكتب الشهر بصيغة MM/YYYY مثل 08/2026');return}
+ const key=String(Number(m[1])).padStart(2,'0')+'/'+m[2];
+ if(key===state.month){renderMonths();return}
+ const old=state.month;
+ if(state.archive[key]){
+   state.month=key;state.data=clone(state.archive[key].data);state.tiers=clone(state.archive[key].tiers||defaultTiers);
+   audit('تغيير الشهر','', '', 'الشهر', old, key);
+ }else{
+   state.month=key;
+   audit('إنشاء شهر','', '', 'الشهر', old, key);
+ }
+ save();renderMonths();renderAll();toast(`تم الانتقال إلى شهر ${key}`);
+}
+function syncMonthInput(){const el=document.getElementById('monthInput');if(el)el.value=state.month}
+
 function tierFor(q,custom){
  if(custom&&custom!=='auto')return state.tiers.find(t=>t.key===custom)||null;
  if(q<=0)return null;
@@ -154,7 +269,7 @@ function renderSettings(){
  state.tiers.forEach((t,i)=>{
   ['p35','p45','p65'].forEach(f=>{
    const d=document.createElement('label');d.className='setting';d.innerHTML=`${t.label} — ${f.toUpperCase()}<input class="input" type="number" value="${t[f]}">`;
-   d.querySelector('input').oninput=e=>{t[f]=Number(e.target.value)||0;save();renderAll()};el.appendChild(d)
+   d.querySelector('input').oninput=e=>{const old=t[f];t[f]=Number(e.target.value)||0;audit('تعديل السعر','',`${t.label}`,'tier'+f.toUpperCase(),old,t[f]);save();renderAll()};el.appendChild(d)
   })
  })
 }
@@ -200,28 +315,77 @@ function renderDashboard(){
  all.sort((a,b)=>b.c.total-a.c.total);document.getElementById('topAgents').innerHTML=all.slice(0,7).map((a,i)=>`<div class="minirow"><span>${i+1}. ${esc(a.r.name)} <small class="muted">(${a.z==='old'?'OLD':'NEW'})</small></span><b class="money">${fmt(a.c.total)}</b></div>`).join('')||'<span class="muted">لا توجد بيانات</span>';
 }
 function renderAll(){renderZone('old');renderZone('new');renderDashboard();renderSettings()}
-function setField(z,i,f,v){state.data[z][i][f]=v;save();renderAll()}
-function setNum(z,i,f,v){state.data[z][i][f]=Math.max(0,Number(v)||0);save();renderAll()}
-function step(z,i,f,d){state.data[z][i][f]=Math.max(0,(Number(state.data[z][i][f])||0)+d);save();renderAll()}
-function addAgent(z){state.data[z].push({name:z==='new'?'FDT-NEW':'وكيل جديد',p35:0,p45:0,p65:0,customTier:'auto',paid:0});save();renderAll();toast('تمت إضافة الوكيل')}
+function setField(z,i,f,v){
+ const r=state.data[z][i],old=r[f];r[f]=v;
+ audit('تعديل',z,r.name,f,old,v);
+ save();renderAll()
+}
+function setNum(z,i,f,v){
+ const r=state.data[z][i],old=Number(r[f])||0,nv=Math.max(0,Number(v)||0);r[f]=nv;
+ audit('تعديل',z,r.name,f,old,nv);
+ save();renderAll()
+}
+function step(z,i,f,d){
+ const r=state.data[z][i],old=Number(r[f])||0,nv=Math.max(0,old+d);r[f]=nv;
+ audit('تعديل',z,r.name,f,old,nv);
+ save();renderAll()
+}
+function addAgent(z){
+ const r={name:z==='new'?'FDT-NEW':'وكيل جديد',p35:0,p45:0,p65:0,customTier:'auto',paid:0};
+ state.data[z].push(r);audit('إضافة',z,r.name,'الوكيل','',r.name);save();renderAll();toast('تمت إضافة الوكيل')
+}
 function removeAgent(z,i){
  const r=state.data[z][i];if(!confirm(`حذف "${r.name}"؟`))return;
- state.undo={z,row:clone(r),index:i};state.data[z].splice(i,1);save();renderAll();toast('تم الحذف — يمكنك التراجع من الرسالة')
+ state.undo={z,row:clone(r),index:i};audit('حذف',z,r.name,'الوكيل',JSON.stringify(r),'—');
+ state.data[z].splice(i,1);save();renderAll();toast('تم الحذف — يمكنك التراجع من الرسالة',true)
 }
-function undoDelete(){if(!state.undo)return;state.data[state.undo.z].splice(state.undo.index,0,state.undo.row);state.undo=null;save();renderAll()}
-function toast(msg,undo=false){const t=document.getElementById('toast');t.innerHTML=esc(msg)+(undo?' <button class="smallbtn" onclick="undoDelete();this.parentElement.classList.remove(\'show\')">تراجع</button>':'');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500)}
+function undoDelete(){if(!state.undo)return;const u=state.undo;state.data[u.z].splice(u.index,0,u.row);audit('تراجع عن حذف',u.z,u.row.name,'الوكيل','محذوف',u.row.name);state.undo=null;save();renderAll()}
+function toast(msg,undo=false){const t=document.getElementById('toast');t.innerHTML=esc(msg)+(undo?' <button class="smallbtn" onclick="undoDelete();this.parentElement.classList.remove(\'show\')">تراجع</button>':'');t.classList.add('show');if(!undo)setTimeout(()=>t.classList.remove('show'),3500)}
 function editPayment(z,i){const r=state.data[z][i],c=calc(r);openModal(`💳 صرف — ${r.name}`,`<div class="formgrid"><label>المستحق<input class="input" value="${c.total}" disabled></label><label>المدفوع الحالي<input id="payInput" class="input" type="number" min="0" value="${c.paid}"></label><label>تاريخ الصرف<input id="payDate" class="input" type="date" value="${r.paymentDate||''}"></label></div><div class="actions" style="margin-top:14px"><button class="btn gold" onclick="savePayment('${z}',${i})">حفظ الصرف</button><button class="btn" onclick="closeModal()">إلغاء</button></div>`) }
-function savePayment(z,i){const r=state.data[z][i],c=calc(r);r.paid=Math.min(Math.max(Number(document.getElementById('payInput').value)||0,0),c.total);r.paymentDate=document.getElementById('payDate').value;save();closeModal();renderAll();toast('تم تحديث حالة الصرف')}
+function savePayment(z,i){
+ const r=state.data[z][i],c=calc(r),oldPaid=r.paid||0,oldDate=r.paymentDate||'';
+ const newPaid=Math.min(Math.max(Number(document.getElementById('payInput').value)||0,0),c.total);
+ const newDate=document.getElementById('payDate').value;
+ r.paid=newPaid;r.paymentDate=newDate;
+ audit('تعديل الصرف',z,r.name,'paid',oldPaid,newPaid);
+ if(oldDate!==newDate)audit('تعديل الصرف',z,r.name,'paymentDate',oldDate,newDate);
+ save();closeModal();renderAll();toast('تم تحديث حالة الصرف')
+}
 function details(z,i){const r=state.data[z][i],c=calc(r), prev=getPreviousRow(z,r.name);openModal(`📋 ${r.name}`,`<div class="detailgrid"><div class="detailcard">المنطقة<b>${z==='old'?'OLD':'NEW'}</b></div><div class="detailcard">الفئة<b>${c.t?c.t.label:'-'}</b></div><div class="detailcard">إجمالي الكمية<b>${fmt(c.qty)}</b></div><div class="detailcard">المستحق<b class="money">${fmt(c.total)}</b></div><div class="detailcard">المدفوع<b>${fmt(c.paid)}</b></div><div class="detailcard">المتبقي<b class="money">${fmt(c.remaining)}</b></div><div class="detailcard">P35<b>${fmt(c.p35)}</b></div><div class="detailcard">P45 / P65<b>${fmt(c.p45)} / ${fmt(c.p65)}</b></div></div><div style="margin-top:14px" class="box"><h3>📈 مقارنة سريعة</h3>${prev?`<div class="minirow"><span>الشهر السابق</span><b>${fmt(prev.total)} د.ع</b></div><div class="minirow"><span>التغيير</span><b>${fmt(c.total-prev.total)} د.ع</b></div>`:'<span class="muted">لا توجد بيانات للشهر السابق</span>'}</div>`) }
 function getPreviousRow(z,name){const keys=Object.keys(state.archive).sort();const idx=keys.indexOf(state.month);if(idx<1)return null;const snap=state.archive[keys[idx-1]];const r=(snap.data?.[z]||[]).find(x=>x.name===name);if(!r)return null;const tiersBackup=state.tiers;state.tiers=snap.tiers||state.tiers;const c=calc(r);state.tiers=tiersBackup;return c}
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.add('open')}
 function closeModal(){document.getElementById('modal').classList.remove('open')}
 function switchTab(z){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.zone===z));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+z))}
 function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'0')+'/'+date.getFullYear()}
-function saveCurrentMonth(){state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};save();renderMonths();toast('تم حفظ الشهر مع الأسعار الحالية')}
-function renderMonths(){const s=document.getElementById('monthSelect');const keys=[...new Set([state.month,...Object.keys(state.archive)])].sort((a,b)=>{const [am,ay]=a.split('/').map(Number),[bm,by]=b.split('/').map(Number);return ay-by || am-bm});s.innerHTML=keys.map(k=>`<option value="${k}" ${k===state.month?'selected':''}>${k}${state.archive[k]?' — محفوظ':''}</option>`).join('')}
-function loadSelectedMonth(){const k=document.getElementById('monthSelect').value;if(state.archive[k]){state.month=k;state.data=clone(state.archive[k].data);state.tiers=clone(state.archive[k].tiers||defaultTiers);save();renderAll()}else{state.month=k;save();renderAll()}}
-function startNewMonth(){if(!confirm('بدء شهر جديد؟ سيتم أخذ نسخة من الشهر الحالي أولاً.'))return;saveCurrentMonth();const d=new Date();d.setMonth(d.getMonth()+1);state.month=monthKey(d);state.data=clone(state.data);state.data.old.forEach(r=>r.paid=0);state.data.new.forEach(r=>r.paid=0);save();renderMonths();renderAll();toast('تم إنشاء شهر جديد')}
+function saveCurrentMonth(){
+ state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};
+ audit('حفظ الشهر','', '', 'الأرشيف', '', state.month);
+ save();renderMonths();toast('تم حفظ الشهر مع الأسعار الحالية')
+}
+function renderMonths(){
+ const s=document.getElementById('monthSelect');
+ const keys=[...new Set([state.month,...Object.keys(state.archive)])].sort((a,b)=>{const [am,ay]=a.split('/').map(Number),[bm,by]=b.split('/').map(Number);return ay-by || am-bm});
+ s.innerHTML=keys.map(k=>`<option value="${k}" ${k===state.month?'selected':''}>${k}${state.archive[k]?' — محفوظ':''}</option>`).join('');
+ syncMonthInput();
+}
+function loadSelectedMonth(){
+ const k=document.getElementById('monthSelect').value,old=state.month;
+ if(state.archive[k]){
+   state.month=k;state.data=clone(state.archive[k].data);state.tiers=clone(state.archive[k].tiers||defaultTiers);
+   audit('تغيير الشهر','','','الشهر',old,k);
+ }else{
+   state.month=k;audit('تغيير الشهر','','','الشهر',old,k);
+ }
+ save();renderAll();syncMonthInput()
+}
+function startNewMonth(){
+ if(!confirm('بدء شهر جديد؟ سيتم أخذ نسخة من الشهر الحالي أولاً.'))return;
+ saveCurrentMonth();const d=new Date();d.setMonth(d.getMonth()+1);const old=state.month;
+ state.month=monthKey(d);state.data=clone(state.data);
+ state.data.old.forEach(r=>r.paid=0);state.data.new.forEach(r=>r.paid=0);
+ audit('إنشاء شهر','','','الشهر',old,state.month);
+ save();renderMonths();renderAll();toast('تم إنشاء شهر جديد')
+}
 function resetData(){if(!confirm('استعادة البيانات الأصلية؟ هذا سيستبدل البيانات الحالية.'))return;state.data=clone(defaultData);state.tiers=clone(defaultTiers);save();renderAll();toast('تمت الاستعادة')}
 function csvEscape(v){const s=String(v??'');return `"${s.replace(/"/g,'""')}"`}
 function rowsFor(zone){return state.data[zone].map(r=>{const c=calc(r);return {Zone:zone==='old'?'OLD':'NEW',Name:r.name,P35:c.p35,P45:c.p45,P65:c.p65,Quantity:c.qty,Tier:c.t?.label||'',Due:c.total,Paid:c.paid,Remaining:c.remaining,Status:{pending:'Pending',partial:'Partial',paid:'Paid'}[status(r)],PaymentDate:r.paymentDate||''}})}
@@ -252,7 +416,10 @@ function normalizeImport(o){
  const zoneRaw=String(get(['Zone','zone','المنطقة'])||'').toLowerCase();const zone=zoneRaw.includes('new')||zoneRaw.includes('جديد')?'new':zoneRaw.includes('old')||zoneRaw.includes('قديم')?'old':String(name).toUpperCase().includes('FDT-')?'new':'old';
  return {name:String(name).trim(),p35:numFrom(o,['P35','p35','35']),p45:numFrom(o,['P45','p45','45']),p65:numFrom(o,['P65','p65','65']),paid:numFrom(o,['Paid','paid','المدفوع']),paymentDate:get(['PaymentDate','payment date','تاريخ الصرف'])||'',customTier:get(['Tier','tier','الفئة'])||'auto',zone}
 }
-load();renderMonths();renderAll();
+load();
+document.getElementById('userInput').value=state.user||'كرار';
+document.getElementById('userInput').addEventListener('change',()=>{state.user=currentUser();save()});
+renderMonths();renderAll();
 </script>
 </body>
 </html>
