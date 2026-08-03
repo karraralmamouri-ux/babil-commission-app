@@ -2,616 +2,257 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة عمولات وكلاء بابل</title>
-
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>لوحة عمولات الوكلاء — HRINS</title>
 <meta name="theme-color" content="#12161c">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="عمولات بابل">
-<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
-
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
-  :root{
-    --ink:#12161c;
-    --panel:#1a212b;
-    --panel-2:#212a36;
-    --line:#2b3542;
-    --text:#e9e7e0;
-    --text-dim:#9aa4b2;
-    --gold:#d4a24e;
-    --gold-soft:rgba(212,162,78,.14);
-    --t1:#4ea1a0;
-    --t2:#4e7fd4;
-    --t3:#b06ad4;
-    --danger:#d4634e;
-    --radius:10px;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    background: radial-gradient(1100px 500px at 85% -10%, rgba(212,162,78,.08), transparent 60%), var(--ink);
-    color:var(--text);
-    font-family:"Segoe UI","Tahoma",Arial,sans-serif;
-    line-height:1.5;
-    min-height:100vh;
-  }
-  .wrap{max-width:1240px;margin:0 auto;padding:24px 16px 60px;}
-
-  .masthead{
-    display:flex;justify-content:space-between;align-items:center;gap:16px;
-    border-bottom:1px solid var(--line);
-    padding-bottom:18px;margin-bottom:20px;flex-wrap:wrap;
-  }
-  .masthead h1{font-size:24px;margin:0 0 4px;font-weight:700;}
-  .masthead .eyebrow{color:var(--gold);font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:700;}
-  
-  .controls-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-  .select-ctrl{
-    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
-    padding:8px 12px;border-radius:6px;font-size:13px;font-family:inherit;outline:none;
-  }
-  .btn-action{
-    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
-    padding:8px 14px;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;
-    display:inline-flex;align-items:center;gap:6px;
-  }
-  .btn-action:hover{border-color:var(--gold);color:var(--gold);}
-  .btn-gold{background:var(--gold-soft);border-color:var(--gold);color:var(--gold);}
-  .btn-gold:hover{background:var(--gold);color:var(--ink);}
-  .btn-danger{background:rgba(212,99,78,.15);border-color:var(--danger);color:var(--danger);}
-  .btn-danger:hover{background:var(--danger);color:#fff;}
-
-  .toolbar{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
-  .search-input{
-    flex:1;background:var(--panel);border:1px solid var(--line);color:var(--text);
-    padding:10px 14px;border-radius:8px;font-size:13.5px;outline:none;
-  }
-  .search-input:focus{border-color:var(--gold);}
-
-  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
-  .card{
-    background:linear-gradient(180deg,var(--panel),var(--panel-2));
-    border:1px solid var(--line);border-radius:var(--radius);
-    padding:16px 18px;position:relative;overflow:hidden;
-  }
-  .card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;}
-  .card.zone-old::before{background:var(--t2);}
-  .card.zone-new::before{background:var(--t1);}
-  .card.grand::before{background:var(--gold);}
-  .card .label{color:var(--text-dim);font-size:12px;margin-bottom:6px;}
-  .card .value{font-size:22px;font-weight:700;font-family:"Consolas","Courier New",monospace;}
-  .card .value small{font-size:13px;color:var(--text-dim);margin-right:4px;}
-  .card .sub{font-size:11.5px;color:var(--text-dim);margin-top:4px;}
-
-  details.config{
-    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-    margin-bottom:22px;padding:2px 18px;
-  }
-  details.config summary{
-    cursor:pointer;padding:12px 0;font-size:13px;color:var(--gold);font-weight:700;
-    list-style:none;display:flex;align-items:center;gap:8px;
-  }
-  details.config summary::-webkit-details-marker{display:none;}
-  details.config summary:before{content:"⚙";font-size:14px;}
-  .tier-grid{
-    display:grid;grid-template-columns:auto repeat(3,1fr);gap:10px 16px;
-    padding-bottom:16px;align-items:center;
-  }
-  .tier-grid .th{font-size:11px;color:var(--text-dim);text-transform:uppercase;}
-  .tier-name{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;}
-  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
-  .dot.t1{background:var(--t1);} .dot.t2{background:var(--t2);} .dot.t3{background:var(--t3);}
-  .tier-range{font-size:11px;color:var(--text-dim);font-weight:400;}
-  .price-input{
-    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
-    padding:6px 8px;border-radius:6px;font-family:"Consolas",monospace;font-size:12.5px;text-align:center;
-  }
-
-  .tabs{display:flex;gap:6px;margin-bottom:14px;}
-  .tab-btn{
-    background:var(--panel);border:1px solid var(--line);color:var(--text-dim);
-    padding:10px 20px;border-radius:8px 8px 0 0;font-size:13px;font-weight:700;cursor:pointer;
-    border-bottom:none;position:relative;top:1px;
-  }
-  .tab-btn.active{color:var(--text);background:var(--panel-2);border-bottom:1px solid var(--panel-2);}
-  .tab-btn .swatch{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px;}
-  .zone-panel{display:none;background:var(--panel-2);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:16px;overflow-x:auto;}
-  .zone-panel.active{display:block;}
-
-  table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px;}
-  thead th{
-    text-align:center;color:var(--text-dim);font-weight:600;font-size:11px;
-    text-transform:uppercase;padding:8px 6px;border-bottom:1px solid var(--line);
-  }
-  thead th:first-child, tbody td:first-child{text-align:right;}
-  tbody td{padding:6px;border-bottom:1px solid rgba(255,255,255,.04);text-align:center;vertical-align:middle;}
-  tbody tr:hover{background:rgba(255,255,255,.02);}
-  .name-input{
-    width:100%;background:transparent;border:1px solid transparent;color:var(--text);
-    padding:5px 6px;border-radius:6px;font-size:13px;font-family:inherit;text-align:right;
-  }
-  .name-input:hover, .name-input:focus{background:var(--panel);border-color:var(--line);outline:none;}
-  
-  .qty-ctrl{display:inline-flex;align-items:center;gap:2px;}
-  .btn-step{
-    background:var(--panel);border:1px solid var(--line);color:var(--text-dim);
-    width:22px;height:26px;border-radius:4px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;
-  }
-  .btn-step:hover{color:var(--gold);border-color:var(--gold);}
-  .qty-input{
-    width:48px;background:var(--panel);border:1px solid var(--line);color:var(--text);
-    padding:4px;border-radius:4px;text-align:center;font-family:"Consolas",monospace;font-size:12.5px;
-  }
-  .qty-input:focus{outline:none;border-color:var(--gold);}
-
-  .tier-select{
-    background:var(--panel);border:1px solid var(--line);color:var(--text);
-    padding:4px 6px;border-radius:6px;font-size:11px;font-weight:700;outline:none;cursor:pointer;
-  }
-  .tier-select.t1{color:var(--t1);border-color:rgba(78,161,160,.4);}
-  .tier-select.t2{color:var(--t2);border-color:rgba(78,127,212,.4);}
-  .tier-select.t3{color:var(--t3);border-color:rgba(176,106,212,.4);}
-
-  .num{font-family:"Consolas","Courier New",monospace;}
-  .row-total{color:var(--gold);font-weight:700;}
-  .del-btn{
-    background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;
-    width:24px;height:24px;border-radius:4px;
-  }
-  .del-btn:hover{color:var(--danger);background:rgba(212,99,78,.1);}
-  tfoot td{padding:12px 6px;border-top:2px solid var(--line);font-weight:700;}
-  tfoot .num{color:var(--gold);font-size:14px;}
-
-  .zone-actions{display:flex;justify-content:space-between;align-items:center;margin-top:14px;}
-  footer.note{color:var(--text-dim);font-size:11.5px;margin-top:22px;text-align:center;}
-
-  @media (max-width:720px){
-    .summary{grid-template-columns:1fr;}
-    .tier-grid{grid-template-columns:1fr;}
-    .masthead{flex-direction:column;align-items:flex-start;}
-    .controls-bar{width:100%;justify-content:flex-start;}
-  }
+:root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
+.wrap{max-width:1450px;margin:auto;padding:22px 16px 60px}.mast{display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:18px}.eyebrow{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px}.mast h1{margin:3px 0;font-size:25px}.controls,.toolbar,.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,select,input{font:inherit}.btn,.select,.input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 12px}.btn{cursor:pointer;font-size:12px;font-weight:700}.btn:hover{border-color:var(--gold);color:var(--gold)}.gold{background:rgba(212,162,78,.13);border-color:var(--gold);color:var(--gold)}.danger{background:rgba(212,99,78,.12);border-color:var(--red);color:var(--red)}.green{border-color:var(--green);color:var(--green)}.muted{color:var(--muted)}
+.toolbar{margin-bottom:15px}.search{flex:1;min-width:240px;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:11px 14px;border-radius:9px;outline:0}.search:focus{border-color:var(--gold)}
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:15px}.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px;min-height:92px}.card .label{font-size:11px;color:var(--muted)}.card .value{font-size:20px;font-weight:800;font-family:Consolas,monospace;margin-top:4px}.card .sub{font-size:10px;color:var(--muted);margin-top:3px}.card.goldline{border-top:3px solid var(--gold)}.card.greenline{border-top:3px solid var(--green)}.card.blueline{border-top:3px solid var(--blue)}.card.redline{border-top:3px solid var(--red)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:15px}.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:15px}.box h3{font-size:14px;margin:0 0 12px}.minirow{display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.05);padding:8px 0;font-size:12px}.minirow:last-child{border-bottom:0}.badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:800}.bpaid{background:rgba(78,161,160,.15);color:var(--green)}.bpartial{background:rgba(214,180,76,.15);color:var(--yellow)}.bpending{background:rgba(212,99,78,.15);color:var(--red)}
+details{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:15px;padding:0 15px}summary{cursor:pointer;color:var(--gold);font-weight:800;font-size:12px;padding:12px 0}.settings{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding-bottom:14px}.setting{font-size:11px;color:var(--muted)}.setting input{width:100%;margin-top:4px}
+.tabs{display:flex;gap:5px}.tab{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:10px 20px;border-radius:9px 9px 0 0;cursor:pointer;font-weight:800;font-size:12px}.tab.active{background:var(--panel2);color:var(--text);border-bottom-color:var(--panel2)}.panel{display:none;background:var(--panel2);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:12px;overflow:auto}.panel.active{display:block}
+table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{color:var(--muted);font-size:10px;padding:9px 5px;border-bottom:1px solid var(--line);white-space:nowrap}td{padding:6px 5px;text-align:center;border-bottom:1px solid rgba(255,255,255,.045);vertical-align:middle}td:first-child,th:first-child{text-align:right}.name{background:transparent;border:1px solid transparent;color:var(--text);padding:6px;width:100%;border-radius:6px;text-align:right}.name:focus,.name:hover{background:var(--panel);border-color:var(--line);outline:0}.qty{width:55px;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:5px;border-radius:5px;text-align:center}.step{width:24px;height:25px;padding:0;background:var(--panel);color:var(--muted);border:1px solid var(--line);border-radius:4px;cursor:pointer}.qwrap{display:inline-flex;align-items:center;gap:2px}.tier{background:var(--panel);color:var(--text);border:1px solid var(--line);padding:5px;border-radius:6px;font-size:10px}.money{color:var(--gold);font-family:Consolas,monospace;font-weight:800}.smallbtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:5px;padding:4px 7px;cursor:pointer;font-size:10px}.smallbtn:hover{color:var(--gold);border-color:var(--gold)}tfoot td{border-top:2px solid var(--line);font-weight:800;padding:11px}.zoneActions{display:flex;justify-content:space-between;gap:8px;margin-top:12px;flex-wrap:wrap}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:20;align-items:center;justify-content:center;padding:15px}.modal.open{display:flex}.modalbox{width:min(850px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.modalhead{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px}.modalhead h2{margin:0;font-size:18px}.close{background:transparent;border:0;color:var(--muted);font-size:22px;cursor:pointer}.detailgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.detailcard{background:var(--panel2);padding:10px;border-radius:8px}.detailcard b{display:block;font-size:16px}.formgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.formgrid label{font-size:11px;color:var(--muted)}.formgrid input,.formgrid select{width:100%;margin-top:4px}
+.toast{position:fixed;bottom:20px;left:20px;background:var(--panel2);border:1px solid var(--gold);color:var(--text);padding:10px 14px;border-radius:8px;display:none;z-index:50;font-size:12px}.toast.show{display:block}
+@media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls{width:100%}.btn{padding:8px 9px}}
 </style>
 </head>
 <body>
 <div class="wrap">
+<header class="mast">
+ <div><div class="eyebrow">HRINS • RESELLER FINANCE</div><h1>لوحة عمولات الوكلاء</h1><div class="muted" style="font-size:11px">إدارة العمولات • الصرف • الأرشيف • الأداء الشهري</div></div>
+ <div class="controls">
+  <span class="muted" style="font-size:11px">الشهر:</span><select id="monthSelect" class="select" onchange="loadSelectedMonth()"></select>
+  <button class="btn gold" onclick="saveCurrentMonth()">💾 حفظ الشهر</button><button class="btn" onclick="startNewMonth()">✨ شهر جديد</button>
+  <button class="btn danger" onclick="resetData()">🔄 استعادة الأصل</button>
+ </div>
+</header>
 
-  <div class="masthead">
-    <div>
-      <div class="eyebrow">شركة توزيع بابل</div>
-      <h1>لوحة عمولات الوكلاء (FDT)</h1>
-    </div>
-    
-    <div class="controls-bar">
-      <span>الأرشيف:</span>
-      <select id="monthSelect" class="select-ctrl" onchange="loadSelectedMonth()"></select>
-      <button class="btn-action btn-gold" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
-      <button class="btn-action" onclick="startNewMonth()">✨ بدء شهر جديد</button>
-      <button class="btn-action btn-danger" onclick="resetToDefaultData()" title="إعادة الجداول لحالتها الأصلية">🔄 استعادة الأصل</button>
-    </div>
-  </div>
-
-  <div class="toolbar">
-    <input type="text" id="searchInput" class="search-input" placeholder="🔍 ابحث عن وكيل أو رقم FDT لتصفيته..." oninput="renderAll()">
-    <button class="btn-action" onclick="document.getElementById('fileInput').click()">📥 استيراد بيانات من Excel/CSV</button>
-    <input type="file" id="fileInput" accept=".csv, .xlsx, .xls" style="display:none;" onchange="importExcel(event)">
-  </div>
-
-  <div class="summary">
-    <div class="card zone-old">
-      <div class="label">إجمالي المنطقة القديمة — OLD ZONE</div>
-      <div class="value" id="oldZoneTotal">0 <small>د.ع</small></div>
-      <div class="sub" id="oldZoneCount">0 وكيل</div>
-    </div>
-    <div class="card zone-new">
-      <div class="label">إجمالي المنطقة الجديدة — NEW ZONE</div>
-      <div class="value" id="newZoneTotal">0 <small>د.ع</small></div>
-      <div class="sub" id="newZoneCount">0 وكيل</div>
-    </div>
-    <div class="card grand">
-      <div class="label">الإجمالي الكلي لكل الوكلاء</div>
-      <div class="value" id="grandTotal">0 <small>د.ع</small></div>
-      <div class="sub" id="grandCount">0 وكيل</div>
-    </div>
-  </div>
-
-  <details class="config" id="configPanel">
-    <summary>أسعار الفئات والشؤون المالية</summary>
-    <div class="tier-grid" id="tierGrid">
-      <div></div>
-      <div class="th">سعر P35</div>
-      <div class="th">سعر P45</div>
-      <div class="th">سعر P65</div>
-    </div>
-  </details>
-
-  <div class="tabs">
-    <button class="tab-btn active" data-zone="old" onclick="switchTab('old')">
-      <span class="swatch" style="background:var(--t2)"></span>OLD ZONE
-    </button>
-    <button class="tab-btn" data-zone="new" onclick="switchTab('new')">
-      <span class="swatch" style="background:var(--t1)"></span>NEW ZONE
-    </button>
-  </div>
-
-  <div class="zone-panel active" id="panel-old">
-    <table>
-      <thead>
-        <tr>
-          <th>اسم الوكيل</th>
-          <th>P35</th>
-          <th>P45</th>
-          <th>P65</th>
-          <th>إجمالي الكمية</th>
-          <th>الفئة (تحرير يدوي)</th>
-          <th>إجمالي المستحق</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="tbody-old"></tbody>
-      <tfoot>
-        <tr>
-          <td colspan="6" style="text-align:left">إجمالي المنطقة</td>
-          <td class="num" id="foot-old">0 د.ع</td>
-          <td></td>
-        </tr>
-      </tfoot>
-    </table>
-    <div class="zone-actions">
-      <button class="btn-action btn-gold" onclick="addAgent('old')">+ إضافة وكيل جديد</button>
-      <button class="btn-action" onclick="exportCSV('old')">تصدير CSV</button>
-    </div>
-  </div>
-
-  <div class="zone-panel" id="panel-new">
-    <table>
-      <thead>
-        <tr>
-          <th>اسم الوكيل</th>
-          <th>P35</th>
-          <th>P45</th>
-          <th>P65</th>
-          <th>إجمالي الكمية</th>
-          <th>الفئة (تحرير يدوي)</th>
-          <th>إجمالي المستحق</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="tbody-new"></tbody>
-      <tfoot>
-        <tr>
-          <td colspan="6" style="text-align:left">إجمالي المنطقة</td>
-          <td class="num" id="foot-new">0 د.ع</td>
-          <td></td>
-        </tr>
-      </tfoot>
-    </table>
-    <div class="zone-actions">
-      <button class="btn-action btn-gold" onclick="addAgent('new')">+ إضافة وكيل جديد</button>
-      <button class="btn-action" onclick="exportCSV('new')">تصدير CSV</button>
-    </div>
-  </div>
-
-  <footer class="note">
-    يتم حفظ كافة البيانات والتغييرات تلقائياً في ذاكرة المتصفح (Auto-Saved).
-  </footer>
-
+<div class="toolbar">
+ <input id="searchInput" class="search" placeholder="🔍 ابحث باسم الوكيل أو FDT..." oninput="renderAll()">
+ <select id="zoneFilter" class="select" onchange="renderAll()"><option value="all">كل المناطق</option><option value="old">OLD ZONE</option><option value="new">NEW ZONE</option></select>
+ <select id="statusFilter" class="select" onchange="renderAll()"><option value="all">كل حالات الصرف</option><option value="pending">غير مدفوع</option><option value="partial">مدفوع جزئياً</option><option value="paid">مدفوع</option></select>
+ <button class="btn" onclick="document.getElementById('fileInput').click()">📥 استيراد Excel / CSV</button>
+ <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden onchange="importFile(event)">
+ <button class="btn" onclick="exportAll()">📤 تصدير الكل</button>
 </div>
 
+<section class="cards">
+ <div class="card goldline"><div class="label">إجمالي العمولات</div><div class="value" id="grandTotal">0</div><div class="sub">د.ع</div></div>
+ <div class="card blueline"><div class="label">OLD ZONE</div><div class="value" id="oldTotal">0</div><div class="sub" id="oldCount">0 وكيل</div></div>
+ <div class="card greenline"><div class="label">NEW ZONE</div><div class="value" id="newTotal">0</div><div class="sub" id="newCount">0 وكيل</div></div>
+ <div class="card"><div class="label">إجمالي المدفوع</div><div class="value" id="paidTotal">0</div><div class="sub">د.ع</div></div>
+ <div class="card"><div class="label">المتبقي</div><div class="value" id="remainingTotal">0</div><div class="sub">د.ع</div></div>
+ <div class="card redline"><div class="label">عدد الوكلاء</div><div class="value" id="agentCount">0</div><div class="sub" id="statusSummary">—</div></div>
+</section>
+
+<div class="grid2">
+ <div class="box"><h3>🏆 أعلى الوكلاء بالعمولة</h3><div id="topAgents"></div></div>
+ <div class="box"><h3>📊 حالة الصرف</h3><div id="paymentSummary"></div></div>
+</div>
+
+<details open>
+ <summary>⚙️ إعدادات أسعار العمولات</summary>
+ <div class="settings" id="settings"></div>
+ <div class="muted" style="font-size:10px;padding-bottom:12px">الأسعار تحفظ مع كل شهر عند الضغط على «حفظ الشهر»، لذلك تغيير الأسعار لاحقاً لا يغيّر الأشهر المؤرشفة.</div>
+</details>
+
+<div class="tabs">
+ <button class="tab active" data-zone="old" onclick="switchTab('old')">🔵 OLD ZONE</button>
+ <button class="tab" data-zone="new" onclick="switchTab('new')">🟢 NEW ZONE</button>
+</div>
+
+<div id="panel-old" class="panel active"></div>
+<div id="panel-new" class="panel"></div>
+
+<footer class="muted" style="font-size:10px;text-align:center;margin-top:18px">
+ البيانات تحفظ تلقائياً في المتصفح. للأمان استخدم «تصدير الكل» كنسخة احتياطية دورية.
+</footer>
+</div>
+
+<div id="modal" class="modal" onclick="if(event.target===this)closeModal()"><div class="modalbox">
+ <div class="modalhead"><h2 id="modalTitle">تفاصيل الوكيل</h2><button class="close" onclick="closeModal()">×</button></div>
+ <div id="modalBody"></div>
+</div></div>
+<div id="toast" class="toast"></div>
+
 <script>
-let tiers = [
-  {key:'t1', label:'T1', min:0,   max:200,  p35:4000, p45:5500, p65:8000},
-  {key:'t2', label:'T2', min:201, max:400,  p35:4750, p45:6000, p65:9000},
-  {key:'t3', label:'T3', min:401, max:Infinity, p35:6000, p45:8000, p65:11500},
+const STORAGE='babil_commission_v2';
+const LEGACY_DATA='babil_current_data',LEGACY_ARCHIVE='babil_archive';
+const defaultTiers=[
+ {key:'t1',label:'T1',min:0,max:200,p35:4000,p45:5500,p65:8000},
+ {key:'t2',label:'T2',min:201,max:400,p35:4750,p45:6000,p65:9000},
+ {key:'t3',label:'T3',min:401,max:Infinity,p35:6000,p45:8000,p65:11500}
 ];
-
-let defaultData = {
-  old: [
-    {name:'حيدر طالب', p35:252, p45:7,  p65:1, customTier: 'auto'},
-    {name:'عمار خليل', p35:541, p45:23, p65:3, customTier: 'auto'},
-    {name:'مصطفى ضياء', p35:94,  p45:8,  p65:0, customTier: 'auto'},
-    {name:'كرار عباس', p35:96,  p45:3,  p65:0, customTier: 'auto'},
-    {name:'زياد جواد', p35:152, p45:6,  p65:0, customTier: 'auto'},
-    {name:'عمار كامل', p35:331, p45:28, p65:8, customTier: 'auto'},
-    {name:'باسم محمد', p35:125, p45:1,  p65:0, customTier: 'auto'},
-    {name:'سعيد عمار', p35:87,  p45:6,  p65:0, customTier: 'auto'},
-    {name:'سعيد عمار sub1', p35:41, p45:0, p65:0, customTier: 'auto'},
-    {name:'سعيد عمار sub2', p35:124, p45:3, p65:0, customTier: 'auto'},
-    {name:'سعيد عمار sub8', p35:13,  p45:0, p65:0, customTier: 'auto'},
-    {name:'احمد عبدالعباس', p35:153, p45:6, p65:0, customTier: 'auto'},
-    {name:'احمد عبدالعباس sub1', p35:26, p45:2, p65:0, customTier: 'auto'},
-    {name:'احمد عبدالعباس sub2', p35:47, p45:0, p65:0, customTier: 'auto'},
-    {name:'احمد عبدالعباس sub3', p35:194, p45:0, p65:1, customTier: 'auto'},
-    {name:'علي طارق', p35:179, p45:1, p65:0, customTier: 'auto'},
-    {name:'بارق ليث', p35:395, p45:9, p65:0, customTier: 'auto'}
-  ],
-  new: [
-    {name:'FDT-94',  p35:397, p45:15, p65:0, customTier: 'auto'},
-    {name:'FDT-95',  p35:377, p45:12, p65:0, customTier: 'auto'},
-    {name:'FDT-96',  p35:369, p45:8,  p65:1, customTier: 'auto'},
-    {name:'FDT-97',  p35:272, p45:4,  p65:1, customTier: 'auto'},
-    {name:'FDT-98',  p35:405, p45:8,  p65:1, customTier: 'auto'},
-    {name:'FDT-99',  p35:301, p45:12, p65:0, customTier: 'auto'},
-    {name:'FDT-100', p35:206, p45:6,  p65:0, customTier: 'auto'},
-    {name:'FDT-101', p35:138, p45:2,  p65:0, customTier: 'auto'},
-    {name:'FDT-102', p35:269, p45:5,  p65:0, customTier: 'auto'},
-    {name:'FDT-108', p35:119, p45:0,  p65:0, customTier: 'auto'},
-    {name:'FDT-109', p35:12,  p45:0,  p65:1, customTier: 'auto'},
-    {name:'FDT-110', p35:56,  p45:0,  p65:0, customTier: 'auto'},
-    {name:'FDT-111', p35:35,  p45:0,  p65:0, customTier: 'auto'},
-    {name:'FDT-112', p35:44,  p45:2,  p65:0, customTier: 'auto'},
-    {name:'FDT-113', p35:150, p45:0,  p65:0, customTier: 'auto'},
-    {name:'FDT-114', p35:105, p45:2,  p65:0, customTier: 'auto'},
-    {name:'FDT-115', p35:38,  p45:2,  p65:0, customTier: 'auto'},
-    {name:'FDT-116', p35:54,  p45:1,  p65:0, customTier: 'auto'},
-    {name:'FDT-117', p35:8,   p45:0,  p65:0, customTier: 'auto'},
-    {name:'FDT-103', p35:252, p45:5,  p65:0, customTier: 'auto'},
-    {name:'FDT-104', p35:184, p45:2,  p65:0, customTier: 'auto'},
-    {name:'FDT-105', p35:286, p45:2,  p65:1, customTier: 'auto'},
-    {name:'FDT-106', p35:215, p45:3,  p65:0, customTier: 'auto'},
-    {name:'FDT-107', p35:154, p45:4,  p65:0, customTier: 'auto'}
-  ]
+const defaultData={
+old:[
+{name:'حيدر طالب',p35:252,p45:7,p65:1,customTier:'auto',paid:0},
+{name:'عمار خليل',p35:541,p45:23,p65:3,customTier:'auto',paid:0},
+{name:'مصطفى ضياء',p35:94,p45:8,p65:0,customTier:'auto',paid:0},
+{name:'كرار عباس',p35:96,p45:3,p65:0,customTier:'auto',paid:0},
+{name:'زياد جواد',p35:152,p45:6,p65:0,customTier:'auto',paid:0},
+{name:'عمار كامل',p35:331,p45:28,p65:8,customTier:'auto',paid:0},
+{name:'باسم محمد',p35:125,p45:1,p65:0,customTier:'auto',paid:0},
+{name:'سعيد عمار',p35:87,p45:6,p65:0,customTier:'auto',paid:0},
+{name:'سعيد عمار sub1',p35:41,p45:0,p65:0,customTier:'auto',paid:0},
+{name:'سعيد عمار sub2',p35:124,p45:3,p65:0,customTier:'auto',paid:0},
+{name:'سعيد عمار sub8',p35:13,p45:0,p65:0,customTier:'auto',paid:0},
+{name:'احمد عبدالعباس',p35:153,p45:6,p65:0,customTier:'auto',paid:0},
+{name:'احمد عبدالعباس sub1',p35:26,p45:2,p65:0,customTier:'auto',paid:0},
+{name:'احمد عبدالعباس sub2',p35:47,p45:0,p65:0,customTier:'auto',paid:0},
+{name:'احمد عبدالعباس sub3',p35:194,p45:0,p65:1,customTier:'auto',paid:0},
+{name:'علي طارق',p35:179,p45:1,p65:0,customTier:'auto',paid:0},
+{name:'بارق ليث',p35:395,p45:9,p65:0,customTier:'auto',paid:0}],
+new:[
+{name:'FDT-94',p35:397,p45:15,p65:0,customTier:'auto',paid:0},{name:'FDT-95',p35:377,p45:12,p65:0,customTier:'auto',paid:0},
+{name:'FDT-96',p35:369,p45:8,p65:1,customTier:'auto',paid:0},{name:'FDT-97',p35:272,p45:4,p65:1,customTier:'auto',paid:0},
+{name:'FDT-98',p35:405,p45:8,p65:1,customTier:'auto',paid:0},{name:'FDT-99',p35:301,p45:12,p65:0,customTier:'auto',paid:0},
+{name:'FDT-100',p35:206,p45:6,p65:0,customTier:'auto',paid:0},{name:'FDT-101',p35:138,p45:2,p65:0,customTier:'auto',paid:0},
+{name:'FDT-102',p35:269,p45:5,p65:0,customTier:'auto',paid:0},{name:'FDT-108',p35:119,p45:0,p65:0,customTier:'auto',paid:0},
+{name:'FDT-109',p35:12,p45:0,p65:1,customTier:'auto',paid:0},{name:'FDT-110',p35:56,p45:0,p65:0,customTier:'auto',paid:0},
+{name:'FDT-111',p35:35,p45:0,p65:0,customTier:'auto',paid:0},{name:'FDT-112',p35:44,p45:2,p65:0,customTier:'auto',paid:0},
+{name:'FDT-113',p35:150,p45:0,p65:0,customTier:'auto',paid:0},{name:'FDT-114',p35:105,p45:2,p65:0,customTier:'auto',paid:0},
+{name:'FDT-115',p35:38,p45:2,p65:0,customTier:'auto',paid:0},{name:'FDT-116',p35:54,p45:1,p65:0,customTier:'auto',paid:0},
+{name:'FDT-117',p35:8,p45:0,p65:1,customTier:'auto',paid:0},{name:'FDT-103',p35:252,p45:5,p65:0,customTier:'auto',paid:0},
+{name:'FDT-104',p35:184,p45:2,p65:0,customTier:'auto',paid:0},{name:'FDT-105',p35:286,p45:2,p65:1,customTier:'auto',paid:0},
+{name:'FDT-106',p35:215,p45:3,p65:0,customTier:'auto',paid:0},{name:'FDT-107',p35:154,p45:4,p65:0,customTier:'auto',paid:0}]
 };
+let state={month:'08/2026',data:clone(defaultData),tiers:clone(defaultTiers),archive:{},undo:null};
 
-let currentMonthKey = '07/2026';
-let archive = JSON.parse(localStorage.getItem('babil_archive') || '{}');
-let data = JSON.parse(localStorage.getItem('babil_current_data') || 'null') || JSON.parse(JSON.stringify(defaultData));
-
-function buildTierGrid(){
-  const grid = document.getElementById('tierGrid');
-  grid.innerHTML = '<div></div><div class="th">سعر P35</div><div class="th">سعر P45</div><div class="th">سعر P65</div>';
-  tiers.forEach(t=>{
-    const rangeTxt = t.max===Infinity ? (t.min+' فأكثر') : (t.min+' - '+t.max);
-    const name = document.createElement('div');
-    name.className='tier-name';
-    name.innerHTML = `<span class="dot ${t.key}"></span>${t.label} <span class="tier-range">(${rangeTxt})</span>`;
-    grid.appendChild(name);
-    ['p35','p45','p65'].forEach(field=>{
-      const inp = document.createElement('input');
-      inp.type='number'; inp.className='price-input'; inp.value=t[field];
-      inp.addEventListener('input', ()=>{ t[field] = Number(inp.value)||0; autoSave(); renderAll(); });
-      grid.appendChild(inp);
-    });
-  });
+function clone(x){return JSON.parse(JSON.stringify(x))}
+function fmt(n){return Math.round(Number(n)||0).toLocaleString('en-US')}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function save(){localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive}));localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data))}
+function load(){
+ try{
+  const x=JSON.parse(localStorage.getItem(STORAGE)||'null');
+  if(x){state={...state,...x};return}
+  const oldData=JSON.parse(localStorage.getItem(LEGACY_DATA)||'null');
+  const oldArchive=JSON.parse(localStorage.getItem(LEGACY_ARCHIVE)||'{}');
+  if(oldData)state.data=oldData;
+  if(oldArchive)state.archive=oldArchive;
+ }catch(e){console.warn(e)}
 }
-
-function getTier(totalQty, customTier){
-  if(customTier && customTier !== 'auto'){
-    return tiers.find(t=> t.key === customTier) || null;
-  }
-  if(totalQty<=0) return null;
-  return tiers.find(t=> totalQty>=t.min && totalQty<=t.max) || tiers[tiers.length-1];
+function tierFor(q,custom){
+ if(custom&&custom!=='auto')return state.tiers.find(t=>t.key===custom)||null;
+ if(q<=0)return null;
+ return state.tiers.find(t=>q>=t.min&&q<=t.max)||state.tiers[state.tiers.length-1];
 }
-
-function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
-
-function computeRow(row){
-  const qty = (Number(row.p35)||0)+(Number(row.p45)||0)+(Number(row.p65)||0);
-  const tier = getTier(qty, row.customTier);
-  const total = tier ? (row.p35*tier.p35 + row.p45*tier.p45 + row.p65*tier.p65) : 0;
-  return {qty, tier, total};
+function calc(r){
+ const p35=Number(r.p35)||0,p45=Number(r.p45)||0,p65=Number(r.p65)||0,qty=p35+p45+p65,t=tierFor(qty,r.customTier);
+ const total=t?(p35*t.p35+p45*t.p45+p65*t.p65):0,paid=Math.min(Math.max(Number(r.paid)||0,0),total);
+ return {p35,p45,p65,qty,t,total,paid,remaining:Math.max(0,total-paid)};
 }
-
+function status(r){const c=calc(r);return c.paid<=0?'pending':c.paid>=c.total?'paid':'partial'}
+function renderSettings(){
+ const el=document.getElementById('settings');el.innerHTML='';
+ state.tiers.forEach((t,i)=>{
+  ['p35','p45','p65'].forEach(f=>{
+   const d=document.createElement('label');d.className='setting';d.innerHTML=`${t.label} — ${f.toUpperCase()}<input class="input" type="number" value="${t[f]}">`;
+   d.querySelector('input').oninput=e=>{t[f]=Number(e.target.value)||0;save();renderAll()};el.appendChild(d)
+  })
+ })
+}
+function filtered(zone){
+ const q=(document.getElementById('searchInput').value||'').trim().toLowerCase(),zf=document.getElementById('zoneFilter').value,sf=document.getElementById('statusFilter').value;
+ if(zf!=='all'&&zf!==zone)return[];
+ return state.data[zone].map((r,i)=>({r,i})).filter(x=>(!q||x.r.name.toLowerCase().includes(q))&& (sf==='all'||status(x.r)===sf))
+}
 function renderZone(zone){
-  const tbody = document.getElementById('tbody-'+zone);
-  tbody.innerHTML='';
-  let zoneTotal = 0;
-  const filter = (document.getElementById('searchInput').value || '').toLowerCase();
-
-  data[zone].forEach((row, idx)=>{
-    if(filter && !row.name.toLowerCase().includes(filter)) return;
-    if(!row.customTier) row.customTier = 'auto';
-
-    const {qty, tier, total} = computeRow(row);
-    zoneTotal += total;
-    const tierClass = tier ? tier.key : '';
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><input class="name-input" value="${row.name}" data-idx="${idx}" data-zone="${zone}" data-field="name"></td>
-      <td>
-        <div class="qty-ctrl">
-          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p35',-1)">-</button>
-          <input class="qty-input" type="number" min="0" value="${row.p35}" data-idx="${idx}" data-zone="${zone}" data-field="p35">
-          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p35',1)">+</button>
-        </div>
-      </td>
-      <td>
-        <div class="qty-ctrl">
-          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p45',-1)">-</button>
-          <input class="qty-input" type="number" min="0" value="${row.p45}" data-idx="${idx}" data-zone="${zone}" data-field="p45">
-          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p45',1)">+</button>
-        </div>
-      </td>
-      <td>
-        <div class="qty-ctrl">
-          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p65',-1)">-</button>
-          <input class="qty-input" type="number" min="0" value="${row.p65}" data-idx="${idx}" data-zone="${zone}" data-field="p65">
-          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p65',1)">+</button>
-        </div>
-      </td>
-      <td class="num">${qty}</td>
-      <td>
-        <select class="tier-select ${tierClass}" onchange="changeCustomTier('${zone}', ${idx}, this.value)">
-          <option value="auto" ${row.customTier==='auto'?'selected':''}>تلقائي (${tier?tier.label:'-'})</option>
-          <option value="t1" ${row.customTier==='t1'?'selected':''}>يدوي: T1</option>
-          <option value="t2" ${row.customTier==='t2'?'selected':''}>يدوي: T2</option>
-          <option value="t3" ${row.customTier==='t3'?'selected':''}>يدوي: T3</option>
-        </select>
-      </td>
-      <td class="num row-total">${fmt(total)}</td>
-      <td><button class="del-btn" title="حذف" onclick="removeAgent('${zone}',${idx})">✕</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
-  document.getElementById('foot-'+zone).textContent = fmt(zoneTotal)+' د.ع';
-  return zoneTotal;
+ const arr=filtered(zone), all=state.data[zone],panel=document.getElementById('panel-'+zone);
+ let rows='',zoneTotal=0,zonePaid=0,zoneRemaining=0;
+ all.forEach(r=>{const c=calc(r);zoneTotal+=c.total;zonePaid+=c.paid;zoneRemaining+=c.remaining});
+ arr.forEach(({r,i})=>{
+  const c=calc(r),st=status(r),stText={pending:'غير مدفوع',partial:'جزئي',paid:'مدفوع'}[st],stClass={pending:'bpending',partial:'bpartial',paid:'bpaid'}[st];
+  rows+=`<tr>
+  <td><input class="name" value="${esc(r.name)}" onchange="setField('${zone}',${i},'name',this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step('${zone}',${i},'p35',-1)">−</button><input class="qty" type="number" min="0" value="${c.p35}" onchange="setNum('${zone}',${i},'p35',this.value)"><button class="step" onclick="step('${zone}',${i},'p35',1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step('${zone}',${i},'p45',-1)">−</button><input class="qty" type="number" min="0" value="${c.p45}" onchange="setNum('${zone}',${i},'p45',this.value)"><button class="step" onclick="step('${zone}',${i},'p45',1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step('${zone}',${i},'p65',-1)">−</button><input class="qty" type="number" min="0" value="${c.p65}" onchange="setNum('${zone}',${i},'p65',this.value)"><button class="step" onclick="step('${zone}',${i},'p65',1)">+</button></div></td>
+  <td class="num">${c.qty}</td><td><select class="tier" onchange="setField('${zone}',${i},'customTier',this.value)">
+  <option value="auto" ${r.customTier==='auto'?'selected':''}>تلقائي (${c.t?c.t.label:'-'})</option><option value="t1" ${r.customTier==='t1'?'selected':''}>يدوي T1</option><option value="t2" ${r.customTier==='t2'?'selected':''}>يدوي T2</option><option value="t3" ${r.customTier==='t3'?'selected':''}>يدوي T3</option></select></td>
+  <td class="money">${fmt(c.total)}</td><td>${fmt(c.paid)}</td><td class="money">${fmt(c.remaining)}</td>
+  <td><span class="badge ${stClass}">${stText}</span></td>
+  <td><button class="smallbtn" onclick="editPayment('${zone}',${i})">💳 صرف</button> <button class="smallbtn" onclick="details('${zone}',${i})">👁</button> <button class="smallbtn" onclick="removeAgent('${zone}',${i})">✕</button></td></tr>`
+ });
+ panel.innerHTML=`<table><thead><tr><th>اسم الوكيل / FDT</th><th>P35</th><th>P45</th><th>P65</th><th>الكمية</th><th>الفئة</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="6">إجمالي المنطقة</td><td class="money">${fmt(zoneTotal)} د.ع</td><td>${fmt(zonePaid)} د.ع</td><td class="money">${fmt(zoneRemaining)} د.ع</td><td colspan="2"></td></tr></tfoot></table>
+ <div class="zoneActions"><div class="actions"><button class="btn gold" onclick="addAgent('${zone}')">+ إضافة وكيل</button><button class="btn" onclick="exportZone('${zone}')">📤 تصدير المنطقة</button></div><span class="muted" style="font-size:10px">يظهر ${arr.length} من ${all.length} سجل</span></div>`
 }
-
-function changeCustomTier(zone, idx, val){
-  data[zone][idx].customTier = val;
-  autoSave();
-  renderAll();
+function totals(){
+ let x={old:{total:0,paid:0,rem:0,count:0},new:{total:0,paid:0,rem:0,count:0}},all=[];
+ ['old','new'].forEach(z=>state.data[z].forEach((r,i)=>{const c=calc(r);x[z].total+=c.total;x[z].paid+=c.paid;x[z].rem+=c.remaining;x[z].count++;all.push({r,i,z,c})}));
+ x.grand={total:x.old.total+x.new.total,paid:x.old.paid+x.new.paid,rem:x.old.rem+x.new.rem,count:all.length};
+ return {x,all}
 }
-
-function renderAll(){
-  const oldTotal = renderZone('old');
-  const newTotal = renderZone('new');
-  document.getElementById('oldZoneTotal').innerHTML = fmt(oldTotal)+' <small>د.ع</small>';
-  document.getElementById('newZoneTotal').innerHTML = fmt(newTotal)+' <small>د.ع</small>';
-  document.getElementById('grandTotal').innerHTML = fmt(oldTotal+newTotal)+' <small>د.ع</small>';
-  document.getElementById('oldZoneCount').textContent = data.old.length+' وكيل';
-  document.getElementById('newZoneCount').textContent = data.new.length+' وكيل';
-  document.getElementById('grandCount').textContent = (data.old.length+data.new.length)+' وكيل';
-  attachInputEvents();
+function renderDashboard(){
+ const {x,all}=totals();
+ document.getElementById('grandTotal').textContent=fmt(x.grand.total);document.getElementById('oldTotal').textContent=fmt(x.old.total);document.getElementById('newTotal').textContent=fmt(x.new.total);
+ document.getElementById('paidTotal').textContent=fmt(x.grand.paid);document.getElementById('remainingTotal').textContent=fmt(x.grand.rem);document.getElementById('agentCount').textContent=x.grand.count;
+ const s={paid:0,partial:0,pending:0};all.forEach(a=>s[status(a.r)]++);
+ document.getElementById('oldCount').textContent=x.old.count+' وكيل';document.getElementById('newCount').textContent=x.new.count+' وكيل';
+ document.getElementById('statusSummary').textContent=`مدفوع ${s.paid} • جزئي ${s.partial} • غير مدفوع ${s.pending}`;
+ document.getElementById('paymentSummary').innerHTML=`<div class="minirow"><span>🟢 مدفوع بالكامل</span><b>${s.paid}</b></div><div class="minirow"><span>🟡 مدفوع جزئياً</span><b>${s.partial}</b></div><div class="minirow"><span>🔴 غير مدفوع</span><b>${s.pending}</b></div><div class="minirow"><span>المتبقي</span><b class="money">${fmt(x.grand.rem)} د.ع</b></div>`;
+ all.sort((a,b)=>b.c.total-a.c.total);document.getElementById('topAgents').innerHTML=all.slice(0,7).map((a,i)=>`<div class="minirow"><span>${i+1}. ${esc(a.r.name)} <small class="muted">(${a.z==='old'?'OLD':'NEW'})</small></span><b class="money">${fmt(a.c.total)}</b></div>`).join('')||'<span class="muted">لا توجد بيانات</span>';
 }
-
-function stepQty(zone, idx, field, delta){
-  data[zone][idx][field] = Math.max(0, (Number(data[zone][idx][field]) || 0) + delta);
-  autoSave();
-  renderAll();
+function renderAll(){renderZone('old');renderZone('new');renderDashboard();renderSettings()}
+function setField(z,i,f,v){state.data[z][i][f]=v;save();renderAll()}
+function setNum(z,i,f,v){state.data[z][i][f]=Math.max(0,Number(v)||0);save();renderAll()}
+function step(z,i,f,d){state.data[z][i][f]=Math.max(0,(Number(state.data[z][i][f])||0)+d);save();renderAll()}
+function addAgent(z){state.data[z].push({name:z==='new'?'FDT-NEW':'وكيل جديد',p35:0,p45:0,p65:0,customTier:'auto',paid:0});save();renderAll();toast('تمت إضافة الوكيل')}
+function removeAgent(z,i){
+ const r=state.data[z][i];if(!confirm(`حذف "${r.name}"؟`))return;
+ state.undo={z,row:clone(r),index:i};state.data[z].splice(i,1);save();renderAll();toast('تم الحذف — يمكنك التراجع من الرسالة')
 }
-
-function attachInputEvents(){
-  document.querySelectorAll('input[data-field]').forEach(inp=>{
-    inp.oninput = (e)=>{
-      const {idx, zone, field} = e.target.dataset;
-      const row = data[zone][idx];
-      if(field==='name'){ row.name = e.target.value; }
-      else{ row[field] = Number(e.target.value)||0; }
-      autoSave();
-      renderAll();
-    };
-  });
+function undoDelete(){if(!state.undo)return;state.data[state.undo.z].splice(state.undo.index,0,state.undo.row);state.undo=null;save();renderAll()}
+function toast(msg,undo=false){const t=document.getElementById('toast');t.innerHTML=esc(msg)+(undo?' <button class="smallbtn" onclick="undoDelete();this.parentElement.classList.remove(\'show\')">تراجع</button>':'');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500)}
+function editPayment(z,i){const r=state.data[z][i],c=calc(r);openModal(`💳 صرف — ${r.name}`,`<div class="formgrid"><label>المستحق<input class="input" value="${c.total}" disabled></label><label>المدفوع الحالي<input id="payInput" class="input" type="number" min="0" value="${c.paid}"></label><label>تاريخ الصرف<input id="payDate" class="input" type="date" value="${r.paymentDate||''}"></label></div><div class="actions" style="margin-top:14px"><button class="btn gold" onclick="savePayment('${z}',${i})">حفظ الصرف</button><button class="btn" onclick="closeModal()">إلغاء</button></div>`) }
+function savePayment(z,i){const r=state.data[z][i],c=calc(r);r.paid=Math.min(Math.max(Number(document.getElementById('payInput').value)||0,0),c.total);r.paymentDate=document.getElementById('payDate').value;save();closeModal();renderAll();toast('تم تحديث حالة الصرف')}
+function details(z,i){const r=state.data[z][i],c=calc(r), prev=getPreviousRow(z,r.name);openModal(`📋 ${r.name}`,`<div class="detailgrid"><div class="detailcard">المنطقة<b>${z==='old'?'OLD':'NEW'}</b></div><div class="detailcard">الفئة<b>${c.t?c.t.label:'-'}</b></div><div class="detailcard">إجمالي الكمية<b>${fmt(c.qty)}</b></div><div class="detailcard">المستحق<b class="money">${fmt(c.total)}</b></div><div class="detailcard">المدفوع<b>${fmt(c.paid)}</b></div><div class="detailcard">المتبقي<b class="money">${fmt(c.remaining)}</b></div><div class="detailcard">P35<b>${fmt(c.p35)}</b></div><div class="detailcard">P45 / P65<b>${fmt(c.p45)} / ${fmt(c.p65)}</b></div></div><div style="margin-top:14px" class="box"><h3>📈 مقارنة سريعة</h3>${prev?`<div class="minirow"><span>الشهر السابق</span><b>${fmt(prev.total)} د.ع</b></div><div class="minirow"><span>التغيير</span><b>${fmt(c.total-prev.total)} د.ع</b></div>`:'<span class="muted">لا توجد بيانات للشهر السابق</span>'}</div>`) }
+function getPreviousRow(z,name){const keys=Object.keys(state.archive).sort();const idx=keys.indexOf(state.month);if(idx<1)return null;const snap=state.archive[keys[idx-1]];const r=(snap.data?.[z]||[]).find(x=>x.name===name);if(!r)return null;const tiersBackup=state.tiers;state.tiers=snap.tiers||state.tiers;const c=calc(r);state.tiers=tiersBackup;return c}
+function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.add('open')}
+function closeModal(){document.getElementById('modal').classList.remove('open')}
+function switchTab(z){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.zone===z));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+z))}
+function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'0')+'/'+date.getFullYear()}
+function saveCurrentMonth(){state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};save();renderMonths();toast('تم حفظ الشهر مع الأسعار الحالية')}
+function renderMonths(){const s=document.getElementById('monthSelect');const keys=[...new Set([state.month,...Object.keys(state.archive)])].sort((a,b)=>{const [am,ay]=a.split('/').map(Number),[bm,by]=b.split('/').map(Number);return ay-by || am-bm});s.innerHTML=keys.map(k=>`<option value="${k}" ${k===state.month?'selected':''}>${k}${state.archive[k]?' — محفوظ':''}</option>`).join('')}
+function loadSelectedMonth(){const k=document.getElementById('monthSelect').value;if(state.archive[k]){state.month=k;state.data=clone(state.archive[k].data);state.tiers=clone(state.archive[k].tiers||defaultTiers);save();renderAll()}else{state.month=k;save();renderAll()}}
+function startNewMonth(){if(!confirm('بدء شهر جديد؟ سيتم أخذ نسخة من الشهر الحالي أولاً.'))return;saveCurrentMonth();const d=new Date();d.setMonth(d.getMonth()+1);state.month=monthKey(d);state.data=clone(state.data);state.data.old.forEach(r=>r.paid=0);state.data.new.forEach(r=>r.paid=0);save();renderMonths();renderAll();toast('تم إنشاء شهر جديد')}
+function resetData(){if(!confirm('استعادة البيانات الأصلية؟ هذا سيستبدل البيانات الحالية.'))return;state.data=clone(defaultData);state.tiers=clone(defaultTiers);save();renderAll();toast('تمت الاستعادة')}
+function csvEscape(v){const s=String(v??'');return `"${s.replace(/"/g,'""')}"`}
+function rowsFor(zone){return state.data[zone].map(r=>{const c=calc(r);return {Zone:zone==='old'?'OLD':'NEW',Name:r.name,P35:c.p35,P45:c.p45,P65:c.p65,Quantity:c.qty,Tier:c.t?.label||'',Due:c.total,Paid:c.paid,Remaining:c.remaining,Status:{pending:'Pending',partial:'Partial',paid:'Paid'}[status(r)],PaymentDate:r.paymentDate||''}})}
+function downloadCSV(rows,name){const keys=Object.keys(rows[0]||{Zone:'',Name:''});const text='\uFEFF'+[keys.map(csvEscape).join(','),...rows.map(r=>keys.map(k=>csvEscape(r[k])).join(','))].join('\r\n');const blob=new Blob([text],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
+function exportZone(z){downloadCSV(rowsFor(z),`${state.month.replace('/','-')}_${z}_commission.csv`)}
+function exportAll(){downloadCSV([...rowsFor('old'),...rowsFor('new')],`${state.month.replace('/','-')}_all_commissions.csv`)}
+function importFile(e){
+ const file=e.target.files[0];if(!file)return;
+ const reader=new FileReader();reader.onload=ev=>{
+  try{
+   let rows=[];
+   if(file.name.toLowerCase().endsWith('.csv'))rows=parseCSV(ev.target.result);
+   else {if(typeof XLSX==='undefined')throw Error('XLSX library not loaded');const wb=XLSX.read(ev.target.result,{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})}
+   if(!rows.length)throw Error('الملف فارغ');
+   const mapped=rows.map(normalizeImport).filter(x=>x.name);
+   if(!mapped.length)throw Error('لم أجد أسماء وكلاء في الملف');
+   if(!confirm(`تم العثور على ${mapped.length} سجل. استبدال البيانات الحالية؟`))return;
+   state.data={old:mapped.filter(x=>x.zone==='old'),new:mapped.filter(x=>x.zone==='new')};save();renderAll();toast('تم استيراد البيانات بنجاح')
+  }catch(err){alert('فشل الاستيراد: '+err.message)}
+  e.target.value=''
+ };if(file.name.toLowerCase().endsWith('.csv'))reader.readAsText(file,'UTF-8');else reader.readAsArrayBuffer(file)
 }
-
-function autoSave(){
-  localStorage.setItem('babil_current_data', JSON.stringify(data));
+function parseCSV(text){const lines=text.replace(/\r/g,'').split('\n').filter(Boolean),out=[];const parse=s=>{let a=[],cur='',q=false;for(let i=0;i<s.length;i++){const ch=s[i];if(ch==='"'&&s[i+1]==='"'){cur+='"';i++;continue}if(ch==='"'){q=!q;continue}if(ch===','&&!q){a.push(cur);cur=''}else cur+=ch}a.push(cur);return a};const h=parse(lines[0]).map(x=>x.trim());for(let i=1;i<lines.length;i++){const a=parse(lines[i]),o={};h.forEach((k,j)=>o[k]=a[j]??'');out.push(o)}return out}
+function numFrom(o,keys){for(const k of keys){if(o[k]!==undefined&&o[k]!=='')return Number(String(o[k]).replace(/,/g,''))||0}return 0}
+function normalizeImport(o){
+ const keys=Object.keys(o);const get=(names)=>{const k=keys.find(x=>names.some(n=>x.trim().toLowerCase()===n.toLowerCase()));return k?o[k]:''};
+ const name=get(['Name','name','اسم الوكيل','اسم','FDT','fdt'])||o[keys[0]];
+ const zoneRaw=String(get(['Zone','zone','المنطقة'])||'').toLowerCase();const zone=zoneRaw.includes('new')||zoneRaw.includes('جديد')?'new':zoneRaw.includes('old')||zoneRaw.includes('قديم')?'old':String(name).toUpperCase().includes('FDT-')?'new':'old';
+ return {name:String(name).trim(),p35:numFrom(o,['P35','p35','35']),p45:numFrom(o,['P45','p45','45']),p65:numFrom(o,['P65','p65','65']),paid:numFrom(o,['Paid','paid','المدفوع']),paymentDate:get(['PaymentDate','payment date','تاريخ الصرف'])||'',customTier:get(['Tier','tier','الفئة'])||'auto',zone}
 }
-
-function addAgent(zone){
-  data[zone].push({name:'وكيل جديد', p35:0, p45:0, p65:0, customTier:'auto'});
-  autoSave();
-  renderAll();
-}
-
-function removeAgent(zone, idx){
-  data[zone].splice(idx,1);
-  autoSave();
-  renderAll();
-}
-
-function switchTab(zone){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelector(`.tab-btn[data-zone="${zone}"]`).classList.add('active');
-  document.querySelectorAll('.zone-panel').forEach(p=>p.classList.remove('active'));
-  document.getElementById('panel-'+zone).classList.add('active');
-}
-
-/* Excel / CSV Import System */
-function importExcel(event){
-  const file = event.target.files[0];
-  if(!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function(e){
-    const text = e.target.result;
-    const lines = text.split('\n');
-    let activeZone = document.querySelector('.tab-btn.active').dataset.zone;
-    let importedCount = 0;
-
-    lines.forEach((line, index)=>{
-      if(index === 0 || !line.trim()) return;
-      const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-      if(cols.length >= 2){
-        const name = cols[0];
-        const p35 = Number(cols[1]) || 0;
-        const p45 = Number(cols[2]) || 0;
-        const p65 = Number(cols[3]) || 0;
-
-        const existing = data[activeZone].find(a => a.name.trim() === name);
-        if(existing){
-          existing.p35 = p35; existing.p45 = p45; existing.p65 = p65;
-        } else {
-          data[activeZone].push({name, p35, p45, p65, customTier:'auto'});
-        }
-        importedCount++;
-      }
-    });
-
-    autoSave();
-    renderAll();
-    alert(`تم استيراد وتحديث ${importedCount} وكيل بنجاح في المنطقة الحالية!`);
-  };
-  reader.readAsText(file);
-}
-
-// Archive Management
-function updateMonthSelect(){
-  const sel = document.getElementById('monthSelect');
-  sel.innerHTML = '<option value="current">الشهر الحالي (نشط)</option>';
-  Object.keys(archive).forEach(m=>{
-    sel.innerHTML += `<option value="${m}">أرشيف: ${m}</option>`;
-  });
-}
-
-function saveCurrentMonth(){
-  const name = prompt("أدخل اسم/تاريخ الشهر للحفظ في الأرشيف (مثال: 07/2026):", currentMonthKey);
-  if(name){
-    archive[name] = JSON.parse(JSON.stringify(data));
-    localStorage.setItem('babil_archive', JSON.stringify(archive));
-    updateMonthSelect();
-    alert('تم حفظ الشهر في الأرشيف بنجاح!');
-  }
-}
-
-function loadSelectedMonth(){
-  const val = document.getElementById('monthSelect').value;
-  if(val === 'current'){
-    data = JSON.parse(localStorage.getItem('babil_current_data') || JSON.stringify(defaultData));
-  } else if(archive[val]) {
-    data = JSON.parse(JSON.stringify(archive[val]));
-  }
-  renderAll();
-}
-
-function startNewMonth(){
-  if(confirm("هل أنت تأكد من بدء شهر جديد؟ سيتم تصفير التفعيلات مع الحفاظ على أسماء الوكلاء.")){
-    ['old','new'].forEach(z=>{
-      data[z].forEach(r=>{ r.p35=0; r.p45=0; r.p65=0; r.customTier='auto'; });
-    });
-    autoSave();
-    renderAll();
-  }
-}
-
-function resetToDefaultData(){
-  if(confirm("هل أنت متأكد من استعادة البيانات الأصلية؟ سيتم مسح البيانات المتداخلة الخاطئة.")){
-    localStorage.removeItem('babil_current_data');
-    data = JSON.parse(JSON.stringify(defaultData));
-    renderAll();
-    alert("تم مسح الخطأ وإعادة البيانات الأصلية بنجاح!");
-  }
-}
-
-function exportCSV(zone){
-  let csv = 'اسم الوكيل,P35,P45,P65,إجمالي الكمية,الفئة,إجمالي المستحق\n';
-  data[zone].forEach(row=>{
-    const {qty, tier, total} = computeRow(row);
-    csv += `${row.name},${row.p35},${row.p45},${row.p65},${qty},${tier?tier.label:'-'},${Math.round(total)}\n`;
-  });
-  const blob = new Blob(["\uFEFF"+csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `agents_${zone}_zone.csv`;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-buildTierGrid();
-updateMonthSelect();
-renderAll();
+load();renderMonths();renderAll();
 </script>
 </body>
 </html>
