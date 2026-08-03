@@ -58,7 +58,16 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   <button class="btn gold" data-permission="edit" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
   <button class="btn" data-permission="edit" onclick="startNewMonth()">✨ شهر جديد</button>
   <button class="btn" onclick="openAuditLog()">🧾 سجل التعديلات</button>
-  <button id="logoutButton" class="btn danger">تسجيل الخروج</button>
+
+<button
+  id="usersButton"
+  class="btn gold"
+  data-permission="users"
+  onclick="openUsersManager()">
+  👥 إدارة المستخدمين
+</button>
+
+<button id="logoutButton" class="btn danger">تسجيل الخروج</button>
  </div>
 </header>
 
