@@ -6,6 +6,8 @@
 <title>لوحة عمولات الوكلاء — HRINS</title>
 <meta name="theme-color" content="#12161c">
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth.js"></script>
 <style>
 :root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
@@ -23,6 +25,12 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 </style>
 </head>
 <body>
+
+<!-- Login موجود هنا -->
+
+<div id="appShell" style="display:none">
+
+<div class="wrap">
 <div class="wrap">
 <header class="mast">
  <div><div class="eyebrow">HRINS • RESELLER FINANCE</div><h1>لوحة عمولات الوكلاء</h1><div class="muted" style="font-size:11px">إدارة العمولات • الصرف • الأرشيف • الأداء الشهري</div></div>
@@ -422,4 +430,5 @@ document.getElementById('userInput').addEventListener('change',()=>{state.user=c
 renderMonths();renderAll();
 </script>
 </body>
+ </div>
 </html>
