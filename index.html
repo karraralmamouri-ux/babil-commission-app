@@ -358,6 +358,70 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&l
 function canEdit(){return hasPermission('edit')}
 function canPay(){return hasPermission('payment')}
 function canDelete(){return hasPermission('delete')}
+
+async function ensurePermission(permission){
+  if(!authUser){
+    showLogin();
+    toast('يجب تسجيل الدخول أولاً');
+    return false;
+  }
+
+  try{
+    const {data,error}=await sb.from('profiles')
+      .select('id,full_name,email,role,is_active')
+      .eq('id',authUser.id)
+      .maybeSingle();
+
+    if(error){
+      console.error('Permission check error:',error);
+      toast('تعذر التحقق من صلاحيات الحساب');
+      return false;
+    }
+
+    if(!data || data.is_active !== true){
+      await sb.auth.signOut();
+      authUser=null;
+      authProfile=null;
+      showLogin();
+      authError('تم تعطيل حسابك. يرجى مراجعة مسؤول النظام.');
+      return false;
+    }
+
+    if(!ROLE_PERMISSIONS[data.role]){
+      await sb.auth.signOut();
+      authUser=null;
+      authProfile=null;
+      showLogin();
+      authError('صلاحية الحساب غير معروفة. راجع مسؤول النظام.');
+      return false;
+    }
+
+    // Always use the role currently stored in Supabase.
+    authProfile=data;
+    applyPermissions();
+
+    const allowed=!!ROLE_PERMISSIONS[data.role]?.[permission];
+
+    if(!allowed){
+      toast(
+        permission==='edit'
+          ? 'ليس لديك صلاحية التعديل'
+          : permission==='payment'
+            ? 'ليس لديك صلاحية الصرف'
+            : permission==='delete'
+              ? 'ليس لديك صلاحية الحذف'
+              : 'ليس لديك صلاحية تنفيذ هذا الإجراء'
+      );
+      return false;
+    }
+
+    return true;
+  }catch(error){
+    console.error('Permission guard error:',error);
+    toast('تعذر التحقق من صلاحيات الحساب');
+    return false;
+  }
+}
 function save(){
  localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog}));
  localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data));
@@ -396,9 +460,10 @@ function renderAuditLog(){
 }
 function exportAuditLog(){const rows=(state.auditLog||[]).map(x=>({DateTime:auditDate(x.at),User:x.user,Month:x.month,Zone:x.zone,Agent:x.agent,Action:x.action,Field:fieldLabel(x.field),Before:x.oldValue,After:x.newValue}));if(!rows.length){toast('لا يوجد سجل لتصديره');return}downloadCSV(rows,`audit_log_${state.month.replace('/','-')}.csv`)}
 function clearAuditLog(){if(!canDelete()){toast('ليس لديك صلاحية مسح السجل');return}if(!(state.auditLog||[]).length){toast('السجل فارغ');return}if(!confirm('مسح سجل التعديلات بالكامل؟'))return;state.auditLog=[];save();renderAuditLog();toast('تم مسح السجل')}
-function applyMonthInput(){
+async function applyMonthInput(){
  const raw=(document.getElementById('monthInput').value||'').trim(),m=raw.match(/^(0?[1-9]|1[0-2])[\/\-](\d{4})$/);
  if(!m){alert('اكتب الشهر بصيغة MM/YYYY مثل 08/2026');return}
+ if(!(await ensurePermission('edit')))return;
  const key=String(Number(m[1])).padStart(2,'0')+'/'+m[2];if(key===state.month){renderMonths();return}
  const old=state.month;
  if(state.archive[key]){state.month=key;state.data=clone(state.archive[key].data);state.tiers=clone(state.archive[key].tiers||defaultTiers);audit('تغيير الشهر','','','الشهر',old,key)}
@@ -411,7 +476,23 @@ function calc(r){const p35=Number(r.p35)||0,p45=Number(r.p45)||0,p65=Number(r.p6
 function status(r){const c=calc(r);return c.paid<=0?'pending':c.paid>=c.total?'paid':'partial'}
 function renderSettings(){
  const el=document.getElementById('settings');el.innerHTML='';
- state.tiers.forEach(t=>['p35','p45','p65'].forEach(f=>{const d=document.createElement('label');d.className='setting';d.innerHTML=`${t.label} — ${f.toUpperCase()}<input class="input" type="number" value="${t[f]}" ${canEdit()?'':'disabled'}>`;d.querySelector('input').onchange=e=>{if(!canEdit())return;const old=t[f];t[f]=Number(e.target.value)||0;audit('تعديل السعر','',t.label,'tier'+f.toUpperCase(),old,t[f]);save();renderAll()};el.appendChild(d)}))
+ state.tiers.forEach(t=>['p35','p45','p65'].forEach(f=>{
+   const d=document.createElement('label');
+   d.className='setting';
+   d.innerHTML=`${t.label} — ${f.toUpperCase()}<input class="input" type="number" value="${t[f]}" ${canEdit()?'':'disabled'}>`;
+   d.querySelector('input').onchange=async e=>{
+     if(!(await ensurePermission('edit'))) {
+       renderSettings();
+       return;
+     }
+     const old=t[f];
+     t[f]=Number(e.target.value)||0;
+     audit('تعديل السعر','',t.label,'tier'+f.toUpperCase(),old,t[f]);
+     save();
+     renderAll();
+   };
+   el.appendChild(d);
+ }))
 }
 function filtered(zone){
  const q=(document.getElementById('searchInput').value||'').trim().toLowerCase(),zf=document.getElementById('zoneFilter').value,sf=document.getElementById('statusFilter').value;
@@ -441,31 +522,141 @@ function renderDashboard(){
  all.sort((a,b)=>b.c.total-a.c.total);document.getElementById('topAgents').innerHTML=all.slice(0,7).map((a,i)=>`<div class="minirow"><span>${i+1}. ${esc(a.r.name)} <small class="muted">(${a.z==='old'?'OLD':'NEW'})</small></span><b class="money">${fmt(a.c.total)}</b></div>`).join('')||'<span class="muted">لا توجد بيانات</span>'
 }
 function renderAll(){renderZone('old');renderZone('new');renderDashboard();renderSettings()}
-function setField(z,i,f,v){if(!canEdit()){toast('ليس لديك صلاحية التعديل');return}const r=state.data[z][i],old=r[f];r[f]=v;audit('تعديل',z,r.name,f,old,v);save();renderAll()}
-function setNum(z,i,f,v){if(!canEdit()){toast('ليس لديك صلاحية التعديل');return}const r=state.data[z][i],old=Number(r[f])||0,nv=Math.max(0,Number(v)||0);r[f]=nv;audit('تعديل',z,r.name,f,old,nv);save();renderAll()}
-function step(z,i,f,d){if(!canEdit()){toast('ليس لديك صلاحية التعديل');return}const r=state.data[z][i],old=Number(r[f])||0,nv=Math.max(0,old+d);r[f]=nv;audit('تعديل',z,r.name,f,old,nv);save();renderAll()}
-function addAgent(z){if(!canEdit())return;const r={name:z==='new'?'FDT-NEW':'وكيل جديد',p35:0,p45:0,p65:0,customTier:'auto',paid:0};state.data[z].push(r);audit('إضافة',z,r.name,'الوكيل','',r.name);save();renderAll();toast('تمت إضافة الوكيل')}
-function removeAgent(z,i){if(!canDelete()){toast('ليس لديك صلاحية الحذف');return}const r=state.data[z][i];if(!confirm(`حذف "${r.name}"؟`))return;state.undo={z,row:clone(r),index:i};audit('حذف',z,r.name,'الوكيل',JSON.stringify(r),'—');state.data[z].splice(i,1);save();renderAll();toast('تم الحذف — يمكنك التراجع',true)}
-function undoDelete(){if(!canDelete()||!state.undo)return;const u=state.undo;state.data[u.z].splice(u.index,0,u.row);audit('تراجع عن حذف',u.z,u.row.name,'الوكيل','محذوف',u.row.name);state.undo=null;save();renderAll()}
+async function setField(z,i,f,v){
+  if(!(await ensurePermission('edit')))return;
+  const r=state.data[z][i],old=r[f];
+  r[f]=v;
+  audit('تعديل',z,r.name,f,old,v);
+  save();
+  renderAll();
+}
+async function setNum(z,i,f,v){
+  if(!(await ensurePermission('edit')))return;
+  const r=state.data[z][i],old=Number(r[f])||0,nv=Math.max(0,Number(v)||0);
+  r[f]=nv;
+  audit('تعديل',z,r.name,f,old,nv);
+  save();
+  renderAll();
+}
+async function step(z,i,f,d){
+  if(!(await ensurePermission('edit')))return;
+  const r=state.data[z][i],old=Number(r[f])||0,nv=Math.max(0,old+d);
+  r[f]=nv;
+  audit('تعديل',z,r.name,f,old,nv);
+  save();
+  renderAll();
+}
+async function addAgent(z){
+  if(!(await ensurePermission('edit')))return;
+  const r={name:z==='new'?'FDT-NEW':'وكيل جديد',p35:0,p45:0,p65:0,customTier:'auto',paid:0};
+  state.data[z].push(r);
+  audit('إضافة',z,r.name,'الوكيل','',r.name);
+  save();
+  renderAll();
+  toast('تمت إضافة الوكيل');
+}
+async function removeAgent(z,i){
+  if(!(await ensurePermission('delete')))return;
+  const r=state.data[z][i];
+  if(!confirm(`حذف "${r.name}"؟`))return;
+  state.undo={z,row:clone(r),index:i};
+  audit('حذف',z,r.name,'الوكيل',JSON.stringify(r),'—');
+  state.data[z].splice(i,1);
+  save();
+  renderAll();
+  toast('تم الحذف — يمكنك التراجع',true);
+}
+async function undoDelete(){
+  if(!(await ensurePermission('delete')) || !state.undo)return;
+  const u=state.undo;
+  state.data[u.z].splice(u.index,0,u.row);
+  audit('تراجع عن حذف',u.z,u.row.name,'الوكيل','محذوف',u.row.name);
+  state.undo=null;
+  save();
+  renderAll();
+}
 function toast(msg,undo=false){const t=document.getElementById('toast');t.innerHTML=esc(msg)+(undo?' <button class="smallbtn" onclick="undoDelete();this.parentElement.classList.remove(\'show\')">تراجع</button>':'');t.classList.add('show');if(!undo)setTimeout(()=>t.classList.remove('show'),3500)}
-function editPayment(z,i){if(!canPay()){toast('ليس لديك صلاحية الصرف');return}const r=state.data[z][i],c=calc(r);openModal(`💳 صرف — ${r.name}`,`<div class="formgrid"><label>المستحق<input class="input" value="${c.total}" disabled></label><label>المدفوع الحالي<input id="payInput" class="input" type="number" min="0" value="${c.paid}"></label><label>تاريخ الصرف<input id="payDate" class="input" type="date" value="${r.paymentDate||''}"></label></div><div class="actions" style="margin-top:14px"><button class="btn gold" onclick="savePayment('${z}',${i})">حفظ الصرف</button><button class="btn" onclick="closeModal()">إلغاء</button></div>`)}
-function savePayment(z,i){if(!canPay())return;const r=state.data[z][i],c=calc(r),oldPaid=r.paid||0,oldDate=r.paymentDate||'',newPaid=Math.min(Math.max(Number(document.getElementById('payInput').value)||0,0),c.total),newDate=document.getElementById('payDate').value;r.paid=newPaid;r.paymentDate=newDate;audit('تعديل الصرف',z,r.name,'paid',oldPaid,newPaid);if(oldDate!==newDate)audit('تعديل الصرف',z,r.name,'paymentDate',oldDate,newDate);save();closeModal();renderAll();toast('تم تحديث حالة الصرف')}
+async function editPayment(z,i){
+  if(!(await ensurePermission('payment')))return;
+  const r=state.data[z][i],c=calc(r);
+  openModal(
+    `💳 صرف — ${r.name}`,
+    `<div class="formgrid">
+      <label>المستحق<input class="input" value="${c.total}" disabled></label>
+      <label>المدفوع الحالي<input id="payInput" class="input" type="number" min="0" value="${c.paid}"></label>
+      <label>تاريخ الصرف><input id="payDate" class="input" type="date" value="${r.paymentDate||''}"></label>
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn gold" onclick="savePayment('${z}',${i})">حفظ الصرف</button>
+      <button class="btn" onclick="closeModal()">إلغاء</button>
+    </div>`
+  );
+}
+async function savePayment(z,i){
+  if(!(await ensurePermission('payment')))return;
+  const r=state.data[z][i],c=calc(r),oldPaid=r.paid||0,oldDate=r.paymentDate||'';
+  const newPaid=Math.min(
+    Math.max(Number(document.getElementById('payInput').value)||0,0),
+    c.total
+  );
+  const newDate=document.getElementById('payDate').value;
+  r.paid=newPaid;
+  r.paymentDate=newDate;
+  audit('تعديل الصرف',z,r.name,'paid',oldPaid,newPaid);
+  if(oldDate!==newDate)audit('تعديل الصرف',z,r.name,'paymentDate',oldDate,newDate);
+  save();
+  closeModal();
+  renderAll();
+  toast('تم تحديث حالة الصرف');
+}
 function details(z,i){const r=state.data[z][i],c=calc(r),prev=getPreviousRow(z,r.name);openModal(`📋 ${r.name}`,`<div class="detailgrid"><div class="detailcard">المنطقة<b>${z==='old'?'OLD':'NEW'}</b></div><div class="detailcard">الفئة<b>${c.t?c.t.label:'-'}</b></div><div class="detailcard">إجمالي الكمية<b>${fmt(c.qty)}</b></div><div class="detailcard">المستحق<b class="money">${fmt(c.total)}</b></div><div class="detailcard">المدفوع<b>${fmt(c.paid)}</b></div><div class="detailcard">المتبقي<b class="money">${fmt(c.remaining)}</b></div><div class="detailcard">P35<b>${fmt(c.p35)}</b></div><div class="detailcard">P45 / P65<b>${fmt(c.p45)} / ${fmt(c.p65)}</b></div></div><div style="margin-top:14px" class="box"><h3>📈 مقارنة سريعة</h3>${prev?`<div class="minirow"><span>الشهر السابق</span><b>${fmt(prev.total)} د.ع</b></div><div class="minirow"><span>التغيير</span><b>${fmt(c.total-prev.total)} د.ع</b></div>`:'<span class="muted">لا توجد بيانات للشهر السابق</span>'}</div>`)}
 function getPreviousRow(z,name){const keys=Object.keys(state.archive).sort(),idx=keys.indexOf(state.month);if(idx<1)return null;const snap=state.archive[keys[idx-1]],r=(snap.data?.[z]||[]).find(x=>x.name===name);if(!r)return null;const backup=state.tiers;state.tiers=snap.tiers||state.tiers;const c=calc(r);state.tiers=backup;return c}
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.add('open')}
 function closeModal(){document.getElementById('modal').classList.remove('open')}
 function switchTab(z){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.zone===z));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+z))}
 function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'0')+'/'+date.getFullYear()}
-function saveCurrentMonth(){if(!canEdit()){toast('ليس لديك صلاحية حفظ الشهر');return}state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};audit('حفظ الشهر','','','الأرشيف','',state.month);save();renderMonths();toast('تم حفظ الشهر مع الأسعار الحالية')}
+async function saveCurrentMonth(){
+  if(!(await ensurePermission('edit')))return;
+  state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};
+  audit('حفظ الشهر','','','الأرشيف','',state.month);
+  save();
+  renderMonths();
+  toast('تم حفظ الشهر مع الأسعار الحالية');
+}
 function renderMonths(){const s=document.getElementById('monthSelect'),keys=[...new Set([state.month,...Object.keys(state.archive)])].sort((a,b)=>{const[am,ay]=a.split('/').map(Number),[bm,by]=b.split('/').map(Number);return ay-by||am-bm});s.innerHTML=keys.map(k=>`<option value="${k}" ${k===state.month?'selected':''}>${k}${state.archive[k]?' — محفوظ':''}</option>`).join('');syncMonthInput()}
-function loadSelectedMonth(){const k=document.getElementById('monthSelect').value,old=state.month;if(state.archive[k]){state.month=k;state.data=clone(state.archive[k].data);state.tiers=clone(state.archive[k].tiers||defaultTiers);audit('تغيير الشهر','','','الشهر',old,k)}else{state.month=k;audit('تغيير الشهر','','','الشهر',old,k)}save();renderAll();syncMonthInput()}
-function startNewMonth(){if(!canEdit()){toast('ليس لديك صلاحية إنشاء شهر');return}if(!confirm('بدء شهر جديد؟ سيتم أخذ نسخة من الشهر الحالي أولاً.'))return;saveCurrentMonth();const d=new Date();d.setMonth(d.getMonth()+1);const old=state.month;state.month=monthKey(d);state.data=clone(state.data);state.data.old.forEach(r=>r.paid=0);state.data.new.forEach(r=>r.paid=0);audit('إنشاء شهر','','','الشهر',old,state.month);save();renderMonths();renderAll();toast('تم إنشاء شهر جديد')}
+async function loadSelectedMonth(){
+ if(!(await ensurePermission('edit'))) {
+   renderMonths();
+   return;
+ }
+ const k=document.getElementById('monthSelect').value,old=state.month;if(state.archive[k]){state.month=k;state.data=clone(state.archive[k].data);state.tiers=clone(state.archive[k].tiers||defaultTiers);audit('تغيير الشهر','','','الشهر',old,k)}else{state.month=k;audit('تغيير الشهر','','','الشهر',old,k)}save();renderAll();syncMonthInput()}
+async function startNewMonth(){
+  if(!(await ensurePermission('edit')))return;
+  if(!confirm('بدء شهر جديد؟ سيتم أخذ نسخة من الشهر الحالي أولاً.'))return;
+  await saveCurrentMonth();
+  const d=new Date();
+  d.setMonth(d.getMonth()+1);
+  const old=state.month;
+  state.month=monthKey(d);
+  state.data=clone(state.data);
+  state.data.old.forEach(r=>r.paid=0);
+  state.data.new.forEach(r=>r.paid=0);
+  audit('إنشاء شهر','','','الشهر',old,state.month);
+  save();
+  renderMonths();
+  renderAll();
+  toast('تم إنشاء شهر جديد');
+}
 function csvEscape(v){const s=String(v??'');return`"${s.replace(/"/g,'""')}"`}
 function rowsFor(zone){return state.data[zone].map(r=>{const c=calc(r);return{Zone:zone==='old'?'OLD':'NEW',Name:r.name,P35:c.p35,P45:c.p45,P65:c.p65,Quantity:c.qty,Tier:c.t?.label||'',Due:c.total,Paid:c.paid,Remaining:c.remaining,Status:{pending:'Pending',partial:'Partial',paid:'Paid'}[status(r)],PaymentDate:r.paymentDate||''}})}
 function downloadCSV(rows,name){const keys=Object.keys(rows[0]||{Zone:'',Name:''}),text='\uFEFF'+[keys.map(csvEscape).join(','),...rows.map(r=>keys.map(k=>csvEscape(r[k])).join(','))].join('\r\n'),blob=new Blob([text],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
 function exportZone(z){downloadCSV(rowsFor(z),`${state.month.replace('/','-')}_${z}_commission.csv`)}
 function exportAll(){downloadCSV([...rowsFor('old'),...rowsFor('new')],`${state.month.replace('/','-')}_all_commissions.csv`)}
-function importFile(e){if(!canEdit()){toast('ليس لديك صلاحية الاستيراد');e.target.value='';return}const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{let rows=[];if(file.name.toLowerCase().endsWith('.csv'))rows=parseCSV(ev.target.result);else{if(typeof XLSX==='undefined')throw Error('XLSX library not loaded');const wb=XLSX.read(ev.target.result,{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})}if(!rows.length)throw Error('الملف فارغ');const mapped=rows.map(normalizeImport).filter(x=>x.name);if(!mapped.length)throw Error('لم أجد أسماء وكلاء في الملف');if(!confirm(`تم العثور على ${mapped.length} سجل. استبدال البيانات الحالية؟`))return;state.data={old:mapped.filter(x=>x.zone==='old'),new:mapped.filter(x=>x.zone==='new')};audit('استيراد بيانات','','','عدد السجلات','',mapped.length);save();renderAll();toast('تم استيراد البيانات بنجاح')}catch(err){alert('فشل الاستيراد: '+err.message)}e.target.value=''};if(file.name.toLowerCase().endsWith('.csv'))reader.readAsText(file,'UTF-8');else reader.readAsArrayBuffer(file)}
+async function importFile(e){
+  if(!(await ensurePermission('edit'))){
+    e.target.value='';
+    return;
+  }const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{let rows=[];if(file.name.toLowerCase().endsWith('.csv'))rows=parseCSV(ev.target.result);else{if(typeof XLSX==='undefined')throw Error('XLSX library not loaded');const wb=XLSX.read(ev.target.result,{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})}if(!rows.length)throw Error('الملف فارغ');const mapped=rows.map(normalizeImport).filter(x=>x.name);if(!mapped.length)throw Error('لم أجد أسماء وكلاء في الملف');if(!confirm(`تم العثور على ${mapped.length} سجل. استبدال البيانات الحالية؟`))return;state.data={old:mapped.filter(x=>x.zone==='old'),new:mapped.filter(x=>x.zone==='new')};audit('استيراد بيانات','','','عدد السجلات','',mapped.length);save();renderAll();toast('تم استيراد البيانات بنجاح')}catch(err){alert('فشل الاستيراد: '+err.message)}e.target.value=''};if(file.name.toLowerCase().endsWith('.csv'))reader.readAsText(file,'UTF-8');else reader.readAsArrayBuffer(file)}
 function parseCSV(text){const lines=text.replace(/\r/g,'').split('\n').filter(Boolean),out=[],parse=s=>{let a=[],cur='',q=false;for(let i=0;i<s.length;i++){const ch=s[i];if(ch==='"'&&s[i+1]==='"'){cur+='"';i++;continue}if(ch==='"'){q=!q;continue}if(ch===','&&!q){a.push(cur);cur=''}else cur+=ch}a.push(cur);return a};const h=parse(lines[0]).map(x=>x.trim());for(let i=1;i<lines.length;i++){const a=parse(lines[i]),o={};h.forEach((k,j)=>o[k]=a[j]??'');out.push(o)}return out}
 function numFrom(o,keys){for(const k of keys){if(o[k]!==undefined&&o[k]!=='')return Number(String(o[k]).replace(/,/g,''))||0}return 0}
 function normalizeImport(o){const keys=Object.keys(o),get=names=>{const k=keys.find(x=>names.some(n=>x.trim().toLowerCase()===n.toLowerCase()));return k?o[k]:''},name=get(['Name','name','اسم الوكيل','اسم','FDT','fdt'])||o[keys[0]],zoneRaw=String(get(['Zone','zone','المنطقة'])||'').toLowerCase(),zone=zoneRaw.includes('new')||zoneRaw.includes('جديد')?'new':zoneRaw.includes('old')||zoneRaw.includes('قديم')?'old':String(name).toUpperCase().includes('FDT-')?'new':'old';return{name:String(name).trim(),p35:numFrom(o,['P35','p35','35']),p45:numFrom(o,['P45','p45','45']),p65:numFrom(o,['P65','p65','65']),paid:numFrom(o,['Paid','paid','المدفوع']),paymentDate:get(['PaymentDate','payment date','تاريخ الصرف'])||'',customTier:get(['Tier','tier','الفئة'])||'auto',zone}}
