@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة عمولات وكلاء بابل</title>
+
+<!-- PWA Meta Tags & Theme Colors -->
+<meta name="theme-color" content="#12161c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="عمولات بابل">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
+
+<!-- Dynamic Data Manifest Injection -->
+<script>
+  const manifestData = {
+    "name": "لوحة عمولات وكلاء بابل",
+    "short_name": "عمولات بابل",
+    "start_url": "./",
+    "display": "standalone",
+    "background_color": "#12161c",
+    "theme_color": "#12161c",
+    "icons": [
+      {
+        "src": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "any maskable"
+      }
+    ]
+  };
+  const manifestBlob = new Blob([JSON.stringify(manifestData)], {type: 'application/json'});
+  const manifestURL = URL.createObjectURL(manifestBlob);
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = manifestURL;
+  document.head.appendChild(link);
+</script>
+
+<style>
+  :root{
+    --ink:#12161c;
+    --panel:#1a212b;
+    --panel-2:#212a36;
+    --line:#2b3542;
+    --text:#e9e7e0;
+    --text-dim:#9aa4b2;
+    --gold:#d4a24e;
+    --gold-soft:rgba(212,162,78,.14);
+    --t1:#4ea1a0;
+    --t2:#4e7fd4;
+    --t3:#b06ad4;
+    --danger:#d4634e;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1100px 500px at 85% -10%, rgba(212,162,78,.08), transparent 60%),
+      var(--ink);
+    color:var(--text);
+    font-family:"Segoe UI","Tahoma",Arial,sans-serif;
+    line-height:1.5;
+    min-height:100vh;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+
+  /* Header */
+  .masthead{
+    display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:18px;margin-bottom:22px;flex-wrap:wrap;
+  }
+  .masthead h1{font-size:26px;margin:0 0 6px;letter-spacing:.2px;font-weight:700;}
+  .masthead .eyebrow{color:var(--gold);font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:700;}
+  .month-field{display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px;}
+  .month-field input{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    padding:7px 10px;border-radius:6px;font-size:13px;font-family:inherit;
+  }
+
+  /* Summary Cards */
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:26px;}
+  .card{
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;position:relative;overflow:hidden;
+  }
+  .card::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;}
+  .card.zone-old::before{background:var(--t2);}
+  .card.zone-new::before{background:var(--t1);}
+  .card.grand::before{background:var(--gold);}
+  .card .label{color:var(--text-dim);font-size:12px;margin-bottom:8px;}
+  .card .value{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;font-family:"Consolas","Courier New",monospace;}
+  .card .value small{font-size:13px;color:var(--text-dim);font-family:inherit;margin-right:4px;}
+  .card .sub{font-size:11.5px;color:var(--text-dim);margin-top:6px;}
+
+  /* Tier Config */
+  details.config{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    margin-bottom:26px;padding:2px 18px;
+  }
+  details.config summary{
+    cursor:pointer;padding:14px 0;font-size:13px;color:var(--gold);font-weight:700;
+    list-style:none;display:flex;align-items:center;gap:8px;
+  }
+  details.config summary::-webkit-details-marker{display:none;}
+  details.config summary:before{content:"⚙";font-size:14px;}
+  .tier-grid{
+    display:grid;grid-template-columns:auto repeat(3,1fr);gap:10px 16px;
+    padding-bottom:18px;align-items:center;
+  }
+  .tier-grid .th{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;}
+  .tier-name{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .dot.t1{background:var(--t1);} .dot.t2{background:var(--t2);} .dot.t3{background:var(--t3);}
+  .tier-range{font-size:11px;color:var(--text-dim);font-weight:400;}
+  .price-input{
+    width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    padding:7px 8px;border-radius:6px;font-family:"Consolas",monospace;font-size:13px;text-align:center;
+  }
+
+  /* Zone Tabs */
+  .tabs{display:flex;gap:6px;margin-bottom:14px;}
+  .tab-btn{
+    background:var(--panel);border:1px solid var(--line);color:var(--text-dim);
+    padding:10px 20px;border-radius:8px 8px 0 0;font-size:13.5px;font-weight:700;cursor:pointer;
+    border-bottom:none;position:relative;top:1px;
+  }
+  .tab-btn.active{color:var(--text);background:var(--panel-2);border-bottom:1px solid var(--panel-2);}
+  .tab-btn .swatch{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px;}
+  .zone-panel{display:none;background:var(--panel-2);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:16px;}
+  .zone-panel.active{display:block;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{
+    text-align:center;color:var(--text-dim);font-weight:600;font-size:11.5px;
+    text-transform:uppercase;letter-spacing:.4px;padding:8px 6px;border-bottom:1px solid var(--line);
+  }
+  thead th:first-child, tbody td:first-child{text-align:right;}
+  tbody td{padding:6px;border-bottom:1px solid rgba(255,255,255,.04);text-align:center;vertical-align:middle;}
+  tbody tr:hover{background:rgba(255,255,255,.02);}
+  .name-input{
+    width:100%;background:transparent;border:1px solid transparent;color:var(--text);
+    padding:6px 8px;border-radius:6px;font-size:13px;font-family:inherit;text-align:right;
+  }
+  .name-input:hover, .name-input:focus{background:var(--panel);border-color:var(--line);outline:none;}
+  .qty-input{
+    width:56px;background:var(--panel);border:1px solid var(--line);color:var(--text);
+    padding:6px 4px;border-radius:6px;text-align:center;font-family:"Consolas",monospace;font-size:13px;
+  }
+  .qty-input:focus{outline:none;border-color:var(--gold);}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+  .badge.t1{background:rgba(78,161,160,.15);color:var(--t1);}
+  .badge.t2{background:rgba(78,127,212,.15);color:var(--t2);}
+  .badge.t3{background:rgba(176,106,212,.15);color:var(--t3);}
+  .badge.t0{background:rgba(255,255,255,.06);color:var(--text-dim);}
+  .num{font-family:"Consolas","Courier New",monospace;font-variant-numeric:tabular-nums;}
+  .row-total{color:var(--gold);font-weight:700;}
+  .del-btn{
+    background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:15px;
+    width:26px;height:26px;border-radius:6px;
+  }
+  .del-btn:hover{color:var(--danger);background:rgba(212,99,78,.1);}
+  tfoot td{padding:12px 6px;border-top:2px solid var(--line);font-weight:700;}
+  tfoot .num{color:var(--gold);font-size:14.5px;}
+
+  .zone-actions{display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
+  .add-btn{
+    background:var(--gold-soft);border:1px solid var(--gold);color:var(--gold);
+    padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;
+  }
+  .add-btn:hover{background:var(--gold);color:var(--ink);}
+  .export-btn{
+    background:transparent;border:1px solid var(--line);color:var(--text-dim);
+    padding:8px 16px;border-radius:7px;font-size:12.5px;cursor:pointer;
+  }
+  .export-btn:hover{color:var(--text);border-color:var(--text-dim);}
+  footer.note{color:var(--text-dim);font-size:11.5px;margin-top:22px;text-align:center;}
+
+  @media (max-width:720px){
+    .summary{grid-template-columns:1fr;}
+    .tier-grid{grid-template-columns:1fr;}
+    table{font-size:11.5px;}
+    .qty-input{width:44px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <div class="eyebrow">شركة توزيع بابل</div>
+      <h1>لوحة عمولات الوكلاء (FDT)</h1>
+    </div>
+    <div class="month-field">
+      الشهر:
+      <input id="monthLabel" type="text" value="7 / 2026">
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="card zone-old">
+      <div class="label">إجمالي المنطقة القديمة — OLD ZONE</div>
+      <div class="value" id="oldZoneTotal">0 <small>د.ع</small></div>
+      <div class="sub" id="oldZoneCount">0 وكيل</div>
+    </div>
+    <div class="card zone-new">
+      <div class="label">إجمالي المنطقة الجديدة — NEW ZONE</div>
+      <div class="value" id="newZoneTotal">0 <small>د.ع</small></div>
+      <div class="sub" id="newZoneCount">0 وكيل</div>
+    </div>
+    <div class="card grand">
+      <div class="label">الإجمالي الكلي لكل الوكلاء</div>
+      <div class="value" id="grandTotal">0 <small>د.ع</small></div>
+      <div class="sub" id="grandCount">0 وكيل</div>
+    </div>
+  </div>
+
+  <details class="config" id="configPanel">
+    <summary>أسعار الفئات (يمكن تعديلها إذا تغيّرت التسعيرة)</summary>
+    <div class="tier-grid" id="tierGrid">
+      <div></div>
+      <div class="th">سعر التفعيلة الأولى P35</div>
+      <div class="th">سعر التفعيلة الثانية P45</div>
+      <div class="th">سعر التفعيلة الثالثة P65</div>
+    </div>
+  </details>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-zone="old" onclick="switchTab('old')">
+      <span class="swatch" style="background:var(--t2)"></span>OLD ZONE
+    </button>
+    <button class="tab-btn" data-zone="new" onclick="switchTab('new')">
+      <span class="swatch" style="background:var(--t1)"></span>NEW ZONE
+    </button>
+  </div>
+
+  <div class="zone-panel active" id="panel-old">
+    <table>
+      <thead>
+        <tr>
+          <th>اسم الوكيل</th>
+          <th>P35</th>
+          <th>P45</th>
+          <th>P65</th>
+          <th>إجمالي الكمية</th>
+          <th>الفئة</th>
+          <th>إجمالي المستحق</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody-old"></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="6" style="text-align:left">إجمالي المنطقة</td>
+          <td class="num" id="foot-old">0 د.ع</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="zone-actions">
+      <button class="add-btn" onclick="addAgent('old')">+ إضافة وكيل جديد</button>
+      <button class="export-btn" onclick="exportCSV('old')">تصدير CSV</button>
+    </div>
+  </div>
+
+  <div class="zone-panel" id="panel-new">
+    <table>
+      <thead>
+        <tr>
+          <th>اسم الوكيل</th>
+          <th>P35</th>
+          <th>P45</th>
+          <th>P65</th>
+          <th>إجمالي الكمية</th>
+          <th>الفئة</th>
+          <th>إجمالي المستحق</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody-new"></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="6" style="text-align:left">إجمالي المنطقة</td>
+          <td class="num" id="foot-new">0 د.ع</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="zone-actions">
+      <button class="add-btn" onclick="addAgent('new')">+ إضافة وكيل جديد</button>
+      <button class="export-btn" onclick="exportCSV('new')">تصدير CSV</button>
+    </div>
+  </div>
+
+  <footer class="note">
+    الفئة تُحدَّد تلقائيًا حسب إجمالي عدد التفعيلات لكل وكيل: T1 حتى 200 · T2 من 201 إلى 400 · T3 من 401 فأكثر.
+  </footer>
+
+</div>
+
+<script>
+// Tier Config
+let tiers = [
+  {key:'t1', label:'T1', min:0,   max:200,  p35:4000, p45:5500, p65:8000},
+  {key:'t2', label:'T2', min:201, max:400,  p35:4750, p45:6000, p65:9000},
+  {key:'t3', label:'T3', min:401, max:Infinity, p35:6000, p45:8000, p65:11500},
+];
+
+function buildTierGrid(){
+  const grid = document.getElementById('tierGrid');
+  grid.innerHTML = '<div></div><div class="th">سعر التفعيلة الأولى P35</div><div class="th">سعر التفعيلة الثانية P45</div><div class="th">سعر التفعيلة الثالثة P65</div>';
+  tiers.forEach(t=>{
+    const rangeTxt = t.max===Infinity ? (t.min+' فأكثر') : (t.min+' - '+t.max);
+    const name = document.createElement('div');
+    name.className='tier-name';
+    name.innerHTML = `<span class="dot ${t.key}"></span>${t.label} <span class="tier-range">(${rangeTxt})</span>`;
+    grid.appendChild(name);
+    ['p35','p45','p65'].forEach(field=>{
+      const inp = document.createElement('input');
+      inp.type='number'; inp.className='price-input'; inp.value=t[field];
+      inp.addEventListener('input', ()=>{ t[field] = Number(inp.value)||0; renderAll(); });
+      grid.appendChild(inp);
+    });
+  });
+}
+
+function getTier(totalQty){
+  if(totalQty<=0) return null;
+  return tiers.find(t=> totalQty>=t.min && totalQty<=t.max) || tiers[tiers.length-1];
+}
+
+let data = {
+  old: [
+    {name:'حيدر طالب', p35:252, p45:7,  p65:1},
+    {name:'عمار خليل', p35:541, p45:23, p65:3},
+    {name:'مصطفى ضياء', p35:94,  p45:8,  p65:0},
+    {name:'كرار عباس', p35:96,  p45:3,  p65:0},
+    {name:'زياد جواد', p35:152, p45:6,  p65:0},
+    {name:'عمار كامل', p35:331, p45:28, p65:8},
+    {name:'باسم محمد', p35:125, p45:1,  p65:0},
+    {name:'سعيد عمار', p35:87,  p45:6,  p65:0},
+    {name:'سعيد عمار sub1', p35:41, p45:0, p65:0},
+    {name:'سعيد عمار sub2', p35:124, p45:3, p65:0},
+    {name:'سعيد عمار sub8', p35:13,  p45:0, p65:0},
+    {name:'احمد عبدالعباس', p35:153, p45:6, p65:0},
+    {name:'احمد عبدالعباس sub1', p35:26, p45:2, p65:0},
+    {name:'احمد عبدالعباس sub2', p35:47, p45:0, p65:0},
+    {name:'احمد عبدالعباس sub3', p35:194, p45:0, p65:1},
+    {name:'علي طارق', p35:179, p45:1, p65:0},
+    {name:'بارق ليث', p35:395, p45:9, p65:0}
+  ],
+  new: [
+    {name:'FDT-94',  p35:397, p45:15, p65:0},
+    {name:'FDT-95',  p35:377, p45:12, p65:0},
+    {name:'FDT-96',  p35:369, p45:8,  p65:1},
+    {name:'FDT-97',  p35:272, p45:4,  p65:1},
+    {name:'FDT-98',  p35:405, p45:8,  p65:1},
+    {name:'FDT-99',  p35:301, p45:12, p65:0},
+    {name:'FDT-100', p35:206, p45:6,  p65:0},
+    {name:'FDT-101', p35:138, p45:2,  p65:0},
+    {name:'FDT-102', p35:269, p45:5,  p65:0},
+    {name:'FDT-108', p35:119, p45:0,  p65:0},
+    {name:'FDT-109', p35:12,  p45:0,  p65:1},
+    {name:'FDT-110', p35:56,  p45:0,  p65:0},
+    {name:'FDT-111', p35:35,  p45:0,  p65:0},
+    {name:'FDT-112', p35:44,  p45:2,  p65:0},
+    {name:'FDT-113', p35:150, p45:0,  p65:0},
+    {name:'FDT-114', p35:105, p45:2,  p65:0},
+    {name:'FDT-115', p35:38,  p45:2,  p65:0},
+    {name:'FDT-116', p35:54,  p45:1,  p65:0},
+    {name:'FDT-117', p35:8,   p45:0,  p65:0},
+    {name:'FDT-103', p35:252, p45:5,  p65:0},
+    {name:'FDT-104', p35:184, p45:2,  p65:0},
+    {name:'FDT-105', p35:286, p45:2,  p65:1},
+    {name:'FDT-106', p35:215, p45:3,  p65:0},
+    {name:'FDT-107', p35:154, p45:4,  p65:0}
+  ]
+};
+
+function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
+
+function computeRow(row){
+  const qty = (Number(row.p35)||0)+(Number(row.p45)||0)+(Number(row.p65)||0);
+  const tier = getTier(qty);
+  const total = tier ? (row.p35*tier.p35 + row.p45*tier.p45 + row.p65*tier.p65) : 0;
+  return {qty, tier, total};
+}
+
+function renderZone(zone){
+  const tbody = document.getElementById('tbody-'+zone);
+  tbody.innerHTML='';
+  let zoneTotal = 0;
+  data[zone].forEach((row, idx)=>{
+    const {qty, tier, total} = computeRow(row);
+    zoneTotal += total;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input class="name-input" value="${row.name}" data-idx="${idx}" data-zone="${zone}" data-field="name"></td>
+      <td><input class="qty-input" type="number" min="0" value="${row.p35}" data-idx="${idx}" data-zone="${zone}" data-field="p35"></td>
+      <td><input class="qty-input" type="number" min="0" value="${row.p45}" data-idx="${idx}" data-zone="${zone}" data-field="p45"></td>
+      <td><input class="qty-input" type="number" min="0" value="${row.p65}" data-idx="${idx}" data-zone="${zone}" data-field="p65"></td>
+      <td class="num">${qty}</td>
+      <td>${tier ? `<span class="badge ${tier.key}">${tier.label}</span>` : `<span class="badge t0">—</span>`}</td>
+      <td class="num row-total">${fmt(total)}</td>
+      <td><button class="del-btn" title="حذف" onclick="removeAgent('${zone}',${idx})">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('foot-'+zone).textContent = fmt(zoneTotal)+' د.ع';
+  return zoneTotal;
+}
+
+function renderAll(){
+  const oldTotal = renderZone('old');
+  const newTotal = renderZone('new');
+  document.getElementById('oldZoneTotal').innerHTML = fmt(oldTotal)+' <small>د.ع</small>';
+  document.getElementById('newZoneTotal').innerHTML = fmt(newTotal)+' <small>د.ع</small>';
+  document.getElementById('grandTotal').innerHTML = fmt(oldTotal+newTotal)+' <small>د.ع</small>';
+  document.getElementById('oldZoneCount').textContent = data.old.length+' وكيل';
+  document.getElementById('newZoneCount').textContent = data.new.length+' وكيل';
+  document.getElementById('grandCount').textContent = (data.old.length+data.new.length)+' وكيل';
+  attachInputEvents();
+}
+
+function attachInputEvents(){
+  document.querySelectorAll('input[data-field]').forEach(inp=>{
+    inp.oninput = (e)=>{
+      const {idx, zone, field} = e.target.dataset;
+      const row = data[zone][idx];
+      if(field==='name'){ row.name = e.target.value; }
+      else{ row[field] = Number(e.target.value)||0; }
+      if(field!=='name'){ renderZoneKeepFocus(zone); }
+      else{ updateSummaryOnly(); }
+    };
+  });
+}
+
+function renderZoneKeepFocus(zone){
+  const active = document.activeElement;
+  const focusInfo = active && active.dataset ? {...active.dataset, selStart:active.selectionStart} : null;
+  const oldTotal = renderZone('old');
+  const newTotal = renderZone('new');
+  document.getElementById('oldZoneTotal').innerHTML = fmt(oldTotal)+' <small>د.ع</small>';
+  document.getElementById('newZoneTotal').innerHTML = fmt(newTotal)+' <small>د.ع</small>';
+  document.getElementById('grandTotal').innerHTML = fmt(oldTotal+newTotal)+' <small>د.ع</small>';
+  attachInputEvents();
+  if(focusInfo){
+    const sel = `input[data-zone="${focusInfo.zone}"][data-idx="${focusInfo.idx}"][data-field="${focusInfo.field}"]`;
+    const el = document.querySelector(sel);
+    if(el){ el.focus(); if(el.setSelectionRange && focusInfo.selStart!=null) el.setSelectionRange(focusInfo.selStart, focusInfo.selStart); }
+  }
+}
+
+function updateSummaryOnly(){
+  let oldTotal=0, newTotal=0;
+  data.old.forEach(r=> oldTotal += computeRow(r).total);
+  data.new.forEach(r=> newTotal += computeRow(r).total);
+  document.getElementById('foot-old').textContent = fmt(oldTotal)+' د.ع';
+  document.getElementById('foot-new').textContent = fmt(newTotal)+' د.ع';
+  document.getElementById('oldZoneTotal').innerHTML = fmt(oldTotal)+' <small>د.ع</small>';
+  document.getElementById('newZoneTotal').innerHTML = fmt(newTotal)+' <small>د.ع</small>';
+  document.getElementById('grandTotal').innerHTML = fmt(oldTotal+newTotal)+' <small>د.ع</small>';
+}
+
+function addAgent(zone){
+  data[zone].push({name:'وكيل جديد', p35:0, p45:0, p65:0});
+  renderAll();
+}
+function removeAgent(zone, idx){
+  data[zone].splice(idx,1);
+  renderAll();
+}
+
+function switchTab(zone){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.tab-btn[data-zone="${zone}"]`).classList.add('active');
+  document.querySelectorAll('.zone-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+zone).classList.add('active');
+}
+
+function exportCSV(zone){
+  let csv = 'اسم الوكيل,P35,P45,P65,إجمالي الكمية,الفئة,إجمالي المستحق\n';
+  data[zone].forEach(row=>{
+    const {qty, tier, total} = computeRow(row);
+    csv += `${row.name},${row.p35},${row.p45},${row.p65},${qty},${tier?tier.label:'-'},${Math.round(total)}\n`;
+  });
+  const blob = new Blob(["\uFEFF"+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `agents_${zone}_zone.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+buildTierGrid();
+renderAll();
+
+// Service Worker for Offline Execution
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE_NAME = 'babil-commissions-v1';
+    self.addEventListener('install', e => {
+      e.waitUntil(
+        caches.open(CACHE_NAME).then(cache => cache.addAll(['./']))
+      );
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(
+        caches.match(e.request).then(res => res || fetch(e.request))
+      );
+    });
+  `;
+  const blob = new Blob([swCode], {type: 'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl).catch(() => {});
+}
+</script>
+</body>
+</html>
