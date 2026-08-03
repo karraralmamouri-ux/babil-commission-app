@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="عمولات بابل">
 <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
 
-<!-- Dynamic Data Manifest Injection -->
+<!-- Dynamic Manifest Injection -->
 <script>
   const manifestData = {
     "name": "لوحة عمولات وكلاء بابل",
@@ -31,10 +31,9 @@
     ]
   };
   const manifestBlob = new Blob([JSON.stringify(manifestData)], {type: 'application/json'});
-  const manifestURL = URL.createObjectURL(manifestBlob);
   const link = document.createElement('link');
   link.rel = 'manifest';
-  link.href = manifestURL;
+  link.href = URL.createObjectURL(manifestBlob);
   document.head.appendChild(link);
 </script>
 
@@ -57,32 +56,46 @@
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
-    background:
-      radial-gradient(1100px 500px at 85% -10%, rgba(212,162,78,.08), transparent 60%),
-      var(--ink);
+    background: radial-gradient(1100px 500px at 85% -10%, rgba(212,162,78,.08), transparent 60%), var(--ink);
     color:var(--text);
     font-family:"Segoe UI","Tahoma",Arial,sans-serif;
     line-height:1.5;
     min-height:100vh;
   }
-  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px;}
+  .wrap{max-width:1200px;margin:0 auto;padding:24px 16px 60px;}
 
-  /* Header */
+  /* Header Controls & Archive */
   .masthead{
-    display:flex;justify-content:space-between;align-items:flex-end;gap:20px;
+    display:flex;justify-content:space-between;align-items:center;gap:16px;
     border-bottom:1px solid var(--line);
-    padding-bottom:18px;margin-bottom:22px;flex-wrap:wrap;
+    padding-bottom:18px;margin-bottom:20px;flex-wrap:wrap;
   }
-  .masthead h1{font-size:26px;margin:0 0 6px;letter-spacing:.2px;font-weight:700;}
+  .masthead h1{font-size:24px;margin:0 0 4px;font-weight:700;}
   .masthead .eyebrow{color:var(--gold);font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:700;}
-  .month-field{display:flex;align-items:center;gap:8px;color:var(--text-dim);font-size:13px;}
-  .month-field input{
+  
+  .controls-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .select-ctrl, .input-ctrl{
     background:var(--panel-2);border:1px solid var(--line);color:var(--text);
-    padding:7px 10px;border-radius:6px;font-size:13px;font-family:inherit;
+    padding:8px 12px;border-radius:6px;font-size:13px;font-family:inherit;outline:none;
   }
+  .btn-action{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--text);
+    padding:8px 14px;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;
+  }
+  .btn-action:hover{border-color:var(--gold);color:var(--gold);}
+  .btn-gold{background:var(--gold-soft);border-color:var(--gold);color:var(--gold);}
+  .btn-gold:hover{background:var(--gold);color:var(--ink);}
+
+  /* Toolbar: Search */
+  .search-box{margin-bottom:18px;width:100%;}
+  .search-input{
+    width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);
+    padding:10px 14px;border-radius:8px;font-size:13.5px;outline:none;
+  }
+  .search-input:focus{border-color:var(--gold);}
 
   /* Summary Cards */
-  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:26px;}
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
   .card{
     background:linear-gradient(180deg,var(--panel),var(--panel-2));
     border:1px solid var(--line);border-radius:var(--radius);
@@ -92,99 +105,98 @@
   .card.zone-old::before{background:var(--t2);}
   .card.zone-new::before{background:var(--t1);}
   .card.grand::before{background:var(--gold);}
-  .card .label{color:var(--text-dim);font-size:12px;margin-bottom:8px;}
-  .card .value{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;font-family:"Consolas","Courier New",monospace;}
-  .card .value small{font-size:13px;color:var(--text-dim);font-family:inherit;margin-right:4px;}
-  .card .sub{font-size:11.5px;color:var(--text-dim);margin-top:6px;}
+  .card .label{color:var(--text-dim);font-size:12px;margin-bottom:6px;}
+  .card .value{font-size:22px;font-weight:700;font-family:"Consolas","Courier New",monospace;}
+  .card .value small{font-size:13px;color:var(--text-dim);margin-right:4px;}
+  .card .sub{font-size:11.5px;color:var(--text-dim);margin-top:4px;}
 
-  /* Tier Config */
+  /* Tier Config Accordion */
   details.config{
     background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-    margin-bottom:26px;padding:2px 18px;
+    margin-bottom:22px;padding:2px 18px;
   }
   details.config summary{
-    cursor:pointer;padding:14px 0;font-size:13px;color:var(--gold);font-weight:700;
+    cursor:pointer;padding:12px 0;font-size:13px;color:var(--gold);font-weight:700;
     list-style:none;display:flex;align-items:center;gap:8px;
   }
   details.config summary::-webkit-details-marker{display:none;}
   details.config summary:before{content:"⚙";font-size:14px;}
   .tier-grid{
     display:grid;grid-template-columns:auto repeat(3,1fr);gap:10px 16px;
-    padding-bottom:18px;align-items:center;
+    padding-bottom:16px;align-items:center;
   }
-  .tier-grid .th{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;}
-  .tier-name{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;}
-  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .tier-grid .th{font-size:11px;color:var(--text-dim);text-transform:uppercase;}
+  .tier-name{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
   .dot.t1{background:var(--t1);} .dot.t2{background:var(--t2);} .dot.t3{background:var(--t3);}
   .tier-range{font-size:11px;color:var(--text-dim);font-weight:400;}
   .price-input{
     width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--text);
-    padding:7px 8px;border-radius:6px;font-family:"Consolas",monospace;font-size:13px;text-align:center;
+    padding:6px 8px;border-radius:6px;font-family:"Consolas",monospace;font-size:12.5px;text-align:center;
   }
 
   /* Zone Tabs */
   .tabs{display:flex;gap:6px;margin-bottom:14px;}
   .tab-btn{
     background:var(--panel);border:1px solid var(--line);color:var(--text-dim);
-    padding:10px 20px;border-radius:8px 8px 0 0;font-size:13.5px;font-weight:700;cursor:pointer;
+    padding:10px 20px;border-radius:8px 8px 0 0;font-size:13px;font-weight:700;cursor:pointer;
     border-bottom:none;position:relative;top:1px;
   }
   .tab-btn.active{color:var(--text);background:var(--panel-2);border-bottom:1px solid var(--panel-2);}
   .tab-btn .swatch{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:6px;}
-  .zone-panel{display:none;background:var(--panel-2);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:16px;}
+  .zone-panel{display:none;background:var(--panel-2);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:16px;overflow-x:auto;}
   .zone-panel.active{display:block;}
 
-  table{width:100%;border-collapse:collapse;font-size:13px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:650px;}
   thead th{
-    text-align:center;color:var(--text-dim);font-weight:600;font-size:11.5px;
-    text-transform:uppercase;letter-spacing:.4px;padding:8px 6px;border-bottom:1px solid var(--line);
+    text-align:center;color:var(--text-dim);font-weight:600;font-size:11px;
+    text-transform:uppercase;padding:8px 6px;border-bottom:1px solid var(--line);
   }
   thead th:first-child, tbody td:first-child{text-align:right;}
   tbody td{padding:6px;border-bottom:1px solid rgba(255,255,255,.04);text-align:center;vertical-align:middle;}
   tbody tr:hover{background:rgba(255,255,255,.02);}
   .name-input{
     width:100%;background:transparent;border:1px solid transparent;color:var(--text);
-    padding:6px 8px;border-radius:6px;font-size:13px;font-family:inherit;text-align:right;
+    padding:5px 6px;border-radius:6px;font-size:13px;font-family:inherit;text-align:right;
   }
   .name-input:hover, .name-input:focus{background:var(--panel);border-color:var(--line);outline:none;}
+  
+  /* Micro Controls for inputs */
+  .qty-ctrl{display:inline-flex;align-items:center;gap:2px;}
+  .btn-step{
+    background:var(--panel);border:1px solid var(--line);color:var(--text-dim);
+    width:22px;height:26px;border-radius:4px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;
+  }
+  .btn-step:hover{color:var(--gold);border-color:var(--gold);}
   .qty-input{
-    width:56px;background:var(--panel);border:1px solid var(--line);color:var(--text);
-    padding:6px 4px;border-radius:6px;text-align:center;font-family:"Consolas",monospace;font-size:13px;
+    width:48px;background:var(--panel);border:1px solid var(--line);color:var(--text);
+    padding:4px;border-radius:4px;text-align:center;font-family:"Consolas",monospace;font-size:12.5px;
   }
   .qty-input:focus{outline:none;border-color:var(--gold);}
-  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
   .badge.t1{background:rgba(78,161,160,.15);color:var(--t1);}
   .badge.t2{background:rgba(78,127,212,.15);color:var(--t2);}
   .badge.t3{background:rgba(176,106,212,.15);color:var(--t3);}
   .badge.t0{background:rgba(255,255,255,.06);color:var(--text-dim);}
-  .num{font-family:"Consolas","Courier New",monospace;font-variant-numeric:tabular-nums;}
+  .num{font-family:"Consolas","Courier New",monospace;}
   .row-total{color:var(--gold);font-weight:700;}
   .del-btn{
-    background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:15px;
-    width:26px;height:26px;border-radius:6px;
+    background:transparent;border:none;color:var(--text-dim);cursor:pointer;font-size:14px;
+    width:24px;height:24px;border-radius:4px;
   }
   .del-btn:hover{color:var(--danger);background:rgba(212,99,78,.1);}
   tfoot td{padding:12px 6px;border-top:2px solid var(--line);font-weight:700;}
-  tfoot .num{color:var(--gold);font-size:14.5px;}
+  tfoot .num{color:var(--gold);font-size:14px;}
 
-  .zone-actions{display:flex;justify-content:space-between;align-items:center;margin-top:12px;}
-  .add-btn{
-    background:var(--gold-soft);border:1px solid var(--gold);color:var(--gold);
-    padding:8px 16px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;
-  }
-  .add-btn:hover{background:var(--gold);color:var(--ink);}
-  .export-btn{
-    background:transparent;border:1px solid var(--line);color:var(--text-dim);
-    padding:8px 16px;border-radius:7px;font-size:12.5px;cursor:pointer;
-  }
-  .export-btn:hover{color:var(--text);border-color:var(--text-dim);}
+  .zone-actions{display:flex;justify-content:space-between;align-items:center;margin-top:14px;}
   footer.note{color:var(--text-dim);font-size:11.5px;margin-top:22px;text-align:center;}
 
   @media (max-width:720px){
     .summary{grid-template-columns:1fr;}
     .tier-grid{grid-template-columns:1fr;}
-    table{font-size:11.5px;}
-    .qty-input{width:44px;}
+    .masthead{flex-direction:column;align-items:flex-start;}
+    .controls-bar{width:100%;justify-content:flex-start;}
   }
 </style>
 </head>
@@ -196,10 +208,17 @@
       <div class="eyebrow">شركة توزيع بابل</div>
       <h1>لوحة عمولات الوكلاء (FDT)</h1>
     </div>
-    <div class="month-field">
-      الشهر:
-      <input id="monthLabel" type="text" value="7 / 2026">
+    
+    <div class="controls-bar">
+      <span>الأرشيف:</span>
+      <select id="monthSelect" class="select-ctrl" onchange="loadSelectedMonth()"></select>
+      <button class="btn-action btn-gold" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
+      <button class="btn-action" onclick="startNewMonth()">✨ بدء شهر جديد</button>
     </div>
+  </div>
+
+  <div class="search-box">
+    <input type="text" id="searchInput" class="search-input" placeholder="🔍 ابحث عن وكيل أو رقم FDT لتصفيته..." oninput="renderAll()">
   </div>
 
   <div class="summary">
@@ -221,12 +240,12 @@
   </div>
 
   <details class="config" id="configPanel">
-    <summary>أسعار الفئات (يمكن تعديلها إذا تغيّرت التسعيرة)</summary>
+    <summary>أسعار الفئات والشؤون المالية</summary>
     <div class="tier-grid" id="tierGrid">
       <div></div>
-      <div class="th">سعر التفعيلة الأولى P35</div>
-      <div class="th">سعر التفعيلة الثانية P45</div>
-      <div class="th">سعر التفعيلة الثالثة P65</div>
+      <div class="th">سعر P35</div>
+      <div class="th">سعر P45</div>
+      <div class="th">سعر P65</div>
     </div>
   </details>
 
@@ -263,8 +282,8 @@
       </tfoot>
     </table>
     <div class="zone-actions">
-      <button class="add-btn" onclick="addAgent('old')">+ إضافة وكيل جديد</button>
-      <button class="export-btn" onclick="exportCSV('old')">تصدير CSV</button>
+      <button class="btn-action btn-gold" onclick="addAgent('old')">+ إضافة وكيل جديد</button>
+      <button class="btn-action" onclick="exportCSV('old')">تصدير CSV</button>
     </div>
   </div>
 
@@ -292,49 +311,25 @@
       </tfoot>
     </table>
     <div class="zone-actions">
-      <button class="add-btn" onclick="addAgent('new')">+ إضافة وكيل جديد</button>
-      <button class="export-btn" onclick="exportCSV('new')">تصدير CSV</button>
+      <button class="btn-action btn-gold" onclick="addAgent('new')">+ إضافة وكيل جديد</button>
+      <button class="btn-action" onclick="exportCSV('new')">تصدير CSV</button>
     </div>
   </div>
 
   <footer class="note">
-    الفئة تُحدَّد تلقائيًا حسب إجمالي عدد التفعيلات لكل وكيل: T1 حتى 200 · T2 من 201 إلى 400 · T3 من 401 فأكثر.
+    يتم حفظ كافة البيانات والتغييرات تلقائياً في ذاكرة المتصفح (Auto-Saved).
   </footer>
 
 </div>
 
 <script>
-// Tier Config
 let tiers = [
   {key:'t1', label:'T1', min:0,   max:200,  p35:4000, p45:5500, p65:8000},
   {key:'t2', label:'T2', min:201, max:400,  p35:4750, p45:6000, p65:9000},
   {key:'t3', label:'T3', min:401, max:Infinity, p35:6000, p45:8000, p65:11500},
 ];
 
-function buildTierGrid(){
-  const grid = document.getElementById('tierGrid');
-  grid.innerHTML = '<div></div><div class="th">سعر التفعيلة الأولى P35</div><div class="th">سعر التفعيلة الثانية P45</div><div class="th">سعر التفعيلة الثالثة P65</div>';
-  tiers.forEach(t=>{
-    const rangeTxt = t.max===Infinity ? (t.min+' فأكثر') : (t.min+' - '+t.max);
-    const name = document.createElement('div');
-    name.className='tier-name';
-    name.innerHTML = `<span class="dot ${t.key}"></span>${t.label} <span class="tier-range">(${rangeTxt})</span>`;
-    grid.appendChild(name);
-    ['p35','p45','p65'].forEach(field=>{
-      const inp = document.createElement('input');
-      inp.type='number'; inp.className='price-input'; inp.value=t[field];
-      inp.addEventListener('input', ()=>{ t[field] = Number(inp.value)||0; renderAll(); });
-      grid.appendChild(inp);
-    });
-  });
-}
-
-function getTier(totalQty){
-  if(totalQty<=0) return null;
-  return tiers.find(t=> totalQty>=t.min && totalQty<=t.max) || tiers[tiers.length-1];
-}
-
-let data = {
+let defaultData = {
   old: [
     {name:'حيدر طالب', p35:252, p45:7,  p65:1},
     {name:'عمار خليل', p35:541, p45:23, p65:3},
@@ -382,6 +377,33 @@ let data = {
   ]
 };
 
+let currentMonthKey = '07/2026';
+let archive = JSON.parse(localStorage.getItem('babil_archive') || '{}');
+let data = JSON.parse(localStorage.getItem('babil_current_data') || 'null') || JSON.parse(JSON.stringify(defaultData));
+
+function buildTierGrid(){
+  const grid = document.getElementById('tierGrid');
+  grid.innerHTML = '<div></div><div class="th">سعر P35</div><div class="th">سعر P45</div><div class="th">سعر P65</div>';
+  tiers.forEach(t=>{
+    const rangeTxt = t.max===Infinity ? (t.min+' فأكثر') : (t.min+' - '+t.max);
+    const name = document.createElement('div');
+    name.className='tier-name';
+    name.innerHTML = `<span class="dot ${t.key}"></span>${t.label} <span class="tier-range">(${rangeTxt})</span>`;
+    grid.appendChild(name);
+    ['p35','p45','p65'].forEach(field=>{
+      const inp = document.createElement('input');
+      inp.type='number'; inp.className='price-input'; inp.value=t[field];
+      inp.addEventListener('input', ()=>{ t[field] = Number(inp.value)||0; autoSave(); renderAll(); });
+      grid.appendChild(inp);
+    });
+  });
+}
+
+function getTier(totalQty){
+  if(totalQty<=0) return null;
+  return tiers.find(t=> totalQty>=t.min && totalQty<=t.max) || tiers[tiers.length-1];
+}
+
 function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
 
 function computeRow(row){
@@ -395,15 +417,37 @@ function renderZone(zone){
   const tbody = document.getElementById('tbody-'+zone);
   tbody.innerHTML='';
   let zoneTotal = 0;
+  const filter = (document.getElementById('searchInput').value || '').toLowerCase();
+
   data[zone].forEach((row, idx)=>{
+    if(filter && !row.name.toLowerCase().includes(filter)) return;
+
     const {qty, tier, total} = computeRow(row);
     zoneTotal += total;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input class="name-input" value="${row.name}" data-idx="${idx}" data-zone="${zone}" data-field="name"></td>
-      <td><input class="qty-input" type="number" min="0" value="${row.p35}" data-idx="${idx}" data-zone="${zone}" data-field="p35"></td>
-      <td><input class="qty-input" type="number" min="0" value="${row.p45}" data-idx="${idx}" data-zone="${zone}" data-field="p45"></td>
-      <td><input class="qty-input" type="number" min="0" value="${row.p65}" data-idx="${idx}" data-zone="${zone}" data-field="p65"></td>
+      <td>
+        <div class="qty-ctrl">
+          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p35',-1)">-</button>
+          <input class="qty-input" type="number" min="0" value="${row.p35}" data-idx="${idx}" data-zone="${zone}" data-field="p35">
+          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p35',1)">+</button>
+        </div>
+      </td>
+      <td>
+        <div class="qty-ctrl">
+          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p45',-1)">-</button>
+          <input class="qty-input" type="number" min="0" value="${row.p45}" data-idx="${idx}" data-zone="${zone}" data-field="p45">
+          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p45',1)">+</button>
+        </div>
+      </td>
+      <td>
+        <div class="qty-ctrl">
+          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p65',-1)">-</button>
+          <input class="qty-input" type="number" min="0" value="${row.p65}" data-idx="${idx}" data-zone="${zone}" data-field="p65">
+          <button class="btn-step" onclick="stepQty('${zone}',${idx},'p65',1)">+</button>
+        </div>
+      </td>
       <td class="num">${qty}</td>
       <td>${tier ? `<span class="badge ${tier.key}">${tier.label}</span>` : `<span class="badge t0">—</span>`}</td>
       <td class="num row-total">${fmt(total)}</td>
@@ -427,6 +471,12 @@ function renderAll(){
   attachInputEvents();
 }
 
+function stepQty(zone, idx, field, delta){
+  data[zone][idx][field] = Math.max(0, (Number(data[zone][idx][field]) || 0) + delta);
+  autoSave();
+  renderAll();
+}
+
 function attachInputEvents(){
   document.querySelectorAll('input[data-field]').forEach(inp=>{
     inp.oninput = (e)=>{
@@ -434,45 +484,25 @@ function attachInputEvents(){
       const row = data[zone][idx];
       if(field==='name'){ row.name = e.target.value; }
       else{ row[field] = Number(e.target.value)||0; }
-      if(field!=='name'){ renderZoneKeepFocus(zone); }
-      else{ updateSummaryOnly(); }
+      autoSave();
+      renderAll();
     };
   });
 }
 
-function renderZoneKeepFocus(zone){
-  const active = document.activeElement;
-  const focusInfo = active && active.dataset ? {...active.dataset, selStart:active.selectionStart} : null;
-  const oldTotal = renderZone('old');
-  const newTotal = renderZone('new');
-  document.getElementById('oldZoneTotal').innerHTML = fmt(oldTotal)+' <small>د.ع</small>';
-  document.getElementById('newZoneTotal').innerHTML = fmt(newTotal)+' <small>د.ع</small>';
-  document.getElementById('grandTotal').innerHTML = fmt(oldTotal+newTotal)+' <small>د.ع</small>';
-  attachInputEvents();
-  if(focusInfo){
-    const sel = `input[data-zone="${focusInfo.zone}"][data-idx="${focusInfo.idx}"][data-field="${focusInfo.field}"]`;
-    const el = document.querySelector(sel);
-    if(el){ el.focus(); if(el.setSelectionRange && focusInfo.selStart!=null) el.setSelectionRange(focusInfo.selStart, focusInfo.selStart); }
-  }
-}
-
-function updateSummaryOnly(){
-  let oldTotal=0, newTotal=0;
-  data.old.forEach(r=> oldTotal += computeRow(r).total);
-  data.new.forEach(r=> newTotal += computeRow(r).total);
-  document.getElementById('foot-old').textContent = fmt(oldTotal)+' د.ع';
-  document.getElementById('foot-new').textContent = fmt(newTotal)+' د.ع';
-  document.getElementById('oldZoneTotal').innerHTML = fmt(oldTotal)+' <small>د.ع</small>';
-  document.getElementById('newZoneTotal').innerHTML = fmt(newTotal)+' <small>د.ع</small>';
-  document.getElementById('grandTotal').innerHTML = fmt(oldTotal+newTotal)+' <small>د.ع</small>';
+function autoSave(){
+  localStorage.setItem('babil_current_data', JSON.stringify(data));
 }
 
 function addAgent(zone){
   data[zone].push({name:'وكيل جديد', p35:0, p45:0, p65:0});
+  autoSave();
   renderAll();
 }
+
 function removeAgent(zone, idx){
   data[zone].splice(idx,1);
+  autoSave();
   renderAll();
 }
 
@@ -481,6 +511,45 @@ function switchTab(zone){
   document.querySelector(`.tab-btn[data-zone="${zone}"]`).classList.add('active');
   document.querySelectorAll('.zone-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+zone).classList.add('active');
+}
+
+// Archive Management
+function updateMonthSelect(){
+  const sel = document.getElementById('monthSelect');
+  sel.innerHTML = '<option value="current">الشهر الحالي (نشط)</option>';
+  Object.keys(archive).forEach(m=>{
+    sel.innerHTML += `<option value="${m}">أرشيف: ${m}</option>`;
+  });
+}
+
+function saveCurrentMonth(){
+  const name = prompt("أدخل اسم/تاريخ الشهر للحفظ في الأرشيف (مثال: 07/2026):", currentMonthKey);
+  if(name){
+    archive[name] = JSON.parse(JSON.stringify(data));
+    localStorage.setItem('babil_archive', JSON.stringify(archive));
+    updateMonthSelect();
+    alert('تم حفظ الشهر في الأرشيف بنجاح!');
+  }
+}
+
+function loadSelectedMonth(){
+  const val = document.getElementById('monthSelect').value;
+  if(val === 'current'){
+    data = JSON.parse(localStorage.getItem('babil_current_data') || JSON.stringify(defaultData));
+  } else if(archive[val]) {
+    data = JSON.parse(JSON.stringify(archive[val]));
+  }
+  renderAll();
+}
+
+function startNewMonth(){
+  if(confirm("هل أنت تأكد من بدء شهر جديد؟ سيتم تصفير التفعيلات مع الحفاظ على أسماء الوكلاء.")){
+    ['old','new'].forEach(z=>{
+      data[z].forEach(r=>{ r.p35=0; r.p45=0; r.p65=0; });
+    });
+    autoSave();
+    renderAll();
+  }
 }
 
 function exportCSV(zone){
@@ -497,28 +566,20 @@ function exportCSV(zone){
   URL.revokeObjectURL(url);
 }
 
-buildTierGrid();
-renderAll();
-
-// Service Worker for Offline Execution
+// Service Worker for Offline Execution (PWA)
 if ('serviceWorker' in navigator) {
   const swCode = `
-    const CACHE_NAME = 'babil-commissions-v1';
-    self.addEventListener('install', e => {
-      e.waitUntil(
-        caches.open(CACHE_NAME).then(cache => cache.addAll(['./']))
-      );
-    });
-    self.addEventListener('fetch', e => {
-      e.respondWith(
-        caches.match(e.request).then(res => res || fetch(e.request))
-      );
-    });
+    const CACHE_NAME = 'babil-app-v2';
+    self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(['./']))); });
+    self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(res => res || fetch(e.request))); });
   `;
   const blob = new Blob([swCode], {type: 'application/javascript'});
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl).catch(() => {});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
 }
+
+buildTierGrid();
+updateMonthSelect();
+renderAll();
 </script>
 </body>
 </html>
