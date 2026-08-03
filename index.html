@@ -5,37 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>لوحة عمولات وكلاء بابل</title>
 
-<!-- PWA Meta Tags & Theme Colors -->
 <meta name="theme-color" content="#12161c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="عمولات بابل">
 <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
-
-<!-- Dynamic Manifest Injection -->
-<script>
-  const manifestData = {
-    "name": "لوحة عمولات وكلاء بابل",
-    "short_name": "عمولات بابل",
-    "start_url": "./",
-    "display": "standalone",
-    "background_color": "#12161c",
-    "theme_color": "#12161c",
-    "icons": [
-      {
-        "src": "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
-        "sizes": "512x512",
-        "type": "image/png",
-        "purpose": "any maskable"
-      }
-    ]
-  };
-  const manifestBlob = new Blob([JSON.stringify(manifestData)], {type: 'application/json'});
-  const link = document.createElement('link');
-  link.rel = 'manifest';
-  link.href = URL.createObjectURL(manifestBlob);
-  document.head.appendChild(link);
-</script>
 
 <style>
   :root{
@@ -64,7 +38,6 @@
   }
   .wrap{max-width:1240px;margin:0 auto;padding:24px 16px 60px;}
 
-  /* Header Controls & Archive */
   .masthead{
     display:flex;justify-content:space-between;align-items:center;gap:16px;
     border-bottom:1px solid var(--line);
@@ -74,7 +47,7 @@
   .masthead .eyebrow{color:var(--gold);font-size:12px;letter-spacing:2px;text-transform:uppercase;font-weight:700;}
   
   .controls-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-  .select-ctrl, .input-ctrl{
+  .select-ctrl{
     background:var(--panel-2);border:1px solid var(--line);color:var(--text);
     padding:8px 12px;border-radius:6px;font-size:13px;font-family:inherit;outline:none;
   }
@@ -86,8 +59,9 @@
   .btn-action:hover{border-color:var(--gold);color:var(--gold);}
   .btn-gold{background:var(--gold-soft);border-color:var(--gold);color:var(--gold);}
   .btn-gold:hover{background:var(--gold);color:var(--ink);}
+  .btn-danger{background:rgba(212,99,78,.15);border-color:var(--danger);color:var(--danger);}
+  .btn-danger:hover{background:var(--danger);color:#fff;}
 
-  /* Toolbar: Search & Import */
   .toolbar{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
   .search-input{
     flex:1;background:var(--panel);border:1px solid var(--line);color:var(--text);
@@ -95,7 +69,6 @@
   }
   .search-input:focus{border-color:var(--gold);}
 
-  /* Summary Cards */
   .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
   .card{
     background:linear-gradient(180deg,var(--panel),var(--panel-2));
@@ -111,7 +84,6 @@
   .card .value small{font-size:13px;color:var(--text-dim);margin-right:4px;}
   .card .sub{font-size:11.5px;color:var(--text-dim);margin-top:4px;}
 
-  /* Tier Config Accordion */
   details.config{
     background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
     margin-bottom:22px;padding:2px 18px;
@@ -136,7 +108,6 @@
     padding:6px 8px;border-radius:6px;font-family:"Consolas",monospace;font-size:12.5px;text-align:center;
   }
 
-  /* Zone Tabs */
   .tabs{display:flex;gap:6px;margin-bottom:14px;}
   .tab-btn{
     background:var(--panel);border:1px solid var(--line);color:var(--text-dim);
@@ -162,7 +133,6 @@
   }
   .name-input:hover, .name-input:focus{background:var(--panel);border-color:var(--line);outline:none;}
   
-  /* Micro Controls for inputs */
   .qty-ctrl{display:inline-flex;align-items:center;gap:2px;}
   .btn-step{
     background:var(--panel);border:1px solid var(--line);color:var(--text-dim);
@@ -175,7 +145,6 @@
   }
   .qty-input:focus{outline:none;border-color:var(--gold);}
 
-  /* Editable Tier Select */
   .tier-select{
     background:var(--panel);border:1px solid var(--line);color:var(--text);
     padding:4px 6px;border-radius:6px;font-size:11px;font-weight:700;outline:none;cursor:pointer;
@@ -219,6 +188,7 @@
       <select id="monthSelect" class="select-ctrl" onchange="loadSelectedMonth()"></select>
       <button class="btn-action btn-gold" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
       <button class="btn-action" onclick="startNewMonth()">✨ بدء شهر جديد</button>
+      <button class="btn-action btn-danger" onclick="resetToDefaultData()" title="إعادة الجداول لحالتها الأصلية">🔄 استعادة الأصل</button>
     </div>
   </div>
 
@@ -552,7 +522,7 @@ function importExcel(event){
     let importedCount = 0;
 
     lines.forEach((line, index)=>{
-      if(index === 0 || !line.trim()) return; // Skip Header or empty lines
+      if(index === 0 || !line.trim()) return;
       const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
       if(cols.length >= 2){
         const name = cols[0];
@@ -616,6 +586,15 @@ function startNewMonth(){
   }
 }
 
+function resetToDefaultData(){
+  if(confirm("هل أنت متأكد من استعادة البيانات الأصلية؟ سيتم مسح البيانات المتداخلة الخاطئة.")){
+    localStorage.removeItem('babil_current_data');
+    data = JSON.parse(JSON.stringify(defaultData));
+    renderAll();
+    alert("تم مسح الخطأ وإعادة البيانات الأصلية بنجاح!");
+  }
+}
+
 function exportCSV(zone){
   let csv = 'اسم الوكيل,P35,P45,P65,إجمالي الكمية,الفئة,إجمالي المستحق\n';
   data[zone].forEach(row=>{
@@ -628,17 +607,6 @@ function exportCSV(zone){
   a.href = url; a.download = `agents_${zone}_zone.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
-}
-
-// Service Worker for Offline Execution (PWA)
-if ('serviceWorker' in navigator) {
-  const swCode = `
-    const CACHE_NAME = 'babil-app-v3';
-    self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(['./']))); });
-    self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(res => res || fetch(e.request))); });
-  `;
-  const blob = new Blob([swCode], {type: 'application/javascript'});
-  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
 }
 
 buildTierGrid();
