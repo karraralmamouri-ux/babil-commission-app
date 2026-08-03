@@ -62,7 +62,7 @@
     line-height:1.5;
     min-height:100vh;
   }
-  .wrap{max-width:1200px;margin:0 auto;padding:24px 16px 60px;}
+  .wrap{max-width:1240px;margin:0 auto;padding:24px 16px 60px;}
 
   /* Header Controls & Archive */
   .masthead{
@@ -81,15 +81,16 @@
   .btn-action{
     background:var(--panel-2);border:1px solid var(--line);color:var(--text);
     padding:8px 14px;border-radius:6px;font-size:12.5px;font-weight:600;cursor:pointer;
+    display:inline-flex;align-items:center;gap:6px;
   }
   .btn-action:hover{border-color:var(--gold);color:var(--gold);}
   .btn-gold{background:var(--gold-soft);border-color:var(--gold);color:var(--gold);}
   .btn-gold:hover{background:var(--gold);color:var(--ink);}
 
-  /* Toolbar: Search */
-  .search-box{margin-bottom:18px;width:100%;}
+  /* Toolbar: Search & Import */
+  .toolbar{display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap;}
   .search-input{
-    width:100%;background:var(--panel);border:1px solid var(--line);color:var(--text);
+    flex:1;background:var(--panel);border:1px solid var(--line);color:var(--text);
     padding:10px 14px;border-radius:8px;font-size:13.5px;outline:none;
   }
   .search-input:focus{border-color:var(--gold);}
@@ -147,7 +148,7 @@
   .zone-panel{display:none;background:var(--panel-2);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:16px;overflow-x:auto;}
   .zone-panel.active{display:block;}
 
-  table{width:100%;border-collapse:collapse;font-size:13px;min-width:650px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px;}
   thead th{
     text-align:center;color:var(--text-dim);font-weight:600;font-size:11px;
     text-transform:uppercase;padding:8px 6px;border-bottom:1px solid var(--line);
@@ -174,11 +175,15 @@
   }
   .qty-input:focus{outline:none;border-color:var(--gold);}
 
-  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;}
-  .badge.t1{background:rgba(78,161,160,.15);color:var(--t1);}
-  .badge.t2{background:rgba(78,127,212,.15);color:var(--t2);}
-  .badge.t3{background:rgba(176,106,212,.15);color:var(--t3);}
-  .badge.t0{background:rgba(255,255,255,.06);color:var(--text-dim);}
+  /* Editable Tier Select */
+  .tier-select{
+    background:var(--panel);border:1px solid var(--line);color:var(--text);
+    padding:4px 6px;border-radius:6px;font-size:11px;font-weight:700;outline:none;cursor:pointer;
+  }
+  .tier-select.t1{color:var(--t1);border-color:rgba(78,161,160,.4);}
+  .tier-select.t2{color:var(--t2);border-color:rgba(78,127,212,.4);}
+  .tier-select.t3{color:var(--t3);border-color:rgba(176,106,212,.4);}
+
   .num{font-family:"Consolas","Courier New",monospace;}
   .row-total{color:var(--gold);font-weight:700;}
   .del-btn{
@@ -217,8 +222,10 @@
     </div>
   </div>
 
-  <div class="search-box">
+  <div class="toolbar">
     <input type="text" id="searchInput" class="search-input" placeholder="🔍 ابحث عن وكيل أو رقم FDT لتصفيته..." oninput="renderAll()">
+    <button class="btn-action" onclick="document.getElementById('fileInput').click()">📥 استيراد بيانات من Excel/CSV</button>
+    <input type="file" id="fileInput" accept=".csv, .xlsx, .xls" style="display:none;" onchange="importExcel(event)">
   </div>
 
   <div class="summary">
@@ -267,7 +274,7 @@
           <th>P45</th>
           <th>P65</th>
           <th>إجمالي الكمية</th>
-          <th>الفئة</th>
+          <th>الفئة (تحرير يدوي)</th>
           <th>إجمالي المستحق</th>
           <th></th>
         </tr>
@@ -296,7 +303,7 @@
           <th>P45</th>
           <th>P65</th>
           <th>إجمالي الكمية</th>
-          <th>الفئة</th>
+          <th>الفئة (تحرير يدوي)</th>
           <th>إجمالي المستحق</th>
           <th></th>
         </tr>
@@ -331,49 +338,49 @@ let tiers = [
 
 let defaultData = {
   old: [
-    {name:'حيدر طالب', p35:252, p45:7,  p65:1},
-    {name:'عمار خليل', p35:541, p45:23, p65:3},
-    {name:'مصطفى ضياء', p35:94,  p45:8,  p65:0},
-    {name:'كرار عباس', p35:96,  p45:3,  p65:0},
-    {name:'زياد جواد', p35:152, p45:6,  p65:0},
-    {name:'عمار كامل', p35:331, p45:28, p65:8},
-    {name:'باسم محمد', p35:125, p45:1,  p65:0},
-    {name:'سعيد عمار', p35:87,  p45:6,  p65:0},
-    {name:'سعيد عمار sub1', p35:41, p45:0, p65:0},
-    {name:'سعيد عمار sub2', p35:124, p45:3, p65:0},
-    {name:'سعيد عمار sub8', p35:13,  p45:0, p65:0},
-    {name:'احمد عبدالعباس', p35:153, p45:6, p65:0},
-    {name:'احمد عبدالعباس sub1', p35:26, p45:2, p65:0},
-    {name:'احمد عبدالعباس sub2', p35:47, p45:0, p65:0},
-    {name:'احمد عبدالعباس sub3', p35:194, p45:0, p65:1},
-    {name:'علي طارق', p35:179, p45:1, p65:0},
-    {name:'بارق ليث', p35:395, p45:9, p65:0}
+    {name:'حيدر طالب', p35:252, p45:7,  p65:1, customTier: 'auto'},
+    {name:'عمار خليل', p35:541, p45:23, p65:3, customTier: 'auto'},
+    {name:'مصطفى ضياء', p35:94,  p45:8,  p65:0, customTier: 'auto'},
+    {name:'كرار عباس', p35:96,  p45:3,  p65:0, customTier: 'auto'},
+    {name:'زياد جواد', p35:152, p45:6,  p65:0, customTier: 'auto'},
+    {name:'عمار كامل', p35:331, p45:28, p65:8, customTier: 'auto'},
+    {name:'باسم محمد', p35:125, p45:1,  p65:0, customTier: 'auto'},
+    {name:'سعيد عمار', p35:87,  p45:6,  p65:0, customTier: 'auto'},
+    {name:'سعيد عمار sub1', p35:41, p45:0, p65:0, customTier: 'auto'},
+    {name:'سعيد عمار sub2', p35:124, p45:3, p65:0, customTier: 'auto'},
+    {name:'سعيد عمار sub8', p35:13,  p45:0, p65:0, customTier: 'auto'},
+    {name:'احمد عبدالعباس', p35:153, p45:6, p65:0, customTier: 'auto'},
+    {name:'احمد عبدالعباس sub1', p35:26, p45:2, p65:0, customTier: 'auto'},
+    {name:'احمد عبدالعباس sub2', p35:47, p45:0, p65:0, customTier: 'auto'},
+    {name:'احمد عبدالعباس sub3', p35:194, p45:0, p65:1, customTier: 'auto'},
+    {name:'علي طارق', p35:179, p45:1, p65:0, customTier: 'auto'},
+    {name:'بارق ليث', p35:395, p45:9, p65:0, customTier: 'auto'}
   ],
   new: [
-    {name:'FDT-94',  p35:397, p45:15, p65:0},
-    {name:'FDT-95',  p35:377, p45:12, p65:0},
-    {name:'FDT-96',  p35:369, p45:8,  p65:1},
-    {name:'FDT-97',  p35:272, p45:4,  p65:1},
-    {name:'FDT-98',  p35:405, p45:8,  p65:1},
-    {name:'FDT-99',  p35:301, p45:12, p65:0},
-    {name:'FDT-100', p35:206, p45:6,  p65:0},
-    {name:'FDT-101', p35:138, p45:2,  p65:0},
-    {name:'FDT-102', p35:269, p45:5,  p65:0},
-    {name:'FDT-108', p35:119, p45:0,  p65:0},
-    {name:'FDT-109', p35:12,  p45:0,  p65:1},
-    {name:'FDT-110', p35:56,  p45:0,  p65:0},
-    {name:'FDT-111', p35:35,  p45:0,  p65:0},
-    {name:'FDT-112', p35:44,  p45:2,  p65:0},
-    {name:'FDT-113', p35:150, p45:0,  p65:0},
-    {name:'FDT-114', p35:105, p45:2,  p65:0},
-    {name:'FDT-115', p35:38,  p45:2,  p65:0},
-    {name:'FDT-116', p35:54,  p45:1,  p65:0},
-    {name:'FDT-117', p35:8,   p45:0,  p65:0},
-    {name:'FDT-103', p35:252, p45:5,  p65:0},
-    {name:'FDT-104', p35:184, p45:2,  p65:0},
-    {name:'FDT-105', p35:286, p45:2,  p65:1},
-    {name:'FDT-106', p35:215, p45:3,  p65:0},
-    {name:'FDT-107', p35:154, p45:4,  p65:0}
+    {name:'FDT-94',  p35:397, p45:15, p65:0, customTier: 'auto'},
+    {name:'FDT-95',  p35:377, p45:12, p65:0, customTier: 'auto'},
+    {name:'FDT-96',  p35:369, p45:8,  p65:1, customTier: 'auto'},
+    {name:'FDT-97',  p35:272, p45:4,  p65:1, customTier: 'auto'},
+    {name:'FDT-98',  p35:405, p45:8,  p65:1, customTier: 'auto'},
+    {name:'FDT-99',  p35:301, p45:12, p65:0, customTier: 'auto'},
+    {name:'FDT-100', p35:206, p45:6,  p65:0, customTier: 'auto'},
+    {name:'FDT-101', p35:138, p45:2,  p65:0, customTier: 'auto'},
+    {name:'FDT-102', p35:269, p45:5,  p65:0, customTier: 'auto'},
+    {name:'FDT-108', p35:119, p45:0,  p65:0, customTier: 'auto'},
+    {name:'FDT-109', p35:12,  p45:0,  p65:1, customTier: 'auto'},
+    {name:'FDT-110', p35:56,  p45:0,  p65:0, customTier: 'auto'},
+    {name:'FDT-111', p35:35,  p45:0,  p65:0, customTier: 'auto'},
+    {name:'FDT-112', p35:44,  p45:2,  p65:0, customTier: 'auto'},
+    {name:'FDT-113', p35:150, p45:0,  p65:0, customTier: 'auto'},
+    {name:'FDT-114', p35:105, p45:2,  p65:0, customTier: 'auto'},
+    {name:'FDT-115', p35:38,  p45:2,  p65:0, customTier: 'auto'},
+    {name:'FDT-116', p35:54,  p45:1,  p65:0, customTier: 'auto'},
+    {name:'FDT-117', p35:8,   p45:0,  p65:0, customTier: 'auto'},
+    {name:'FDT-103', p35:252, p45:5,  p65:0, customTier: 'auto'},
+    {name:'FDT-104', p35:184, p45:2,  p65:0, customTier: 'auto'},
+    {name:'FDT-105', p35:286, p45:2,  p65:1, customTier: 'auto'},
+    {name:'FDT-106', p35:215, p45:3,  p65:0, customTier: 'auto'},
+    {name:'FDT-107', p35:154, p45:4,  p65:0, customTier: 'auto'}
   ]
 };
 
@@ -399,7 +406,10 @@ function buildTierGrid(){
   });
 }
 
-function getTier(totalQty){
+function getTier(totalQty, customTier){
+  if(customTier && customTier !== 'auto'){
+    return tiers.find(t=> t.key === customTier) || null;
+  }
   if(totalQty<=0) return null;
   return tiers.find(t=> totalQty>=t.min && totalQty<=t.max) || tiers[tiers.length-1];
 }
@@ -408,7 +418,7 @@ function fmt(n){ return Math.round(n).toLocaleString('en-US'); }
 
 function computeRow(row){
   const qty = (Number(row.p35)||0)+(Number(row.p45)||0)+(Number(row.p65)||0);
-  const tier = getTier(qty);
+  const tier = getTier(qty, row.customTier);
   const total = tier ? (row.p35*tier.p35 + row.p45*tier.p45 + row.p65*tier.p65) : 0;
   return {qty, tier, total};
 }
@@ -421,9 +431,12 @@ function renderZone(zone){
 
   data[zone].forEach((row, idx)=>{
     if(filter && !row.name.toLowerCase().includes(filter)) return;
+    if(!row.customTier) row.customTier = 'auto';
 
     const {qty, tier, total} = computeRow(row);
     zoneTotal += total;
+    const tierClass = tier ? tier.key : '';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input class="name-input" value="${row.name}" data-idx="${idx}" data-zone="${zone}" data-field="name"></td>
@@ -449,7 +462,14 @@ function renderZone(zone){
         </div>
       </td>
       <td class="num">${qty}</td>
-      <td>${tier ? `<span class="badge ${tier.key}">${tier.label}</span>` : `<span class="badge t0">—</span>`}</td>
+      <td>
+        <select class="tier-select ${tierClass}" onchange="changeCustomTier('${zone}', ${idx}, this.value)">
+          <option value="auto" ${row.customTier==='auto'?'selected':''}>تلقائي (${tier?tier.label:'-'})</option>
+          <option value="t1" ${row.customTier==='t1'?'selected':''}>يدوي: T1</option>
+          <option value="t2" ${row.customTier==='t2'?'selected':''}>يدوي: T2</option>
+          <option value="t3" ${row.customTier==='t3'?'selected':''}>يدوي: T3</option>
+        </select>
+      </td>
       <td class="num row-total">${fmt(total)}</td>
       <td><button class="del-btn" title="حذف" onclick="removeAgent('${zone}',${idx})">✕</button></td>
     `;
@@ -457,6 +477,12 @@ function renderZone(zone){
   });
   document.getElementById('foot-'+zone).textContent = fmt(zoneTotal)+' د.ع';
   return zoneTotal;
+}
+
+function changeCustomTier(zone, idx, val){
+  data[zone][idx].customTier = val;
+  autoSave();
+  renderAll();
 }
 
 function renderAll(){
@@ -495,7 +521,7 @@ function autoSave(){
 }
 
 function addAgent(zone){
-  data[zone].push({name:'وكيل جديد', p35:0, p45:0, p65:0});
+  data[zone].push({name:'وكيل جديد', p35:0, p45:0, p65:0, customTier:'auto'});
   autoSave();
   renderAll();
 }
@@ -511,6 +537,44 @@ function switchTab(zone){
   document.querySelector(`.tab-btn[data-zone="${zone}"]`).classList.add('active');
   document.querySelectorAll('.zone-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('panel-'+zone).classList.add('active');
+}
+
+/* Excel / CSV Import System */
+function importExcel(event){
+  const file = event.target.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const text = e.target.result;
+    const lines = text.split('\n');
+    let activeZone = document.querySelector('.tab-btn.active').dataset.zone;
+    let importedCount = 0;
+
+    lines.forEach((line, index)=>{
+      if(index === 0 || !line.trim()) return; // Skip Header or empty lines
+      const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+      if(cols.length >= 2){
+        const name = cols[0];
+        const p35 = Number(cols[1]) || 0;
+        const p45 = Number(cols[2]) || 0;
+        const p65 = Number(cols[3]) || 0;
+
+        const existing = data[activeZone].find(a => a.name.trim() === name);
+        if(existing){
+          existing.p35 = p35; existing.p45 = p45; existing.p65 = p65;
+        } else {
+          data[activeZone].push({name, p35, p45, p65, customTier:'auto'});
+        }
+        importedCount++;
+      }
+    });
+
+    autoSave();
+    renderAll();
+    alert(`تم استيراد وتحديث ${importedCount} وكيل بنجاح في المنطقة الحالية!`);
+  };
+  reader.readAsText(file);
 }
 
 // Archive Management
@@ -545,7 +609,7 @@ function loadSelectedMonth(){
 function startNewMonth(){
   if(confirm("هل أنت تأكد من بدء شهر جديد؟ سيتم تصفير التفعيلات مع الحفاظ على أسماء الوكلاء.")){
     ['old','new'].forEach(z=>{
-      data[z].forEach(r=>{ r.p35=0; r.p45=0; r.p65=0; });
+      data[z].forEach(r=>{ r.p35=0; r.p45=0; r.p65=0; r.customTier='auto'; });
     });
     autoSave();
     renderAll();
@@ -569,7 +633,7 @@ function exportCSV(zone){
 // Service Worker for Offline Execution (PWA)
 if ('serviceWorker' in navigator) {
   const swCode = `
-    const CACHE_NAME = 'babil-app-v2';
+    const CACHE_NAME = 'babil-app-v3';
     self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(['./']))); });
     self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(res => res || fetch(e.request))); });
   `;
