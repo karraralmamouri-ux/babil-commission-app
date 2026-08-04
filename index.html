@@ -670,22 +670,16 @@ async function loadCloudData(){
 
   try{
 
-    const {
-      data: { user },
-      error: userError
-    } = await sb.auth.getUser();
-
-    if(userError) throw userError;
-
-    if(!user){
+    if(!currentUser){
       console.warn('No authenticated user');
       return false;
     }
 
-    const {
-      data: month,
-      error: monthError
-    } = await sb
+    // ---------------------------------------------
+    // Get current month
+    // ---------------------------------------------
+
+    const { data: month, error: monthError } = await sb
       .from('commission_months')
       .select('*')
       .eq('month_key', state.month)
@@ -694,16 +688,19 @@ async function loadCloudData(){
     if(monthError) throw monthError;
 
     if(!month){
-      console.log('Month not found:', state.month);
+
+      console.log('Month not found in Supabase:', state.month);
+
       return false;
     }
 
     cloudMonthId = month.id;
 
-    const {
-      data: rows,
-      error: rowsError
-    } = await sb
+    // ---------------------------------------------
+    // Get rows
+    // ---------------------------------------------
+
+    const { data: rows, error: rowsError } = await sb
       .from('commission_rows')
       .select('*')
       .eq('month_id', cloudMonthId)
@@ -711,28 +708,27 @@ async function loadCloudData(){
 
     if(rowsError) throw rowsError;
 
+    // ---------------------------------------------
+    // Convert Supabase rows → App format
+    // ---------------------------------------------
+
     const oldRows = [];
     const newRows = [];
 
     (rows || []).forEach(r => {
 
       const item = {
-
         name: r.name,
 
         p35: Number(r.p35) || 0,
         p45: Number(r.p45) || 0,
         p65: Number(r.p65) || 0,
 
-        customTier:
-          r.custom_tier || 'auto',
+        customTier: r.custom_tier || 'auto',
 
-        paid:
-          Number(r.paid) || 0,
+        paid: Number(r.paid) || 0,
 
-        paymentDate:
-          r.payment_date || ''
-
+        paymentDate: r.payment_date || ''
       };
 
       if(r.zone === 'old'){
@@ -745,6 +741,10 @@ async function loadCloudData(){
 
     });
 
+    // ---------------------------------------------
+    // Update state
+    // ---------------------------------------------
+
     state.data.old = oldRows;
     state.data.new = newRows;
 
@@ -752,24 +752,21 @@ async function loadCloudData(){
       state.tiers = month.tiers;
     }
 
-    localStorage.setItem(
-      STORAGE,
-      JSON.stringify({
-        month: state.month,
-        data: state.data,
-        tiers: state.tiers,
-        archive: state.archive,
-        auditLog: state.auditLog
-      })
-    );
+    // ---------------------------------------------
+    // Keep local backup
+    // ---------------------------------------------
 
-    localStorage.setItem(
-      LEGACY_DATA,
-      JSON.stringify(state.data)
-    );
+    try{
+      localStorage.setItem(
+        'babil_commission_v2',
+        JSON.stringify(state)
+      );
+    }catch(e){
+      console.warn('Local backup failed:', e);
+    }
 
     console.log(
-      '☁️ Cloud data loaded:',
+      'Cloud data loaded successfully:',
       {
         month: state.month,
         old: oldRows.length,
@@ -786,251 +783,128 @@ async function loadCloudData(){
       error
     );
 
+    alert(
+      'تعذر تحميل البيانات من السيرفر.\n\n' +
+      (error.message || error)
+    );
+
     return false;
-
   }
-
-}
-
-
-// =====================================================
-// SAVE
-// =====================================================
-
-async function save(){
-
-  // -----------------------------------------------
-  // LOCAL BACKUP
-  // -----------------------------------------------
-
-  localStorage.setItem(
-    STORAGE,
-    JSON.stringify({
-      month: state.month,
-      data: state.data,
-      tiers: state.tiers,
-      archive: state.archive,
-      auditLog: state.auditLog
-    })
-  );
-
-  localStorage.setItem(
-    LEGACY_DATA,
-    JSON.stringify(state.data)
-  );
-
-
-  console.log('💾 SAVE STARTED');
-
-
-  // -----------------------------------------------
-  // SUPABASE
-  // -----------------------------------------------
+}async function saveCloudData(){
 
   try{
 
-    const {
-      data: { user },
-      error: userError
-    } = await sb.auth.getUser();
-
-    if(userError){
-      throw userError;
+    if(!currentUser){
+      throw new Error('المستخدم غير مسجل دخول');
     }
 
-    if(!user){
-
-      console.warn(
-        'No logged-in user. Local save only.'
-      );
-
-      return;
-    }
-
-
     // ---------------------------------------------
-    // GET MONTH
+    // Get / create current month
     // ---------------------------------------------
 
-    let {
-      data: month,
-      error: monthError
-    } = await sb
+    let { data: month, error: monthError } = await sb
       .from('commission_months')
       .select('*')
       .eq('month_key', state.month)
       .maybeSingle();
 
-    if(monthError){
-      throw monthError;
-    }
-
-
-    // ---------------------------------------------
-    // CREATE MONTH IF NEEDED
-    // ---------------------------------------------
+    if(monthError) throw monthError;
 
     if(!month){
 
-      const {
-        data: newMonth,
-        error: createError
-      } = await sb
+      const { data: newMonth, error: createError } = await sb
         .from('commission_months')
         .insert({
-
-          month_key:
-            state.month,
-
-          tiers:
-            state.tiers || [],
-
-          created_by:
-            user.id,
-
-          updated_by:
-            user.id
-
+          month_key: state.month,
+          tiers: state.tiers || [],
+          created_by: currentUser.id,
+          updated_by: currentUser.id
         })
         .select()
         .single();
 
-      if(createError){
-        throw createError;
-      }
+      if(createError) throw createError;
 
       month = newMonth;
     }
 
-
     cloudMonthId = month.id;
 
-
     // ---------------------------------------------
-    // UPDATE MONTH
-    // ---------------------------------------------
-
-    const {
-      error: updateMonthError
-    } = await sb
-      .from('commission_months')
-      .update({
-
-        tiers:
-          state.tiers || [],
-
-        updated_by:
-          user.id
-
-      })
-      .eq(
-        'id',
-        month.id
-      );
-
-    if(updateMonthError){
-      throw updateMonthError;
-    }
-
-
-    // ---------------------------------------------
-    // PREPARE ROWS
+    // Prepare rows
     // ---------------------------------------------
 
     const rows = [
 
       ...(state.data.old || []).map(r => ({
+        month_id: cloudMonthId,
 
-        month_id:
-          month.id,
+        zone: 'old',
 
-        zone:
-          'old',
+        name: r.name,
 
-        name:
-          r.name,
+        p35: Number(r.p35) || 0,
+        p45: Number(r.p45) || 0,
+        p65: Number(r.p65) || 0,
 
-        p35:
-          Number(r.p35) || 0,
+        custom_tier: r.customTier || 'auto',
 
-        p45:
-          Number(r.p45) || 0,
-
-        p65:
-          Number(r.p65) || 0,
-
-        custom_tier:
-          r.customTier || 'auto',
-
-        paid:
-          Number(r.paid) || 0,
+        paid: Number(r.paid) || 0,
 
         payment_date:
           r.paymentDate || null,
 
-        created_by:
-          user.id,
-
-        updated_by:
-          user.id
-
+        created_by: currentUser.id,
+        updated_by: currentUser.id
       })),
 
       ...(state.data.new || []).map(r => ({
+        month_id: cloudMonthId,
 
-        month_id:
-          month.id,
+        zone: 'new',
 
-        zone:
-          'new',
+        name: r.name,
 
-        name:
-          r.name,
+        p35: Number(r.p35) || 0,
+        p45: Number(r.p45) || 0,
+        p65: Number(r.p65) || 0,
 
-        p35:
-          Number(r.p35) || 0,
+        custom_tier: r.customTier || 'auto',
 
-        p45:
-          Number(r.p45) || 0,
-
-        p65:
-          Number(r.p65) || 0,
-
-        custom_tier:
-          r.customTier || 'auto',
-
-        paid:
-          Number(r.paid) || 0,
+        paid: Number(r.paid) || 0,
 
         payment_date:
           r.paymentDate || null,
 
-        created_by:
-          user.id,
-
-        updated_by:
-          user.id
-
+        created_by: currentUser.id,
+        updated_by: currentUser.id
       }))
 
     ];
 
+    // ---------------------------------------------
+    // Save month
+    // ---------------------------------------------
 
-    console.log(
-      '☁️ ROWS TO SAVE:',
-      rows.length
-    );
+    const { error: monthUpdateError } = await sb
+      .from('commission_months')
+      .update({
+        tiers: state.tiers || [],
+        updated_by: currentUser.id
+      })
+      .eq('id', cloudMonthId);
 
+    if(monthUpdateError){
+      throw monthUpdateError;
+    }
 
     // ---------------------------------------------
-    // SAVE ROWS
+    // Save rows
     // ---------------------------------------------
 
     if(rows.length){
 
-      const {
-        error: rowsError
-      } = await sb
+      const { error: rowsError } = await sb
         .from('commission_rows')
         .upsert(
           rows,
@@ -1046,31 +920,66 @@ async function save(){
 
     }
 
+    // ---------------------------------------------
+    // Local backup
+    // ---------------------------------------------
+
+    try{
+
+      localStorage.setItem(
+        'babil_commission_v2',
+        JSON.stringify(state)
+      );
+
+    }catch(e){
+
+      console.warn(
+        'Local backup failed:',
+        e
+      );
+
+    }
 
     console.log(
-      '✅ SUPABASE SAVE SUCCESS'
+      'Cloud data saved successfully'
     );
 
+    return true;
 
   }catch(error){
 
     console.error(
-      '❌ SUPABASE SAVE ERROR:',
+      'Supabase save error:',
       error
     );
 
-    // البيانات المحلية تبقى محفوظة
+    alert(
+      'تعذر حفظ البيانات على السيرفر.\n\n' +
+      (error.message || error)
+    );
+
+    return false;
+  }
+}async function testCloudConnection(){
+
+  const ok = await loadCloudData();
+
+  if(ok){
+
+    alert(
+      '✅ تم الاتصال بـ Supabase\n\n' +
+      'الشهر: ' + state.month + '\n' +
+      'OLD: ' + state.data.old.length + '\n' +
+      'NEW: ' + state.data.new.length
+    );
 
   }
 
 }
-
-
-// =====================================================
-// LOAD
-// =====================================================
-
-function load(){
+function save(){
+ localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog}));
+ localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data));
+}
 function load(){
  try{
   const x=JSON.parse(localStorage.getItem(STORAGE)||'null');
