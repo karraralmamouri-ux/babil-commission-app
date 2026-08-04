@@ -40,6 +40,10 @@ npm test
 
 راجع `.env.example`. الواجهة تحتاج فقط إلى URL وPublishable/Anon key. أي `service_role` يجب أن يبقى داخل Supabase Edge Functions ولا يصل إلى المتصفح أو GitHub.
 
+## مكونات الطرف الثالث
+
+تستخدم الصفحة نسخة محلية مثبتة من SheetJS CE لاستيراد Excel. راجع `THIRD_PARTY_NOTICES.md` وملف الترخيص داخل `assets/vendor/`. لا تستبدل ملف vendor دون تحديث الإصدار والبصمة واختبار round-trip.
+
 ## وثائق المشروع
 
 - [سياق المشروع](docs/PROJECT_CONTEXT.md)
