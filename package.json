@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --test tests/*.test.js",
     "test:staging": "node scripts/verify-supabase-staging.mjs",
-    "inspect:backup": "node scripts/inspect-local-backup.mjs"
+    "inspect:backup": "node scripts/inspect-local-backup.mjs",
+    "reconcile:backup": "node scripts/reconcile-local-backup.mjs"
   },
   "engines": {
     "node": ">=20"
