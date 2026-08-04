@@ -976,9 +976,176 @@ async function loadCloudData(){
   }
 
 }
-function save(){
- localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog}));
- localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data));
+async async function save(){
+
+  // حفظ محلي كالعادة
+  localStorage.setItem(
+    STORAGE,
+    JSON.stringify({
+      month: state.month,
+      data: state.data,
+      tiers: state.tiers,
+      archive: state.archive,
+      auditLog: state.auditLog
+    })
+  );
+
+  localStorage.setItem(
+    LEGACY_DATA,
+    JSON.stringify(state.data)
+  );
+
+  console.log('SAVE STARTED');
+  console.log('Current month:', state.month);
+  console.log('Current data:', state.data);
+
+  try {
+
+    // ---------------------------------------
+    // Get logged-in user
+    // ---------------------------------------
+
+    const {
+      data: { user },
+      error: userError
+    } = await sb.auth.getUser();
+
+    console.log('USER:', user);
+
+    if(userError){
+      console.error('USER ERROR:', userError);
+      return;
+    }
+
+    if(!user){
+      console.error('NO LOGGED USER');
+      alert('المستخدم غير مسجل دخول');
+      return;
+    }
+
+    // ---------------------------------------
+    // Get month
+    // ---------------------------------------
+
+    const {
+      data: month,
+      error: monthError
+    } = await sb
+      .from('commission_months')
+      .select('*')
+      .eq('month_key', state.month)
+      .maybeSingle();
+
+    console.log('MONTH:', month);
+    console.log('MONTH ERROR:', monthError);
+
+    if(monthError){
+      console.error(monthError);
+      alert('خطأ بجلب الشهر: ' + monthError.message);
+      return;
+    }
+
+    if(!month){
+      alert(
+        'الشهر ' + state.month +
+        ' غير موجود في Supabase'
+      );
+      return;
+    }
+
+    // ---------------------------------------
+    // Prepare rows
+    // ---------------------------------------
+
+    const rows = [
+
+      ...(state.data.old || []).map(r => ({
+        month_id: month.id,
+        zone: 'old',
+        name: r.name,
+        p35: Number(r.p35) || 0,
+        p45: Number(r.p45) || 0,
+        p65: Number(r.p65) || 0,
+        custom_tier: r.customTier || 'auto',
+        paid: Number(r.paid) || 0,
+        payment_date: r.paymentDate || null,
+        created_by: user.id,
+        updated_by: user.id
+      })),
+
+      ...(state.data.new || []).map(r => ({
+        month_id: month.id,
+        zone: 'new',
+        name: r.name,
+        p35: Number(r.p35) || 0,
+        p45: Number(r.p45) || 0,
+        p65: Number(r.p65) || 0,
+        custom_tier: r.customTier || 'auto',
+        paid: Number(r.paid) || 0,
+        payment_date: r.paymentDate || null,
+        created_by: user.id,
+        updated_by: user.id
+      }))
+
+    ];
+
+    console.log('ROWS TO SAVE:', rows);
+
+    // ---------------------------------------
+    // UPSERT
+    // ---------------------------------------
+
+    const {
+      data: savedRows,
+      error: saveError
+    } = await sb
+      .from('commission_rows')
+      .upsert(
+        rows,
+        {
+          onConflict: 'month_id,zone,name'
+        }
+      )
+      .select();
+
+    console.log('SAVED ROWS:', savedRows);
+    console.log('SAVE ERROR:', saveError);
+
+    if(saveError){
+
+      console.error(
+        'SUPABASE SAVE ERROR:',
+        saveError
+      );
+
+      alert(
+        '❌ فشل الحفظ في Supabase\n\n' +
+        saveError.message
+      );
+
+      return;
+    }
+
+    alert(
+      '✅ تم الحفظ في Supabase\n\n' +
+      'عدد السجلات: ' +
+      (savedRows ? savedRows.length : 0)
+    );
+
+  }catch(error){
+
+    console.error(
+      'SAVE EXCEPTION:',
+      error
+    );
+
+    alert(
+      '❌ خطأ:\n\n' +
+      (error.message || error)
+    );
+
+  }
+
 }
 function load(){
  try{
