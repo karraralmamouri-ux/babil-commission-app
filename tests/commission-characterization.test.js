@@ -100,5 +100,39 @@ test('import normalization supports Arabic headings and numeric separators', () 
   });
 });
 
-test.todo('previous-period lookup works across December and January');
-test.todo('new-month creation advances from the open period instead of the device date');
+test('previous-period lookup works across December and January', () => {
+  const app = loadCurrentApp();
+  app.state.month = '01/2027';
+  app.state.archive = {
+    '11/2026': {
+      data: { old: [row({ name: 'Test Agent', p35: 2 })], new: [] },
+      tiers: app.state.tiers,
+    },
+    '12/2026': {
+      data: { old: [row({ name: 'Test Agent', p35: 3 })], new: [] },
+      tiers: app.state.tiers,
+    },
+  };
+
+  assert.equal(app.getPreviousRow('old', 'Test Agent').total, 12_000);
+});
+
+test('month ordering is chronological across years', () => {
+  const app = loadCurrentApp();
+  const periods = ['02/2027', '12/2026', '01/2027', '11/2026'];
+
+  assert.deepEqual(periods.sort(app.compareMonthKeys), [
+    '11/2026',
+    '12/2026',
+    '01/2027',
+    '02/2027',
+  ]);
+});
+
+test('new-month calculation advances from the open period', () => {
+  const app = loadCurrentApp();
+
+  assert.equal(app.nextMonthKey('08/2026'), '09/2026');
+  assert.equal(app.nextMonthKey('12/2026'), '01/2027');
+  assert.throws(() => app.nextMonthKey('2026-08'), /صيغة شهر غير صالحة/);
+});

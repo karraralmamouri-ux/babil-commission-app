@@ -718,11 +718,14 @@ async function savePayment(z,i){
   toast('تم تحديث حالة الصرف');
 }
 function details(z,i){const r=state.data[z][i],c=calc(r),prev=getPreviousRow(z,r.name);openModal(`📋 ${r.name}`,`<div class="detailgrid"><div class="detailcard">المنطقة<b>${z==='old'?'OLD':'NEW'}</b></div><div class="detailcard">الفئة<b>${c.t?c.t.label:'-'}</b></div><div class="detailcard">إجمالي الكمية<b>${fmt(c.qty)}</b></div><div class="detailcard">المستحق<b class="money">${fmt(c.total)}</b></div><div class="detailcard">المدفوع<b>${fmt(c.paid)}</b></div><div class="detailcard">المتبقي<b class="money">${fmt(c.remaining)}</b></div><div class="detailcard">P35<b>${fmt(c.p35)}</b></div><div class="detailcard">P45 / P65<b>${fmt(c.p45)} / ${fmt(c.p65)}</b></div></div><div style="margin-top:14px" class="box"><h3>📈 مقارنة سريعة</h3>${prev?`<div class="minirow"><span>الشهر السابق</span><b>${fmt(prev.total)} د.ع</b></div><div class="minirow"><span>التغيير</span><b>${fmt(c.total-prev.total)} د.ع</b></div>`:'<span class="muted">لا توجد بيانات للشهر السابق</span>'}</div>`)}
-function getPreviousRow(z,name){const keys=Object.keys(state.archive).sort(),idx=keys.indexOf(state.month);if(idx<1)return null;const snap=state.archive[keys[idx-1]],r=(snap.data?.[z]||[]).find(x=>x.name===name);if(!r)return null;const backup=state.tiers;state.tiers=snap.tiers||state.tiers;const c=calc(r);state.tiers=backup;return c}
+function getPreviousRow(z,name){const current=monthOrder(state.month),key=Object.keys(state.archive).filter(k=>monthOrder(k)<current).sort(compareMonthKeys).pop();if(!key)return null;const snap=state.archive[key],r=(snap.data?.[z]||[]).find(x=>x.name===name);if(!r)return null;const backup=state.tiers;state.tiers=snap.tiers||state.tiers;const c=calc(r);state.tiers=backup;return c}
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.add('open')}
 function closeModal(){document.getElementById('modal').classList.remove('open')}
 function switchTab(z){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.zone===z));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+z))}
 function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'0')+'/'+date.getFullYear()}
+function monthOrder(key){const m=String(key||'').match(/^(0[1-9]|1[0-2])\/(\d{4})$/);if(!m)return NaN;return Number(m[2])*12+Number(m[1])-1}
+function compareMonthKeys(a,b){return monthOrder(a)-monthOrder(b)}
+function nextMonthKey(key){const order=monthOrder(key);if(!Number.isFinite(order))throw new Error(`صيغة شهر غير صالحة: ${key}`);const next=order+1,year=Math.floor(next/12),month=next%12+1;return String(month).padStart(2,'0')+'/'+year}
 async function saveCurrentMonth(){
   if(!(await ensurePermission('edit')))return;
   state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};
@@ -731,7 +734,7 @@ async function saveCurrentMonth(){
   renderMonths();
   toast('تم حفظ جميع التعديلات للشهر مع الأسعار الحالية');
 }
-function renderMonths(){const s=document.getElementById('monthSelect'),keys=[...new Set([state.month,...Object.keys(state.archive)])].sort((a,b)=>{const[am,ay]=a.split('/').map(Number),[bm,by]=b.split('/').map(Number);return ay-by||am-bm});s.innerHTML=keys.map(k=>`<option value="${k}" ${k===state.month?'selected':''}>${k}${state.archive[k]?' — محفوظ':''}</option>`).join('');syncMonthInput()}
+function renderMonths(){const s=document.getElementById('monthSelect'),keys=[...new Set([state.month,...Object.keys(state.archive)])].sort(compareMonthKeys);s.innerHTML=keys.map(k=>`<option value="${k}" ${k===state.month?'selected':''}>${k}${state.archive[k]?' — محفوظ':''}</option>`).join('');syncMonthInput()}
 async function loadSelectedMonth(){
  if(!(await ensurePermission('edit'))) {
    renderMonths();
@@ -744,10 +747,8 @@ async function startNewMonth(){
   if(!confirm('بدء شهر جديد؟ سيتم أخذ نسخة من الشهر الحالي أولاً.'))return;
   // إنشاء الشهر لا يكتب على التخزين؛ يبقى كل شيء مؤقتاً حتى ضغط «حفظ الشهر».
   state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};
-  const d=new Date();
-  d.setMonth(d.getMonth()+1);
   const old=state.month;
-  state.month=monthKey(d);
+  state.month=nextMonthKey(state.month);
   state.data=clone(state.data);
   state.data.old.forEach(r=>r.paid=0);
   state.data.new.forEach(r=>r.paid=0);
