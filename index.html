@@ -72,6 +72,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  <button class="btn" data-permission="edit" onclick="document.getElementById(&#39;fileInput&#39;).click()">📥 استيراد Excel / CSV</button>
  <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden="" onchange="importFile(event)">
  <button class="btn" onclick="exportAll()">📤 تصدير الكل</button>
+ <button class="btn" data-permission="backup" onclick="exportBackup()">🛡️ نسخة احتياطية JSON</button>
 </div>
 
 <section class="cards">
@@ -180,10 +181,10 @@ const sb={
 };
 const ROLE_LABELS={admin:'Admin',accountant:'محاسب',monitor:'متابع',viewer:'مشاهد'};
 const ROLE_PERMISSIONS={
- admin:{edit:true,payment:true,rates:true,users:true,delete:true},
- accountant:{edit:false,payment:true,rates:false,users:false,delete:false},
- monitor:{edit:false,payment:false,rates:false,users:false,delete:false},
- viewer:{edit:false,payment:false,rates:false,users:false,delete:false}
+ admin:{edit:true,payment:true,rates:true,users:true,delete:true,backup:true},
+ accountant:{edit:false,payment:true,rates:false,users:false,delete:false,backup:false},
+ monitor:{edit:false,payment:false,rates:false,users:false,delete:false,backup:false},
+ viewer:{edit:false,payment:false,rates:false,users:false,delete:false,backup:false}
 };
 let managedUsers=[];
 function hasPermission(p){return !!(authProfile&&ROLE_PERMISSIONS[authProfile.role]?.[p])}
@@ -475,7 +476,7 @@ async function ensurePermission(permission){
 /* إدارة المستخدمين: جميع العمليات الحساسة تمر عبر Edge Function خادمية.
    لا تضع SERVICE_ROLE_KEY في هذا الملف أو في المتصفح. */
 function roleOptions(selected){return Object.keys(ROLE_LABELS).map(role=>`<option value="${role}" ${role===selected?'selected':''}>${esc(ROLE_LABELS[role])}</option>`).join('')}
-function describeRole(role){const p=ROLE_PERMISSIONS[role]||{};const labels=[];if(p.edit)labels.push('تعديل');if(p.payment)labels.push('صرف');if(p.rates)labels.push('أسعار');if(p.users)labels.push('مستخدمون');if(p.delete)labels.push('حذف');return labels.length?labels.join(' • '):'عرض فقط'}
+function describeRole(role){const p=ROLE_PERMISSIONS[role]||{};const labels=[];if(p.edit)labels.push('تعديل');if(p.payment)labels.push('صرف');if(p.rates)labels.push('أسعار');if(p.users)labels.push('مستخدمون');if(p.delete)labels.push('حذف');if(p.backup)labels.push('نسخ احتياطي');return labels.length?labels.join(' • '):'عرض فقط'}
 function openUserManagement(){if(!hasPermission('users')){toast('ليس لديك صلاحية إدارة المستخدمين');return}document.getElementById('usersModal').classList.add('open');loadManagedUsers()}
 function closeUserManagement(){document.getElementById('usersModal').classList.remove('open')}
 function setUsersMessage(message,isError=false){const el=document.getElementById('usersManagerMessage');el.textContent=message||'';el.style.color=isError?'var(--red)':'var(--muted)'}
@@ -763,6 +764,19 @@ function rowsFor(zone){return state.data[zone].map(r=>{const c=calc(r);return{Zo
 function downloadCSV(rows,name){const keys=Object.keys(rows[0]||{Zone:'',Name:''}),text='\uFEFF'+[keys.map(csvEscape).join(','),...rows.map(r=>keys.map(k=>csvEscape(r[k])).join(','))].join('\r\n'),blob=new Blob([text],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
 function exportZone(z){downloadCSV(rowsFor(z),`${state.month.replace('/','-')}_${z}_commission.csv`)}
 function exportAll(){downloadCSV([...rowsFor('old'),...rowsFor('new')],`${state.month.replace('/','-')}_all_commissions.csv`)}
+function backupStateSnapshot(source=state){return JSON.parse(JSON.stringify({month:source.month,data:source.data,tiers:source.tiers,archive:source.archive,auditLog:source.auditLog||[]}))}
+async function sha256Hex(value){const bytes=new TextEncoder().encode(value),digest=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('')}
+async function createBackupDocument(source=state,exportedAt=new Date().toISOString(),exportedBy=authProfile?.email||authUser?.email||authProfile?.full_name||'unknown'){
+ const snapshot=backupStateSnapshot(source);
+ return{format:'babil-commission-backup',version:1,exportedAt,exportedBy,source:{app:'babil-commission-app',storageKey:STORAGE},integrity:{algorithm:'SHA-256',scope:'state',value:await sha256Hex(JSON.stringify(snapshot))},state:snapshot};
+}
+async function verifyBackupDocument(document){if(!document||document.format!=='babil-commission-backup'||document.version!==1||document.integrity?.algorithm!=='SHA-256'||document.integrity?.scope!=='state'||!document.state)return false;return(await sha256Hex(JSON.stringify(document.state)))===document.integrity.value}
+async function exportBackup(){
+ if(!(await ensurePermission('backup')))return;
+ if(!confirm('تحتوي النسخة على بيانات مالية وأرشيف وسجل تعديلات. احفظها في مكان آمن ولا ترسلها عبر قناة غير موثوقة. هل تريد المتابعة؟'))return;
+ try{const backup=await createBackupDocument(),blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json;charset=utf-8'}),a=document.createElement('a'),stamp=backup.exportedAt.replace(/[:.]/g,'-');a.href=URL.createObjectURL(blob);a.download=`babil_commission_backup_${stamp}.json`;a.click();URL.revokeObjectURL(a.href);toast('تم إنشاء النسخة الاحتياطية الآمنة')}
+ catch(error){console.error(error);toast('تعذر إنشاء النسخة الاحتياطية')}
+}
 async function importFile(e){
   if(!(await ensurePermission('edit'))){
     e.target.value='';

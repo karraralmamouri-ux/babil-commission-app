@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { webcrypto } = require('node:crypto');
+const { TextEncoder } = require('node:util');
 
 function createElement() {
   return {
@@ -54,6 +56,7 @@ function loadCurrentApp() {
 
   const context = vm.createContext({
     Blob,
+    crypto: webcrypto,
     Date,
     FileReader: function FileReader() {},
     Intl,
@@ -63,6 +66,8 @@ function loadCurrentApp() {
     Object,
     Set,
     String,
+    TextEncoder,
+    Uint8Array,
     URL: {
       createObjectURL() {
         return 'blob:test';
@@ -107,7 +112,9 @@ function loadCurrentApp() {
   const exportsScript = `
     globalThis.__characterization = {
       calc,
+      backupStateSnapshot,
       compareMonthKeys,
+      createBackupDocument,
       defaultData,
       defaultTiers,
       getPreviousRow,
@@ -116,9 +123,11 @@ function loadCurrentApp() {
       nextMonthKey,
       normalizeImport,
       parseCSV,
+      ROLE_PERMISSIONS,
       state,
       status,
-      tierFor
+      tierFor,
+      verifyBackupDocument
     };
   `;
 
