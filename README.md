@@ -22,9 +22,10 @@ python -m http.server 8080
 
 ## الاختبارات الحالية
 
-تحتاج Node.js 20 أو أحدث، ولا توجد تبعيات npm في خط الأساس التوصيفي:
+تحتاج Node.js 20 أو أحدث. ثبّت التبعيات المقفلة ثم شغّل الاختبارات:
 
 ```text
+npm ci
 npm test
 ```
 
@@ -57,6 +58,7 @@ npm test
 - [سجل المخاطر](docs/RISK_REGISTER.md)
 - [خطة الاختبار](docs/TEST_PLAN.md)
 - [دليل التشغيل](docs/RUNBOOK.md)
+- [مطابقة النسخ المحلية والمركزية](docs/RECONCILIATION.md)
 
 ## المساهمة
 
