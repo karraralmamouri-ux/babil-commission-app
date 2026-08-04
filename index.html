@@ -976,9 +976,197 @@ async function loadCloudData(){
   }
 
 }
-function save(){
- localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog}));
- localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data));
+async function save(){
+
+  // ==========================================
+  // 1. LOCAL BACKUP
+  // ==========================================
+
+  localStorage.setItem(
+    STORAGE,
+    JSON.stringify({
+      month: state.month,
+      data: state.data,
+      tiers: state.tiers,
+      archive: state.archive,
+      auditLog: state.auditLog
+    })
+  );
+
+  localStorage.setItem(
+    LEGACY_DATA,
+    JSON.stringify(state.data)
+  );
+
+
+  // ==========================================
+  // 2. SAVE TO SUPABASE
+  // ==========================================
+
+  try{
+
+    const {
+      data: { user },
+      error: userError
+    } = await sb.auth.getUser();
+
+    if(userError) throw userError;
+
+    if(!user){
+      console.warn('No logged-in user. Local save only.');
+      return;
+    }
+
+
+    // ========================================
+    // Get current month
+    // ========================================
+
+    let { data: month, error: monthError } = await sb
+      .from('commission_months')
+      .select('*')
+      .eq('month_key', state.month)
+      .maybeSingle();
+
+    if(monthError) throw monthError;
+
+
+    // ========================================
+    // Create month if not exists
+    // ========================================
+
+    if(!month){
+
+      const {
+        data: newMonth,
+        error: createMonthError
+      } = await sb
+        .from('commission_months')
+        .insert({
+          month_key: state.month,
+          tiers: state.tiers || [],
+          created_by: user.id,
+          updated_by: user.id
+        })
+        .select()
+        .single();
+
+      if(createMonthError) throw createMonthError;
+
+      month = newMonth;
+    }
+
+
+    cloudMonthId = month.id;
+
+
+    // ========================================
+    // Update month tiers
+    // ========================================
+
+    const {
+      error: updateMonthError
+    } = await sb
+      .from('commission_months')
+      .update({
+        tiers: state.tiers || [],
+        updated_by: user.id
+      })
+      .eq('id', month.id);
+
+    if(updateMonthError) throw updateMonthError;
+
+
+    // ========================================
+    // Prepare OLD + NEW
+    // ========================================
+
+    const rows = [
+
+      ...(state.data.old || []).map(r => ({
+        month_id: month.id,
+        zone: 'old',
+        name: r.name,
+
+        p35: Number(r.p35) || 0,
+        p45: Number(r.p45) || 0,
+        p65: Number(r.p65) || 0,
+
+        custom_tier: r.customTier || 'auto',
+
+        paid: Number(r.paid) || 0,
+
+        payment_date:
+          r.paymentDate || null,
+
+        created_by: user.id,
+        updated_by: user.id
+      })),
+
+      ...(state.data.new || []).map(r => ({
+        month_id: month.id,
+        zone: 'new',
+        name: r.name,
+
+        p35: Number(r.p35) || 0,
+        p45: Number(r.p45) || 0,
+        p65: Number(r.p65) || 0,
+
+        custom_tier: r.customTier || 'auto',
+
+        paid: Number(r.paid) || 0,
+
+        payment_date:
+          r.paymentDate || null,
+
+        created_by: user.id,
+        updated_by: user.id
+      }))
+
+    ];
+
+
+    // ========================================
+    // Save rows
+    // ========================================
+
+    if(rows.length){
+
+      const {
+        error: rowsError
+      } = await sb
+        .from('commission_rows')
+        .upsert(
+          rows,
+          {
+            onConflict: 'month_id,zone,name'
+          }
+        );
+
+      if(rowsError) throw rowsError;
+    }
+
+
+    console.log(
+      '☁️ Saved to Supabase:',
+      state.month,
+      rows.length,
+      'rows'
+    );
+
+
+  }catch(error){
+
+    console.error(
+      'Supabase save error:',
+      error
+    );
+
+    // مهم:
+    // البيانات المحلية تبقى محفوظة حتى لو السيرفر فشل
+
+  }
+
 }
 function load(){
  try{
