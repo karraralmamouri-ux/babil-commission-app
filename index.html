@@ -63,7 +63,13 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   data-permission="edit"
   onclick="migrateLocalDataToSupabase()">
   ☁️ نقل البيانات للسيرفر
+<button
+  class="btn"
+  data-permission="edit"
+  onclick="testCloudConnection()">
+  ☁️ اختبار السيرفر
 </button>
+   </button>
   <button id="logoutButton" class="btn danger">تسجيل الخروج</button>
  </div>
 </header>
@@ -653,6 +659,322 @@ async function ensurePermission(permission){
       (error.message||error)
     );
   }
+}
+  // =====================================================
+// SUPABASE CLOUD DATA
+// =====================================================
+
+let cloudMonthId = null;
+
+async function loadCloudData(){
+
+  try{
+
+    if(!currentUser){
+      console.warn('No authenticated user');
+      return false;
+    }
+
+    // ---------------------------------------------
+    // Get current month
+    // ---------------------------------------------
+
+    const { data: month, error: monthError } = await sb
+      .from('commission_months')
+      .select('*')
+      .eq('month_key', state.month)
+      .maybeSingle();
+
+    if(monthError) throw monthError;
+
+    if(!month){
+
+      console.log('Month not found in Supabase:', state.month);
+
+      return false;
+    }
+
+    cloudMonthId = month.id;
+
+    // ---------------------------------------------
+    // Get rows
+    // ---------------------------------------------
+
+    const { data: rows, error: rowsError } = await sb
+      .from('commission_rows')
+      .select('*')
+      .eq('month_id', cloudMonthId)
+      .order('id');
+
+    if(rowsError) throw rowsError;
+
+    // ---------------------------------------------
+    // Convert Supabase rows → App format
+    // ---------------------------------------------
+
+    const oldRows = [];
+    const newRows = [];
+
+    (rows || []).forEach(r => {
+
+      const item = {
+        name: r.name,
+
+        p35: Number(r.p35) || 0,
+        p45: Number(r.p45) || 0,
+        p65: Number(r.p65) || 0,
+
+        customTier: r.custom_tier || 'auto',
+
+        paid: Number(r.paid) || 0,
+
+        paymentDate: r.payment_date || ''
+      };
+
+      if(r.zone === 'old'){
+        oldRows.push(item);
+      }
+
+      if(r.zone === 'new'){
+        newRows.push(item);
+      }
+
+    });
+
+    // ---------------------------------------------
+    // Update state
+    // ---------------------------------------------
+
+    state.data.old = oldRows;
+    state.data.new = newRows;
+
+    if(month.tiers){
+      state.tiers = month.tiers;
+    }
+
+    // ---------------------------------------------
+    // Keep local backup
+    // ---------------------------------------------
+
+    try{
+      localStorage.setItem(
+        'babil_commission_v2',
+        JSON.stringify(state)
+      );
+    }catch(e){
+      console.warn('Local backup failed:', e);
+    }
+
+    console.log(
+      'Cloud data loaded successfully:',
+      {
+        month: state.month,
+        old: oldRows.length,
+        new: newRows.length
+      }
+    );
+
+    return true;
+
+  }catch(error){
+
+    console.error(
+      'Supabase load error:',
+      error
+    );
+
+    alert(
+      'تعذر تحميل البيانات من السيرفر.\n\n' +
+      (error.message || error)
+    );
+
+    return false;
+  }
+}async function saveCloudData(){
+
+  try{
+
+    if(!currentUser){
+      throw new Error('المستخدم غير مسجل دخول');
+    }
+
+    // ---------------------------------------------
+    // Get / create current month
+    // ---------------------------------------------
+
+    let { data: month, error: monthError } = await sb
+      .from('commission_months')
+      .select('*')
+      .eq('month_key', state.month)
+      .maybeSingle();
+
+    if(monthError) throw monthError;
+
+    if(!month){
+
+      const { data: newMonth, error: createError } = await sb
+        .from('commission_months')
+        .insert({
+          month_key: state.month,
+          tiers: state.tiers || [],
+          created_by: currentUser.id,
+          updated_by: currentUser.id
+        })
+        .select()
+        .single();
+
+      if(createError) throw createError;
+
+      month = newMonth;
+    }
+
+    cloudMonthId = month.id;
+
+    // ---------------------------------------------
+    // Prepare rows
+    // ---------------------------------------------
+
+    const rows = [
+
+      ...(state.data.old || []).map(r => ({
+        month_id: cloudMonthId,
+
+        zone: 'old',
+
+        name: r.name,
+
+        p35: Number(r.p35) || 0,
+        p45: Number(r.p45) || 0,
+        p65: Number(r.p65) || 0,
+
+        custom_tier: r.customTier || 'auto',
+
+        paid: Number(r.paid) || 0,
+
+        payment_date:
+          r.paymentDate || null,
+
+        created_by: currentUser.id,
+        updated_by: currentUser.id
+      })),
+
+      ...(state.data.new || []).map(r => ({
+        month_id: cloudMonthId,
+
+        zone: 'new',
+
+        name: r.name,
+
+        p35: Number(r.p35) || 0,
+        p45: Number(r.p45) || 0,
+        p65: Number(r.p65) || 0,
+
+        custom_tier: r.customTier || 'auto',
+
+        paid: Number(r.paid) || 0,
+
+        payment_date:
+          r.paymentDate || null,
+
+        created_by: currentUser.id,
+        updated_by: currentUser.id
+      }))
+
+    ];
+
+    // ---------------------------------------------
+    // Save month
+    // ---------------------------------------------
+
+    const { error: monthUpdateError } = await sb
+      .from('commission_months')
+      .update({
+        tiers: state.tiers || [],
+        updated_by: currentUser.id
+      })
+      .eq('id', cloudMonthId);
+
+    if(monthUpdateError){
+      throw monthUpdateError;
+    }
+
+    // ---------------------------------------------
+    // Save rows
+    // ---------------------------------------------
+
+    if(rows.length){
+
+      const { error: rowsError } = await sb
+        .from('commission_rows')
+        .upsert(
+          rows,
+          {
+            onConflict:
+              'month_id,zone,name'
+          }
+        );
+
+      if(rowsError){
+        throw rowsError;
+      }
+
+    }
+
+    // ---------------------------------------------
+    // Local backup
+    // ---------------------------------------------
+
+    try{
+
+      localStorage.setItem(
+        'babil_commission_v2',
+        JSON.stringify(state)
+      );
+
+    }catch(e){
+
+      console.warn(
+        'Local backup failed:',
+        e
+      );
+
+    }
+
+    console.log(
+      'Cloud data saved successfully'
+    );
+
+    return true;
+
+  }catch(error){
+
+    console.error(
+      'Supabase save error:',
+      error
+    );
+
+    alert(
+      'تعذر حفظ البيانات على السيرفر.\n\n' +
+      (error.message || error)
+    );
+
+    return false;
+  }
+}async function testCloudConnection(){
+
+  const ok = await loadCloudData();
+
+  if(ok){
+
+    alert(
+      '✅ تم الاتصال بـ Supabase\n\n' +
+      'الشهر: ' + state.month + '\n' +
+      'OLD: ' + state.data.old.length + '\n' +
+      'NEW: ' + state.data.new.length
+    );
+
+  }
+
 }
 function save(){
  localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog}));
