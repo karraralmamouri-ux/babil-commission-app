@@ -23,6 +23,8 @@
 ### Security
 
 - توثيق تدقيق Supabase الفعلي وإعداد إصلاح لمسار تصعيد الدور في `profiles` وتقليص منح `anon` و`authenticated` وجعل التدقيق append-only.
+- تطبيق مهاجرة تحصين الصلاحيات على Supabase الإنتاجي والتحقق من policies وgrants ومنع تعديل profile المباشر بمحاكاة دوري admin وaccountant.
+- حذف رمز الوصول المؤقت بعد اكتمال التدقيق والتحقق من عدم بقاء Access Tokens في الحساب.
 
 ### Fixed
 
