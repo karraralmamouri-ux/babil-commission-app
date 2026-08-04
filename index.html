@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<!-- saved from url=(0077)file:///C:/Users/karar.haydar/Documents/Codex/2026-08-04/i/outputs/index.html -->
+<!-- saved from url=(0050)file:///C:/Users/karar.haydar/Downloads/index.html -->
 <html lang="ar" dir="rtl"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>لوحة عمولات الوكلاء — HRINS</title>
 <meta name="theme-color" content="#12161c">
 <script src="./index_files/xlsx.full.min.js.download"></script>
-<script src="./index_files/supabase.js.download"></script>
+<script src="./index_files/supabase-js@2"></script>
 <style>
 :root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
@@ -74,17 +74,17 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 </div>
 
 <section class="cards">
- <div class="card goldline"><div class="label">إجمالي العمولات</div><div class="value" id="grandTotal">36,458,000</div><div class="sub">د.ع</div></div>
- <div class="card blueline"><div class="label">OLD ZONE</div><div class="value" id="oldTotal">14,496,750</div><div class="sub" id="oldCount">18 وكيل</div></div>
+ <div class="card goldline"><div class="label">إجمالي العمولات</div><div class="value" id="grandTotal">36,464,000</div><div class="sub">د.ع</div></div>
+ <div class="card blueline"><div class="label">OLD ZONE</div><div class="value" id="oldTotal">14,502,750</div><div class="sub" id="oldCount">18 وكيل</div></div>
  <div class="card greenline"><div class="label">NEW ZONE</div><div class="value" id="newTotal">21,961,250</div><div class="sub" id="newCount">24 وكيل</div></div>
  <div class="card"><div class="label">إجمالي المدفوع</div><div class="value" id="paidTotal">0</div><div class="sub">د.ع</div></div>
- <div class="card"><div class="label">المتبقي</div><div class="value" id="remainingTotal">36,458,000</div><div class="sub">د.ع</div></div>
+ <div class="card"><div class="label">المتبقي</div><div class="value" id="remainingTotal">36,464,000</div><div class="sub">د.ع</div></div>
  <div class="card redline"><div class="label">عدد الوكلاء</div><div class="value" id="agentCount">42</div><div class="sub" id="statusSummary">مدفوع 0 • جزئي 0 • غير مدفوع 42</div></div>
 </section>
 
 <div class="grid2">
- <div class="box"><h3>🏆 أعلى الوكلاء بالعمولة</h3><div id="topAgents"><div class="minirow"><span>1. عمار خليل <small class="muted">(OLD)</small></span><b class="money">3,464,500</b></div><div class="minirow"><span>2. FDT-98 <small class="muted">(NEW)</small></span><b class="money">2,505,500</b></div><div class="minirow"><span>3. FDT-94 <small class="muted">(NEW)</small></span><b class="money">2,502,000</b></div><div class="minirow"><span>4. بارق ليث <small class="muted">(OLD)</small></span><b class="money">2,442,000</b></div><div class="minirow"><span>5. FDT-95 <small class="muted">(NEW)</small></span><b class="money">1,862,750</b></div><div class="minirow"><span>6. عمار كامل <small class="muted">(OLD)</small></span><b class="money">1,812,250</b></div><div class="minirow"><span>7. FDT-96 <small class="muted">(NEW)</small></span><b class="money">1,809,750</b></div></div></div>
- <div class="box"><h3>📊 حالة الصرف</h3><div id="paymentSummary"><div class="minirow"><span>🟢 مدفوع بالكامل</span><b>0</b></div><div class="minirow"><span>🟡 مدفوع جزئياً</span><b>0</b></div><div class="minirow"><span>🔴 غير مدفوع</span><b>42</b></div><div class="minirow"><span>المتبقي</span><b class="money">36,458,000 د.ع</b></div></div></div>
+ <div class="box"><h3>🏆 أعلى الوكلاء بالعمولة</h3><div id="topAgents"><div class="minirow"><span>1. عمار خليل <small class="muted">(OLD)</small></span><b class="money">3,470,500</b></div><div class="minirow"><span>2. FDT-98 <small class="muted">(NEW)</small></span><b class="money">2,505,500</b></div><div class="minirow"><span>3. FDT-94 <small class="muted">(NEW)</small></span><b class="money">2,502,000</b></div><div class="minirow"><span>4. بارق ليث <small class="muted">(OLD)</small></span><b class="money">2,442,000</b></div><div class="minirow"><span>5. FDT-95 <small class="muted">(NEW)</small></span><b class="money">1,862,750</b></div><div class="minirow"><span>6. عمار كامل <small class="muted">(OLD)</small></span><b class="money">1,812,250</b></div><div class="minirow"><span>7. FDT-96 <small class="muted">(NEW)</small></span><b class="money">1,809,750</b></div></div></div>
+ <div class="box"><h3>📊 حالة الصرف</h3><div id="paymentSummary"><div class="minirow"><span>🟢 مدفوع بالكامل</span><b>0</b></div><div class="minirow"><span>🟡 مدفوع جزئياً</span><b>0</b></div><div class="minirow"><span>🔴 غير مدفوع</span><b>42</b></div><div class="minirow"><span>المتبقي</span><b class="money">36,464,000 د.ع</b></div></div></div>
 </div>
 
 <details id="ratesDetails" open="">
@@ -106,11 +106,11 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   <td class="money">1,248,000</td><td>0</td><td class="money">1,248,000</td><td><span class="badge bpending">غير مدفوع</span></td>
   <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,0)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,0)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,0)">✕</button></td></tr><tr>
   <td><input class="name" value="عمار خليل" onchange="setField(&#39;old&#39;,1,&#39;name&#39;,this.value)"></td>
-  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="541" onchange="setNum(&#39;old&#39;,1,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="542" onchange="setNum(&#39;old&#39;,1,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p35&#39;,1)">+</button></div></td>
   <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="23" onchange="setNum(&#39;old&#39;,1,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p45&#39;,1)">+</button></div></td>
   <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="3" onchange="setNum(&#39;old&#39;,1,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p65&#39;,1)">+</button></div></td>
-  <td>567</td><td><select class="tier" onchange="setField(&#39;old&#39;,1,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T3)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
-  <td class="money">3,464,500</td><td>0</td><td class="money">3,464,500</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td>568</td><td><select class="tier" onchange="setField(&#39;old&#39;,1,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T3)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">3,470,500</td><td>0</td><td class="money">3,470,500</td><td><span class="badge bpending">غير مدفوع</span></td>
   <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,1)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,1)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,1)">✕</button></td></tr><tr>
   <td><input class="name" value="مصطفى ضياء" onchange="setField(&#39;old&#39;,2,&#39;name&#39;,this.value)"></td>
   <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,2,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="94" onchange="setNum(&#39;old&#39;,2,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,2,&#39;p35&#39;,1)">+</button></div></td>
@@ -223,7 +223,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,17,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,17,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,17,&#39;p65&#39;,1)">+</button></div></td>
   <td>0</td><td><select class="tier" onchange="setField(&#39;old&#39;,17,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (-)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
   <td class="money">0</td><td>0</td><td class="money">0</td><td><span class="badge bpending">غير مدفوع</span></td>
-  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,17)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,17)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,17)">✕</button></td></tr></tbody><tfoot><tr><td colspan="6">إجمالي المنطقة</td><td class="money">14,496,750 د.ع</td><td>0 د.ع</td><td class="money">14,496,750 د.ع</td><td colspan="2"></td></tr></tfoot></table><div class="zoneActions"><div class="actions"><button class="btn gold" onclick="addAgent(&#39;old&#39;)">+ إضافة وكيل</button><button class="btn" onclick="exportZone(&#39;old&#39;)">📤 تصدير المنطقة</button></div><span class="muted" style="font-size:10px">يظهر 18 من 18 سجل</span></div></div>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,17)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,17)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,17)">✕</button></td></tr></tbody><tfoot><tr><td colspan="6">إجمالي المنطقة</td><td class="money">14,502,750 د.ع</td><td>0 د.ع</td><td class="money">14,502,750 د.ع</td><td colspan="2"></td></tr></tfoot></table><div class="zoneActions"><div class="actions"><button class="btn gold" onclick="addAgent(&#39;old&#39;)">+ إضافة وكيل</button><button class="btn" onclick="exportZone(&#39;old&#39;)">📤 تصدير المنطقة</button></div><span class="muted" style="font-size:10px">يظهر 18 من 18 سجل</span></div></div>
 <div id="panel-new" class="panel"><table><thead><tr><th>اسم الوكيل / FDT</th><th>P35</th><th>P45</th><th>P65</th><th>الكمية</th><th>الفئة</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody><tr>
   <td><input class="name" value="FDT-94" onchange="setField(&#39;new&#39;,0,&#39;name&#39;,this.value)"></td>
   <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,0,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="397" onchange="setNum(&#39;new&#39;,0,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,0,&#39;p35&#39;,1)">+</button></div></td>
@@ -535,6 +535,10 @@ async function verifyCurrentUser(){
 
 async function login(){
  clearAuthError();
+ if(!sb){
+   authError('تعذر تحميل خدمة تسجيل الدخول. تحقق من اتصال الإنترنت ثم أعد تحميل الصفحة.');
+   return;
+ }
  const email=document.getElementById('loginEmail').value.trim();
  const password=document.getElementById('loginPassword').value;
  const b=document.getElementById('loginButton');
