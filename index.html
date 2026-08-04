@@ -122,6 +122,40 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  <div class="modalhead"><h2 id="modalTitle">تفاصيل الوكيل</h2><button class="close" onclick="closeModal()">×</button></div>
  <div id="modalBody"></div>
 </div></div>
+
+<div id="userManagementModal" class="modal" onclick="if(event.target===this)closeUserManagement()">
+  <div class="modalbox" style="width:min(600px,100%)">
+    <div class="modalhead">
+      <h2>👥 إنشاء حساب مستخدم</h2>
+      <button class="close" onclick="closeUserManagement()">×</button>
+    </div>
+    <div class="formgrid">
+      <label>الاسم الكامل
+        <input id="newUserName" class="input" placeholder="اسم المستخدم">
+      </label>
+      <label>البريد الإلكتروني
+        <input id="newUserEmail" class="input" type="email" placeholder="name@example.com">
+      </label>
+      <label>كلمة المرور
+        <input id="newUserPassword" class="input" type="password" placeholder="8 أحرف على الأقل">
+      </label>
+      <label>الصلاحية
+        <select id="newUserRole" class="select">
+          <option value="viewer">مشاهد</option>
+          <option value="monitor">متابع</option>
+          <option value="accountant">محاسب</option>
+          <option value="admin">Admin</option>
+        </select>
+      </label>
+    </div>
+    <div id="userCreateMsg" class="muted" style="margin-top:12px;font-size:11px"></div>
+    <div class="actions" style="margin-top:14px">
+      <button id="createUserBtn" class="btn gold" onclick="createUser()">➕ إنشاء الحساب</button>
+      <button class="btn" onclick="closeUserManagement()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script>
@@ -660,6 +694,53 @@ async function importFile(e){
 function parseCSV(text){const lines=text.replace(/\r/g,'').split('\n').filter(Boolean),out=[],parse=s=>{let a=[],cur='',q=false;for(let i=0;i<s.length;i++){const ch=s[i];if(ch==='"'&&s[i+1]==='"'){cur+='"';i++;continue}if(ch==='"'){q=!q;continue}if(ch===','&&!q){a.push(cur);cur=''}else cur+=ch}a.push(cur);return a};const h=parse(lines[0]).map(x=>x.trim());for(let i=1;i<lines.length;i++){const a=parse(lines[i]),o={};h.forEach((k,j)=>o[k]=a[j]??'');out.push(o)}return out}
 function numFrom(o,keys){for(const k of keys){if(o[k]!==undefined&&o[k]!=='')return Number(String(o[k]).replace(/,/g,''))||0}return 0}
 function normalizeImport(o){const keys=Object.keys(o),get=names=>{const k=keys.find(x=>names.some(n=>x.trim().toLowerCase()===n.toLowerCase()));return k?o[k]:''},name=get(['Name','name','اسم الوكيل','اسم','FDT','fdt'])||o[keys[0]],zoneRaw=String(get(['Zone','zone','المنطقة'])||'').toLowerCase(),zone=zoneRaw.includes('new')||zoneRaw.includes('جديد')?'new':zoneRaw.includes('old')||zoneRaw.includes('قديم')?'old':String(name).toUpperCase().includes('FDT-')?'new':'old';return{name:String(name).trim(),p35:numFrom(o,['P35','p35','35']),p45:numFrom(o,['P45','p45','45']),p65:numFrom(o,['P65','p65','65']),paid:numFrom(o,['Paid','paid','المدفوع']),paymentDate:get(['PaymentDate','payment date','تاريخ الصرف'])||'',customTier:get(['Tier','tier','الفئة'])||'auto',zone}}
+
+
+function openUserManagement(){
+  if(!hasPermission('users')){toast('ليس لديك صلاحية إدارة المستخدمين');return}
+  document.getElementById('userCreateMsg').textContent='';
+  document.getElementById('userManagementModal').classList.add('open');
+}
+function closeUserManagement(){
+  document.getElementById('userManagementModal').classList.remove('open');
+}
+async function createUser(){
+  if(!hasPermission('users')){toast('ليس لديك صلاحية إنشاء المستخدمين');return}
+  const name=document.getElementById('newUserName').value.trim();
+  const email=document.getElementById('newUserEmail').value.trim().toLowerCase();
+  const password=document.getElementById('newUserPassword').value;
+  const role=document.getElementById('newUserRole').value;
+  const msg=document.getElementById('userCreateMsg');
+  const btn=document.getElementById('createUserBtn');
+
+  if(name.length<2){msg.textContent='اكتب الاسم الكامل.';return}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){msg.textContent='البريد الإلكتروني غير صحيح.';return}
+  if(password.length<8){msg.textContent='كلمة المرور يجب أن تكون 8 أحرف على الأقل.';return}
+
+  btn.disabled=true;
+  btn.textContent='جاري الإنشاء...';
+  msg.textContent='';
+
+  try{
+    const {data,error}=await sb.functions.invoke('admin-create-user',{
+      body:{full_name:name,email,password,role,is_active:true}
+    });
+    if(error)throw new Error(error.message||'فشل إنشاء الحساب');
+    if(!data?.ok)throw new Error(data?.error||'فشل إنشاء الحساب');
+
+    msg.textContent='✅ تم إنشاء الحساب بنجاح: '+email;
+    document.getElementById('newUserName').value='';
+    document.getElementById('newUserEmail').value='';
+    document.getElementById('newUserPassword').value='';
+    toast('تم إنشاء حساب المستخدم');
+  }catch(e){
+    console.error(e);
+    msg.textContent='❌ '+(e.message||'حدث خطأ');
+  }finally{
+    btn.disabled=false;
+    btn.textContent='➕ إنشاء الحساب';
+  }
+}
 
 initAuth();
 </script>
