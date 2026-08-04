@@ -107,10 +107,13 @@ function loadCurrentApp() {
   const exportsScript = `
     globalThis.__characterization = {
       calc,
+      compareMonthKeys,
       defaultData,
       defaultTiers,
       getPreviousRow,
       monthKey,
+      monthOrder,
+      nextMonthKey,
       normalizeImport,
       parseCSV,
       state,
