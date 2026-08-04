@@ -58,6 +58,12 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   <button class="btn gold" data-permission="edit" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
   <button class="btn" data-permission="edit" onclick="startNewMonth()">✨ شهر جديد</button>
   <button class="btn" onclick="openAuditLog()">🧾 سجل التعديلات</button>
+   <button
+  class="btn green"
+  data-permission="edit"
+  onclick="migrateLocalDataToSupabase()">
+  ☁️ نقل البيانات للسيرفر
+</button>
   <button id="logoutButton" class="btn danger">تسجيل الخروج</button>
  </div>
 </header>
@@ -420,6 +426,232 @@ async function ensurePermission(permission){
     console.error('Permission guard error:',error);
     toast('تعذر التحقق من صلاحيات الحساب');
     return false;
+  }
+}
+  async function migrateLocalDataToSupabase(){
+
+  if(!(await ensurePermission('edit'))) return;
+
+  if(!confirm(
+    'سيتم نقل البيانات الموجودة حالياً في هذا المتصفح إلى Supabase.\n\n' +
+    'لن يتم حذف بيانات LocalStorage.\n\n' +
+    'هل تريد المتابعة؟'
+  )) return;
+
+  try{
+
+    toast('جاري نقل البيانات إلى Supabase...');
+
+    // -----------------------------------------
+    // 1. Create / get current month
+    // -----------------------------------------
+
+    let {data:month,error:monthError}=await sb
+      .from('commission_months')
+      .select('*')
+      .eq('month_key',state.month)
+      .maybeSingle();
+
+    if(monthError) throw monthError;
+
+    if(!month){
+
+      const {data:newMonth,error:newMonthError}=await sb
+        .from('commission_months')
+        .insert({
+          month_key:state.month,
+          tiers:state.tiers,
+          created_by:authUser.id,
+          updated_by:authUser.id
+        })
+        .select()
+        .single();
+
+      if(newMonthError) throw newMonthError;
+
+      month=newMonth;
+    }
+
+    // -----------------------------------------
+    // 2. Upload current OLD + NEW rows
+    // -----------------------------------------
+
+    const rows=[
+      ...state.data.old.map(r=>({
+        month_id:month.id,
+        zone:'old',
+        name:r.name,
+        p35:Number(r.p35)||0,
+        p45:Number(r.p45)||0,
+        p65:Number(r.p65)||0,
+        custom_tier:r.customTier||'auto',
+        paid:Number(r.paid)||0,
+        payment_date:r.paymentDate||null,
+        created_by:authUser.id,
+        updated_by:authUser.id
+      })),
+
+      ...state.data.new.map(r=>({
+        month_id:month.id,
+        zone:'new',
+        name:r.name,
+        p35:Number(r.p35)||0,
+        p45:Number(r.p45)||0,
+        p65:Number(r.p65)||0,
+        custom_tier:r.customTier||'auto',
+        paid:Number(r.paid)||0,
+        payment_date:r.paymentDate||null,
+        created_by:authUser.id,
+        updated_by:authUser.id
+      }))
+    ];
+
+    if(rows.length){
+
+      const {error:rowsError}=await sb
+        .from('commission_rows')
+        .upsert(rows,{
+          onConflict:'month_id,zone,name'
+        });
+
+      if(rowsError) throw rowsError;
+    }
+
+    // -----------------------------------------
+    // 3. Upload archived months
+    // -----------------------------------------
+
+    let archiveCount=0;
+
+    for(const [monthKey,snapshot] of Object.entries(state.archive||{})){
+
+      let {data:archiveMonth,error:archiveFindError}=await sb
+        .from('commission_months')
+        .select('*')
+        .eq('month_key',monthKey)
+        .maybeSingle();
+
+      if(archiveFindError) throw archiveFindError;
+
+      if(!archiveMonth){
+
+        const {data:newArchiveMonth,error:newArchiveError}=await sb
+          .from('commission_months')
+          .insert({
+            month_key:monthKey,
+            tiers:snapshot.tiers||defaultTiers,
+            created_by:authUser.id,
+            updated_by:authUser.id
+          })
+          .select()
+          .single();
+
+        if(newArchiveError) throw newArchiveError;
+
+        archiveMonth=newArchiveMonth;
+      }
+
+      const archiveRows=[
+        ...(snapshot.data?.old||[]).map(r=>({
+          month_id:archiveMonth.id,
+          zone:'old',
+          name:r.name,
+          p35:Number(r.p35)||0,
+          p45:Number(r.p45)||0,
+          p65:Number(r.p65)||0,
+          custom_tier:r.customTier||'auto',
+          paid:Number(r.paid)||0,
+          payment_date:r.paymentDate||null,
+          created_by:authUser.id,
+          updated_by:authUser.id
+        })),
+
+        ...(snapshot.data?.new||[]).map(r=>({
+          month_id:archiveMonth.id,
+          zone:'new',
+          name:r.name,
+          p35:Number(r.p35)||0,
+          p45:Number(r.p45)||0,
+          p65:Number(r.p65)||0,
+          custom_tier:r.customTier||'auto',
+          paid:Number(r.paid)||0,
+          payment_date:r.paymentDate||null,
+          created_by:authUser.id,
+          updated_by:authUser.id
+        }))
+      ];
+
+      if(archiveRows.length){
+
+        const {error:archiveRowsError}=await sb
+          .from('commission_rows')
+          .upsert(archiveRows,{
+            onConflict:'month_id,zone,name'
+          });
+
+        if(archiveRowsError) throw archiveRowsError;
+      }
+
+      archiveCount++;
+    }
+
+    // -----------------------------------------
+    // 4. Upload local audit log
+    // -----------------------------------------
+
+    let auditCount=0;
+
+    for(const log of (state.auditLog||[])){
+
+      const {error:auditError}=await sb
+        .from('commission_audit_logs')
+        .insert({
+          user_id:authUser.id,
+          month_id:month.id,
+          month_key:log.month||state.month,
+          zone:log.zone||null,
+          agent:log.agent||null,
+          action:log.action||'تعديل',
+          field:log.field||null,
+          old_value:log.oldValue||null,
+          new_value:log.newValue||null,
+          extra:log.extra||null,
+          created_at:log.at||new Date().toISOString()
+        });
+
+      if(auditError) throw auditError;
+
+      auditCount++;
+    }
+
+    // -----------------------------------------
+    // 5. Verification
+    // -----------------------------------------
+
+    const {count:rowCount,error:countError}=await sb
+      .from('commission_rows')
+      .select('*',{count:'exact',head:true});
+
+    if(countError) throw countError;
+
+    toast(
+      `تم النقل بنجاح ✅ الوكلاء: ${rowCount||0} • الأشهر: ${archiveCount+1} • السجل: ${auditCount}`
+    );
+
+    console.log('Migration completed:',{
+      rows:rowCount,
+      months:archiveCount+1,
+      auditLogs:auditCount
+    });
+
+  }catch(error){
+
+    console.error('Migration error:',error);
+
+    alert(
+      'فشل نقل البيانات إلى Supabase.\n\n' +
+      (error.message||error)
+    );
   }
 }
 function save(){
