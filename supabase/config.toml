@@ -1,0 +1,9 @@
+project_id = "babil-commission-app"
+
+[functions.admin-create-user]
+verify_jwt = false
+entrypoint = "./functions/admin-create-user/index.ts"
+
+[functions.admin-users]
+verify_jwt = true
+entrypoint = "./functions/admin-users/index.ts"

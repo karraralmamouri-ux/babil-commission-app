@@ -10,3 +10,4 @@ coverage/
 backups/
 exports/
 work/
+supabase/.temp/
