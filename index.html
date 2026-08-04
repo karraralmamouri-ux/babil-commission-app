@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0091)file:///C:/Users/karar.haydar/Documents/Codex/2026-08-04/i/outputs/index-managed-users.html -->
+<html lang="ar" dir="rtl"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>لوحة عمولات الوكلاء — HRINS</title>
 <meta name="theme-color" content="#12161c">
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./index.html 1_files/xlsx.full.min.js.download"></script>
+<script src="./index.html 1_files/supabase-js@2"></script>
 <style>
 :root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
@@ -22,12 +22,13 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 .toast{position:fixed;bottom:20px;left:20px;background:var(--panel2);border:1px solid var(--gold);color:var(--text);padding:10px 14px;border-radius:8px;display:none;z-index:50;font-size:12px}.toast.show{display:block}
 .login-screen{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:#0f141a}.login-card{width:min(430px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.login-card h1{font-size:24px;text-align:center;margin:8px 0}.login-card .sub{text-align:center;color:var(--muted);font-size:12px;margin-bottom:22px}.login-card label{display:block;color:var(--muted);font-size:12px;margin:0 0 6px}.login-card input{width:100%;margin-bottom:13px}.login-error{display:none;background:rgba(212,99,78,.12);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:9px 11px;font-size:12px;margin-bottom:12px}.session-user{display:flex;align-items:center;gap:7px;font-size:11px}.role-pill{background:rgba(212,162,78,.13);color:var(--gold);border:1px solid rgba(212,162,78,.35);border-radius:20px;padding:3px 8px;font-size:10px;font-weight:800}
 .no-permission{padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
+.users-table{min-width:780px}.users-table td{padding:9px 6px}.user-actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}.status-active{color:var(--green)}.status-disabled{color:var(--red)}
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls{width:100%}.btn{padding:8px 9px}}
 </style>
 </head>
 <body>
 
-<div id="loginScreen" class="login-screen">
+<div id="loginScreen" class="login-screen" style="display: none;">
   <div class="login-card">
     <div class="eyebrow" style="text-align:center">HRINS • RESELLER FINANCE</div>
     <h1>لوحة عمولات الوكلاء</h1>
@@ -41,7 +42,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   </div>
 </div>
 
-<div id="appShell" style="display:none">
+<div id="appShell" style="display: block;">
 <div class="wrap">
 <header class="mast">
  <div>
@@ -50,14 +51,15 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   <div class="muted" style="font-size:11px">إدارة العمولات • الصرف • الأرشيف • الأداء الشهري</div>
  </div>
  <div class="controls">
-  <div class="session-user">👤 <b id="loggedUserName"></b><span id="loggedUserRole" class="role-pill"></span></div>
+  <div class="session-user">👤 <b id="loggedUserName">كرار</b><span id="loggedUserRole" class="role-pill">Admin</span></div>
   <span class="muted" style="font-size:11px">الشهر:</span>
   <input id="monthInput" class="input" value="08/2026" placeholder="MM/YYYY" style="width:105px;text-align:center" title="اكتب الشهر بصيغة MM/YYYY">
   <button class="btn" onclick="applyMonthInput()">تطبيق</button>
-  <select id="monthSelect" class="select" onchange="loadSelectedMonth()"></select>
+  <select id="monthSelect" class="select" onchange="loadSelectedMonth()"><option value="08/2026" selected="">08/2026</option></select>
   <button class="btn gold" data-permission="edit" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
   <button class="btn" data-permission="edit" onclick="startNewMonth()">✨ شهر جديد</button>
   <button class="btn" onclick="openAuditLog()">🧾 سجل التعديلات</button>
+  <button class="btn gold" data-permission="users" onclick="openUserManagement()">👥 إدارة المستخدمين</button>
   <button id="logoutButton" class="btn danger">تسجيل الخروج</button>
  </div>
 </header>
@@ -66,37 +68,331 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  <input id="searchInput" class="search" placeholder="🔍 ابحث باسم الوكيل أو FDT..." oninput="renderAll()">
  <select id="zoneFilter" class="select" onchange="renderAll()"><option value="all">كل المناطق</option><option value="old">OLD ZONE</option><option value="new">NEW ZONE</option></select>
  <select id="statusFilter" class="select" onchange="renderAll()"><option value="all">كل حالات الصرف</option><option value="pending">غير مدفوع</option><option value="partial">مدفوع جزئياً</option><option value="paid">مدفوع</option></select>
- <button class="btn" data-permission="edit" onclick="document.getElementById('fileInput').click()">📥 استيراد Excel / CSV</button>
- <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden onchange="importFile(event)">
+ <button class="btn" data-permission="edit" onclick="document.getElementById(&#39;fileInput&#39;).click()">📥 استيراد Excel / CSV</button>
+ <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden="" onchange="importFile(event)">
  <button class="btn" onclick="exportAll()">📤 تصدير الكل</button>
 </div>
 
 <section class="cards">
- <div class="card goldline"><div class="label">إجمالي العمولات</div><div class="value" id="grandTotal">0</div><div class="sub">د.ع</div></div>
- <div class="card blueline"><div class="label">OLD ZONE</div><div class="value" id="oldTotal">0</div><div class="sub" id="oldCount">0 وكيل</div></div>
- <div class="card greenline"><div class="label">NEW ZONE</div><div class="value" id="newTotal">0</div><div class="sub" id="newCount">0 وكيل</div></div>
+ <div class="card goldline"><div class="label">إجمالي العمولات</div><div class="value" id="grandTotal">36,458,000</div><div class="sub">د.ع</div></div>
+ <div class="card blueline"><div class="label">OLD ZONE</div><div class="value" id="oldTotal">14,496,750</div><div class="sub" id="oldCount">18 وكيل</div></div>
+ <div class="card greenline"><div class="label">NEW ZONE</div><div class="value" id="newTotal">21,961,250</div><div class="sub" id="newCount">24 وكيل</div></div>
  <div class="card"><div class="label">إجمالي المدفوع</div><div class="value" id="paidTotal">0</div><div class="sub">د.ع</div></div>
- <div class="card"><div class="label">المتبقي</div><div class="value" id="remainingTotal">0</div><div class="sub">د.ع</div></div>
- <div class="card redline"><div class="label">عدد الوكلاء</div><div class="value" id="agentCount">0</div><div class="sub" id="statusSummary">—</div></div>
+ <div class="card"><div class="label">المتبقي</div><div class="value" id="remainingTotal">36,458,000</div><div class="sub">د.ع</div></div>
+ <div class="card redline"><div class="label">عدد الوكلاء</div><div class="value" id="agentCount">42</div><div class="sub" id="statusSummary">مدفوع 0 • جزئي 0 • غير مدفوع 42</div></div>
 </section>
 
 <div class="grid2">
- <div class="box"><h3>🏆 أعلى الوكلاء بالعمولة</h3><div id="topAgents"></div></div>
- <div class="box"><h3>📊 حالة الصرف</h3><div id="paymentSummary"></div></div>
+ <div class="box"><h3>🏆 أعلى الوكلاء بالعمولة</h3><div id="topAgents"><div class="minirow"><span>1. عمار خليل <small class="muted">(OLD)</small></span><b class="money">3,464,500</b></div><div class="minirow"><span>2. FDT-98 <small class="muted">(NEW)</small></span><b class="money">2,505,500</b></div><div class="minirow"><span>3. FDT-94 <small class="muted">(NEW)</small></span><b class="money">2,502,000</b></div><div class="minirow"><span>4. بارق ليث <small class="muted">(OLD)</small></span><b class="money">2,442,000</b></div><div class="minirow"><span>5. FDT-95 <small class="muted">(NEW)</small></span><b class="money">1,862,750</b></div><div class="minirow"><span>6. عمار كامل <small class="muted">(OLD)</small></span><b class="money">1,812,250</b></div><div class="minirow"><span>7. FDT-96 <small class="muted">(NEW)</small></span><b class="money">1,809,750</b></div></div></div>
+ <div class="box"><h3>📊 حالة الصرف</h3><div id="paymentSummary"><div class="minirow"><span>🟢 مدفوع بالكامل</span><b>0</b></div><div class="minirow"><span>🟡 مدفوع جزئياً</span><b>0</b></div><div class="minirow"><span>🔴 غير مدفوع</span><b>42</b></div><div class="minirow"><span>المتبقي</span><b class="money">36,458,000 د.ع</b></div></div></div>
 </div>
 
-<details id="ratesDetails" open>
+<details id="ratesDetails" open="">
  <summary>⚙️ إعدادات أسعار العمولات</summary>
- <div class="settings" id="settings"></div>
+ <div class="settings" id="settings"><label class="setting">T1 — P35<input class="input" type="number" value="4000"></label><label class="setting">T1 — P45<input class="input" type="number" value="5500"></label><label class="setting">T1 — P65<input class="input" type="number" value="8000"></label><label class="setting">T2 — P35<input class="input" type="number" value="4750"></label><label class="setting">T2 — P45<input class="input" type="number" value="6000"></label><label class="setting">T2 — P65<input class="input" type="number" value="9000"></label><label class="setting">T3 — P35<input class="input" type="number" value="6000"></label><label class="setting">T3 — P45<input class="input" type="number" value="8000"></label><label class="setting">T3 — P65<input class="input" type="number" value="11500"></label></div>
  <div class="muted" style="font-size:10px;padding-bottom:12px">الأسعار تحفظ مع كل شهر عند الضغط على «حفظ الشهر»، لذلك تغيير الأسعار لاحقاً لا يغيّر الأشهر المؤرشفة.</div>
 </details>
 
 <div class="tabs">
- <button class="tab active" data-zone="old" onclick="switchTab('old')">🔵 OLD ZONE</button>
- <button class="tab" data-zone="new" onclick="switchTab('new')">🟢 NEW ZONE</button>
+ <button class="tab active" data-zone="old" onclick="switchTab(&#39;old&#39;)">🔵 OLD ZONE</button>
+ <button class="tab" data-zone="new" onclick="switchTab(&#39;new&#39;)">🟢 NEW ZONE</button>
 </div>
-<div id="panel-old" class="panel active"></div>
-<div id="panel-new" class="panel"></div>
+<div id="panel-old" class="panel active"><table><thead><tr><th>اسم الوكيل / FDT</th><th>P35</th><th>P45</th><th>P65</th><th>الكمية</th><th>الفئة</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody><tr>
+  <td><input class="name" value="حيدر طالب" onchange="setField(&#39;old&#39;,0,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,0,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="252" onchange="setNum(&#39;old&#39;,0,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,0,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,0,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="7" onchange="setNum(&#39;old&#39;,0,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,0,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,0,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;old&#39;,0,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,0,&#39;p65&#39;,1)">+</button></div></td>
+  <td>260</td><td><select class="tier" onchange="setField(&#39;old&#39;,0,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,248,000</td><td>0</td><td class="money">1,248,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,0)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,0)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,0)">✕</button></td></tr><tr>
+  <td><input class="name" value="عمار خليل" onchange="setField(&#39;old&#39;,1,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="541" onchange="setNum(&#39;old&#39;,1,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="23" onchange="setNum(&#39;old&#39;,1,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="3" onchange="setNum(&#39;old&#39;,1,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,1,&#39;p65&#39;,1)">+</button></div></td>
+  <td>567</td><td><select class="tier" onchange="setField(&#39;old&#39;,1,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T3)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">3,464,500</td><td>0</td><td class="money">3,464,500</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,1)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,1)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,1)">✕</button></td></tr><tr>
+  <td><input class="name" value="مصطفى ضياء" onchange="setField(&#39;old&#39;,2,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,2,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="94" onchange="setNum(&#39;old&#39;,2,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,2,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,2,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="8" onchange="setNum(&#39;old&#39;,2,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,2,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,2,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,2,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,2,&#39;p65&#39;,1)">+</button></div></td>
+  <td>102</td><td><select class="tier" onchange="setField(&#39;old&#39;,2,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">420,000</td><td>0</td><td class="money">420,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,2)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,2)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,2)">✕</button></td></tr><tr>
+  <td><input class="name" value="كرار عباس" onchange="setField(&#39;old&#39;,3,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,3,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="96" onchange="setNum(&#39;old&#39;,3,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,3,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,3,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="3" onchange="setNum(&#39;old&#39;,3,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,3,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,3,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,3,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,3,&#39;p65&#39;,1)">+</button></div></td>
+  <td>99</td><td><select class="tier" onchange="setField(&#39;old&#39;,3,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">400,500</td><td>0</td><td class="money">400,500</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,3)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,3)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,3)">✕</button></td></tr><tr>
+  <td><input class="name" value="زياد جواد" onchange="setField(&#39;old&#39;,4,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,4,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="152" onchange="setNum(&#39;old&#39;,4,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,4,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,4,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="6" onchange="setNum(&#39;old&#39;,4,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,4,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,4,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,4,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,4,&#39;p65&#39;,1)">+</button></div></td>
+  <td>158</td><td><select class="tier" onchange="setField(&#39;old&#39;,4,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">641,000</td><td>0</td><td class="money">641,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,4)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,4)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,4)">✕</button></td></tr><tr>
+  <td><input class="name" value="عمار كامل" onchange="setField(&#39;old&#39;,5,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,5,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="331" onchange="setNum(&#39;old&#39;,5,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,5,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,5,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="28" onchange="setNum(&#39;old&#39;,5,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,5,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,5,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="8" onchange="setNum(&#39;old&#39;,5,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,5,&#39;p65&#39;,1)">+</button></div></td>
+  <td>367</td><td><select class="tier" onchange="setField(&#39;old&#39;,5,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,812,250</td><td>0</td><td class="money">1,812,250</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,5)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,5)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,5)">✕</button></td></tr><tr>
+  <td><input class="name" value="باسم محمد" onchange="setField(&#39;old&#39;,6,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,6,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="125" onchange="setNum(&#39;old&#39;,6,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,6,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,6,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;old&#39;,6,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,6,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,6,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,6,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,6,&#39;p65&#39;,1)">+</button></div></td>
+  <td>126</td><td><select class="tier" onchange="setField(&#39;old&#39;,6,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">505,500</td><td>0</td><td class="money">505,500</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,6)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,6)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,6)">✕</button></td></tr><tr>
+  <td><input class="name" value="سعيد عمار" onchange="setField(&#39;old&#39;,7,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,7,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="87" onchange="setNum(&#39;old&#39;,7,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,7,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,7,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="6" onchange="setNum(&#39;old&#39;,7,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,7,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,7,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,7,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,7,&#39;p65&#39;,1)">+</button></div></td>
+  <td>93</td><td><select class="tier" onchange="setField(&#39;old&#39;,7,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">381,000</td><td>0</td><td class="money">381,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,7)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,7)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,7)">✕</button></td></tr><tr>
+  <td><input class="name" value="سعيد عمار sub1" onchange="setField(&#39;old&#39;,8,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,8,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="41" onchange="setNum(&#39;old&#39;,8,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,8,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,8,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,8,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,8,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,8,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,8,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,8,&#39;p65&#39;,1)">+</button></div></td>
+  <td>41</td><td><select class="tier" onchange="setField(&#39;old&#39;,8,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">164,000</td><td>0</td><td class="money">164,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,8)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,8)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,8)">✕</button></td></tr><tr>
+  <td><input class="name" value="سعيد عمار sub2" onchange="setField(&#39;old&#39;,9,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,9,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="124" onchange="setNum(&#39;old&#39;,9,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,9,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,9,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="3" onchange="setNum(&#39;old&#39;,9,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,9,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,9,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,9,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,9,&#39;p65&#39;,1)">+</button></div></td>
+  <td>127</td><td><select class="tier" onchange="setField(&#39;old&#39;,9,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">512,500</td><td>0</td><td class="money">512,500</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,9)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,9)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,9)">✕</button></td></tr><tr>
+  <td><input class="name" value="سعيد عمار sub8" onchange="setField(&#39;old&#39;,10,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,10,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="13" onchange="setNum(&#39;old&#39;,10,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,10,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,10,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,10,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,10,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,10,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,10,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,10,&#39;p65&#39;,1)">+</button></div></td>
+  <td>13</td><td><select class="tier" onchange="setField(&#39;old&#39;,10,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">52,000</td><td>0</td><td class="money">52,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,10)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,10)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,10)">✕</button></td></tr><tr>
+  <td><input class="name" value="احمد عبدالعباس" onchange="setField(&#39;old&#39;,11,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,11,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="153" onchange="setNum(&#39;old&#39;,11,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,11,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,11,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="6" onchange="setNum(&#39;old&#39;,11,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,11,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,11,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,11,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,11,&#39;p65&#39;,1)">+</button></div></td>
+  <td>159</td><td><select class="tier" onchange="setField(&#39;old&#39;,11,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">645,000</td><td>0</td><td class="money">645,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,11)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,11)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,11)">✕</button></td></tr><tr>
+  <td><input class="name" value="احمد عبدالعباس sub1" onchange="setField(&#39;old&#39;,12,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,12,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="26" onchange="setNum(&#39;old&#39;,12,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,12,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,12,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="2" onchange="setNum(&#39;old&#39;,12,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,12,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,12,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,12,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,12,&#39;p65&#39;,1)">+</button></div></td>
+  <td>28</td><td><select class="tier" onchange="setField(&#39;old&#39;,12,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">115,000</td><td>0</td><td class="money">115,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,12)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,12)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,12)">✕</button></td></tr><tr>
+  <td><input class="name" value="احمد عبدالعباس sub2" onchange="setField(&#39;old&#39;,13,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,13,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="47" onchange="setNum(&#39;old&#39;,13,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,13,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,13,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,13,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,13,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,13,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,13,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,13,&#39;p65&#39;,1)">+</button></div></td>
+  <td>47</td><td><select class="tier" onchange="setField(&#39;old&#39;,13,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">188,000</td><td>0</td><td class="money">188,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,13)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,13)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,13)">✕</button></td></tr><tr>
+  <td><input class="name" value="احمد عبدالعباس sub3" onchange="setField(&#39;old&#39;,14,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,14,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="194" onchange="setNum(&#39;old&#39;,14,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,14,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,14,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,14,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,14,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,14,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;old&#39;,14,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,14,&#39;p65&#39;,1)">+</button></div></td>
+  <td>195</td><td><select class="tier" onchange="setField(&#39;old&#39;,14,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">784,000</td><td>0</td><td class="money">784,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,14)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,14)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,14)">✕</button></td></tr><tr>
+  <td><input class="name" value="علي طارق" onchange="setField(&#39;old&#39;,15,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,15,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="179" onchange="setNum(&#39;old&#39;,15,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,15,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,15,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;old&#39;,15,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,15,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,15,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,15,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,15,&#39;p65&#39;,1)">+</button></div></td>
+  <td>180</td><td><select class="tier" onchange="setField(&#39;old&#39;,15,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">721,500</td><td>0</td><td class="money">721,500</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,15)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,15)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,15)">✕</button></td></tr><tr>
+  <td><input class="name" value="بارق ليث" onchange="setField(&#39;old&#39;,16,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,16,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="395" onchange="setNum(&#39;old&#39;,16,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,16,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,16,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="9" onchange="setNum(&#39;old&#39;,16,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,16,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,16,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,16,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,16,&#39;p65&#39;,1)">+</button></div></td>
+  <td>404</td><td><select class="tier" onchange="setField(&#39;old&#39;,16,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T3)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">2,442,000</td><td>0</td><td class="money">2,442,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,16)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,16)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,16)">✕</button></td></tr><tr>
+  <td><input class="name" value="وكيل جديد" onchange="setField(&#39;old&#39;,17,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,17,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,17,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,17,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,17,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,17,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,17,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;old&#39;,17,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;old&#39;,17,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;old&#39;,17,&#39;p65&#39;,1)">+</button></div></td>
+  <td>0</td><td><select class="tier" onchange="setField(&#39;old&#39;,17,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (-)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">0</td><td>0</td><td class="money">0</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;old&#39;,17)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;old&#39;,17)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;old&#39;,17)">✕</button></td></tr></tbody><tfoot><tr><td colspan="6">إجمالي المنطقة</td><td class="money">14,496,750 د.ع</td><td>0 د.ع</td><td class="money">14,496,750 د.ع</td><td colspan="2"></td></tr></tfoot></table><div class="zoneActions"><div class="actions"><button class="btn gold" onclick="addAgent(&#39;old&#39;)">+ إضافة وكيل</button><button class="btn" onclick="exportZone(&#39;old&#39;)">📤 تصدير المنطقة</button></div><span class="muted" style="font-size:10px">يظهر 18 من 18 سجل</span></div></div>
+<div id="panel-new" class="panel"><table><thead><tr><th>اسم الوكيل / FDT</th><th>P35</th><th>P45</th><th>P65</th><th>الكمية</th><th>الفئة</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody><tr>
+  <td><input class="name" value="FDT-94" onchange="setField(&#39;new&#39;,0,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,0,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="397" onchange="setNum(&#39;new&#39;,0,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,0,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,0,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="15" onchange="setNum(&#39;new&#39;,0,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,0,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,0,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,0,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,0,&#39;p65&#39;,1)">+</button></div></td>
+  <td>412</td><td><select class="tier" onchange="setField(&#39;new&#39;,0,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T3)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">2,502,000</td><td>0</td><td class="money">2,502,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,0)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,0)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,0)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-95" onchange="setField(&#39;new&#39;,1,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,1,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="377" onchange="setNum(&#39;new&#39;,1,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,1,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,1,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="12" onchange="setNum(&#39;new&#39;,1,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,1,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,1,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,1,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,1,&#39;p65&#39;,1)">+</button></div></td>
+  <td>389</td><td><select class="tier" onchange="setField(&#39;new&#39;,1,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,862,750</td><td>0</td><td class="money">1,862,750</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,1)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,1)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,1)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-96" onchange="setField(&#39;new&#39;,2,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,2,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="369" onchange="setNum(&#39;new&#39;,2,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,2,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,2,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="8" onchange="setNum(&#39;new&#39;,2,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,2,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,2,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;new&#39;,2,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,2,&#39;p65&#39;,1)">+</button></div></td>
+  <td>378</td><td><select class="tier" onchange="setField(&#39;new&#39;,2,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,809,750</td><td>0</td><td class="money">1,809,750</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,2)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,2)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,2)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-97" onchange="setField(&#39;new&#39;,3,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,3,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="272" onchange="setNum(&#39;new&#39;,3,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,3,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,3,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="4" onchange="setNum(&#39;new&#39;,3,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,3,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,3,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;new&#39;,3,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,3,&#39;p65&#39;,1)">+</button></div></td>
+  <td>277</td><td><select class="tier" onchange="setField(&#39;new&#39;,3,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,325,000</td><td>0</td><td class="money">1,325,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,3)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,3)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,3)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-98" onchange="setField(&#39;new&#39;,4,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,4,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="405" onchange="setNum(&#39;new&#39;,4,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,4,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,4,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="8" onchange="setNum(&#39;new&#39;,4,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,4,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,4,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;new&#39;,4,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,4,&#39;p65&#39;,1)">+</button></div></td>
+  <td>414</td><td><select class="tier" onchange="setField(&#39;new&#39;,4,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T3)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">2,505,500</td><td>0</td><td class="money">2,505,500</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,4)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,4)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,4)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-99" onchange="setField(&#39;new&#39;,5,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,5,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="301" onchange="setNum(&#39;new&#39;,5,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,5,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,5,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="12" onchange="setNum(&#39;new&#39;,5,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,5,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,5,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,5,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,5,&#39;p65&#39;,1)">+</button></div></td>
+  <td>313</td><td><select class="tier" onchange="setField(&#39;new&#39;,5,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,501,750</td><td>0</td><td class="money">1,501,750</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,5)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,5)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,5)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-100" onchange="setField(&#39;new&#39;,6,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,6,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="206" onchange="setNum(&#39;new&#39;,6,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,6,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,6,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="6" onchange="setNum(&#39;new&#39;,6,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,6,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,6,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,6,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,6,&#39;p65&#39;,1)">+</button></div></td>
+  <td>212</td><td><select class="tier" onchange="setField(&#39;new&#39;,6,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,014,500</td><td>0</td><td class="money">1,014,500</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,6)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,6)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,6)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-101" onchange="setField(&#39;new&#39;,7,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,7,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="138" onchange="setNum(&#39;new&#39;,7,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,7,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,7,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="2" onchange="setNum(&#39;new&#39;,7,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,7,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,7,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,7,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,7,&#39;p65&#39;,1)">+</button></div></td>
+  <td>140</td><td><select class="tier" onchange="setField(&#39;new&#39;,7,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">563,000</td><td>0</td><td class="money">563,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,7)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,7)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,7)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-102" onchange="setField(&#39;new&#39;,8,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,8,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="269" onchange="setNum(&#39;new&#39;,8,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,8,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,8,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="5" onchange="setNum(&#39;new&#39;,8,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,8,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,8,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,8,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,8,&#39;p65&#39;,1)">+</button></div></td>
+  <td>274</td><td><select class="tier" onchange="setField(&#39;new&#39;,8,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,307,750</td><td>0</td><td class="money">1,307,750</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,8)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,8)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,8)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-108" onchange="setField(&#39;new&#39;,9,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,9,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="119" onchange="setNum(&#39;new&#39;,9,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,9,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,9,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,9,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,9,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,9,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,9,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,9,&#39;p65&#39;,1)">+</button></div></td>
+  <td>119</td><td><select class="tier" onchange="setField(&#39;new&#39;,9,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">476,000</td><td>0</td><td class="money">476,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,9)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,9)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,9)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-109" onchange="setField(&#39;new&#39;,10,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,10,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="12" onchange="setNum(&#39;new&#39;,10,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,10,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,10,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,10,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,10,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,10,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;new&#39;,10,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,10,&#39;p65&#39;,1)">+</button></div></td>
+  <td>13</td><td><select class="tier" onchange="setField(&#39;new&#39;,10,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">56,000</td><td>0</td><td class="money">56,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,10)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,10)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,10)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-110" onchange="setField(&#39;new&#39;,11,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,11,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="56" onchange="setNum(&#39;new&#39;,11,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,11,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,11,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,11,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,11,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,11,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,11,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,11,&#39;p65&#39;,1)">+</button></div></td>
+  <td>56</td><td><select class="tier" onchange="setField(&#39;new&#39;,11,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">224,000</td><td>0</td><td class="money">224,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,11)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,11)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,11)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-111" onchange="setField(&#39;new&#39;,12,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,12,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="35" onchange="setNum(&#39;new&#39;,12,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,12,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,12,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,12,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,12,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,12,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,12,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,12,&#39;p65&#39;,1)">+</button></div></td>
+  <td>35</td><td><select class="tier" onchange="setField(&#39;new&#39;,12,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">140,000</td><td>0</td><td class="money">140,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,12)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,12)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,12)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-112" onchange="setField(&#39;new&#39;,13,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,13,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="44" onchange="setNum(&#39;new&#39;,13,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,13,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,13,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="2" onchange="setNum(&#39;new&#39;,13,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,13,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,13,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,13,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,13,&#39;p65&#39;,1)">+</button></div></td>
+  <td>46</td><td><select class="tier" onchange="setField(&#39;new&#39;,13,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">187,000</td><td>0</td><td class="money">187,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,13)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,13)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,13)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-113" onchange="setField(&#39;new&#39;,14,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,14,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="150" onchange="setNum(&#39;new&#39;,14,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,14,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,14,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,14,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,14,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,14,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,14,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,14,&#39;p65&#39;,1)">+</button></div></td>
+  <td>150</td><td><select class="tier" onchange="setField(&#39;new&#39;,14,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">600,000</td><td>0</td><td class="money">600,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,14)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,14)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,14)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-114" onchange="setField(&#39;new&#39;,15,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,15,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="105" onchange="setNum(&#39;new&#39;,15,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,15,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,15,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="2" onchange="setNum(&#39;new&#39;,15,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,15,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,15,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,15,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,15,&#39;p65&#39;,1)">+</button></div></td>
+  <td>107</td><td><select class="tier" onchange="setField(&#39;new&#39;,15,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">431,000</td><td>0</td><td class="money">431,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,15)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,15)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,15)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-115" onchange="setField(&#39;new&#39;,16,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,16,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="38" onchange="setNum(&#39;new&#39;,16,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,16,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,16,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="2" onchange="setNum(&#39;new&#39;,16,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,16,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,16,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,16,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,16,&#39;p65&#39;,1)">+</button></div></td>
+  <td>40</td><td><select class="tier" onchange="setField(&#39;new&#39;,16,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">163,000</td><td>0</td><td class="money">163,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,16)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,16)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,16)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-116" onchange="setField(&#39;new&#39;,17,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,17,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="54" onchange="setNum(&#39;new&#39;,17,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,17,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,17,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;new&#39;,17,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,17,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,17,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,17,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,17,&#39;p65&#39;,1)">+</button></div></td>
+  <td>55</td><td><select class="tier" onchange="setField(&#39;new&#39;,17,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">221,500</td><td>0</td><td class="money">221,500</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,17)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,17)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,17)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-117" onchange="setField(&#39;new&#39;,18,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,18,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="8" onchange="setNum(&#39;new&#39;,18,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,18,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,18,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,18,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,18,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,18,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;new&#39;,18,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,18,&#39;p65&#39;,1)">+</button></div></td>
+  <td>9</td><td><select class="tier" onchange="setField(&#39;new&#39;,18,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">40,000</td><td>0</td><td class="money">40,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,18)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,18)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,18)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-103" onchange="setField(&#39;new&#39;,19,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,19,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="252" onchange="setNum(&#39;new&#39;,19,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,19,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,19,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="5" onchange="setNum(&#39;new&#39;,19,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,19,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,19,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,19,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,19,&#39;p65&#39;,1)">+</button></div></td>
+  <td>257</td><td><select class="tier" onchange="setField(&#39;new&#39;,19,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,227,000</td><td>0</td><td class="money">1,227,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,19)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,19)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,19)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-104" onchange="setField(&#39;new&#39;,20,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,20,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="184" onchange="setNum(&#39;new&#39;,20,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,20,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,20,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="2" onchange="setNum(&#39;new&#39;,20,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,20,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,20,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,20,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,20,&#39;p65&#39;,1)">+</button></div></td>
+  <td>186</td><td><select class="tier" onchange="setField(&#39;new&#39;,20,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">747,000</td><td>0</td><td class="money">747,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,20)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,20)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,20)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-105" onchange="setField(&#39;new&#39;,21,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,21,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="286" onchange="setNum(&#39;new&#39;,21,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,21,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,21,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="2" onchange="setNum(&#39;new&#39;,21,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,21,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,21,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="1" onchange="setNum(&#39;new&#39;,21,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,21,&#39;p65&#39;,1)">+</button></div></td>
+  <td>289</td><td><select class="tier" onchange="setField(&#39;new&#39;,21,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,379,500</td><td>0</td><td class="money">1,379,500</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,21)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,21)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,21)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-106" onchange="setField(&#39;new&#39;,22,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,22,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="215" onchange="setNum(&#39;new&#39;,22,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,22,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,22,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="3" onchange="setNum(&#39;new&#39;,22,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,22,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,22,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,22,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,22,&#39;p65&#39;,1)">+</button></div></td>
+  <td>218</td><td><select class="tier" onchange="setField(&#39;new&#39;,22,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T2)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">1,039,250</td><td>0</td><td class="money">1,039,250</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,22)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,22)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,22)">✕</button></td></tr><tr>
+  <td><input class="name" value="FDT-107" onchange="setField(&#39;new&#39;,23,&#39;name&#39;,this.value)"></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,23,&#39;p35&#39;,-1)">−</button><input class="qty" type="number" min="0" value="154" onchange="setNum(&#39;new&#39;,23,&#39;p35&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,23,&#39;p35&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,23,&#39;p45&#39;,-1)">−</button><input class="qty" type="number" min="0" value="4" onchange="setNum(&#39;new&#39;,23,&#39;p45&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,23,&#39;p45&#39;,1)">+</button></div></td>
+  <td><div class="qwrap"><button class="step" onclick="step(&#39;new&#39;,23,&#39;p65&#39;,-1)">−</button><input class="qty" type="number" min="0" value="0" onchange="setNum(&#39;new&#39;,23,&#39;p65&#39;,this.value)"><button class="step" onclick="step(&#39;new&#39;,23,&#39;p65&#39;,1)">+</button></div></td>
+  <td>158</td><td><select class="tier" onchange="setField(&#39;new&#39;,23,&#39;customTier&#39;,this.value)"><option value="auto" selected="">تلقائي (T1)</option><option value="t1">يدوي T1</option><option value="t2">يدوي T2</option><option value="t3">يدوي T3</option></select></td>
+  <td class="money">638,000</td><td>0</td><td class="money">638,000</td><td><span class="badge bpending">غير مدفوع</span></td>
+  <td><button class="smallbtn" onclick="editPayment(&#39;new&#39;,23)">💳 صرف</button> <button class="smallbtn" onclick="details(&#39;new&#39;,23)">👁</button> <button class="smallbtn" onclick="removeAgent(&#39;new&#39;,23)">✕</button></td></tr></tbody><tfoot><tr><td colspan="6">إجمالي المنطقة</td><td class="money">21,961,250 د.ع</td><td>0 د.ع</td><td class="money">21,961,250 د.ع</td><td colspan="2"></td></tr></tfoot></table><div class="zoneActions"><div class="actions"><button class="btn gold" onclick="addAgent(&#39;new&#39;)">+ إضافة وكيل</button><button class="btn" onclick="exportZone(&#39;new&#39;)">📤 تصدير المنطقة</button></div><span class="muted" style="font-size:10px">يظهر 24 من 24 سجل</span></div></div>
 <footer class="muted" style="font-size:10px;text-align:center;margin-top:18px">
  المرحلة الأولى: الدخول والحسابات عبر Supabase، بينما بيانات العمولات ما زالت محلية في المتصفح. سيتم نقلها إلى قاعدة البيانات في المرحلة الثانية.
 </footer>
@@ -118,44 +414,28 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  </table></div>
 </div></div>
 
+<div id="usersModal" class="modal" onclick="if(event.target===this)closeUserManagement()"><div class="modalbox" style="width:min(1100px,100%)">
+ <div class="modalhead"><h2>👥 إدارة المستخدمين والصلاحيات</h2><button class="close" onclick="closeUserManagement()">×</button></div>
+ <p class="muted" style="font-size:11px;margin-top:0">هذه الصفحة متاحة لمسؤول النظام فقط. يمكن إنشاء الحسابات وتحديد الدور وتفعيل الحساب أو تعطيله.</p>
+ <div class="box" style="margin-bottom:14px">
+  <h3>➕ إنشاء حساب جديد</h3>
+  <div class="formgrid">
+   <label>الاسم الكامل<input id="newUserName" class="input" maxlength="100" placeholder="اسم المستخدم"></label>
+   <label>البريد الإلكتروني<input id="newUserEmail" class="input" type="email" placeholder="name@example.com"></label>
+   <label>كلمة المرور المؤقتة<input id="newUserPassword" class="input" type="password" minlength="8" placeholder="8 أحرف أو أكثر"></label>
+   <label>الدور<select id="newUserRole" class="select"><option value="viewer">مشاهد</option><option value="monitor">متابع</option><option value="accountant">محاسب</option><option value="admin">مسؤول النظام</option></select></label>
+  </div>
+  <div class="zoneActions"><span class="muted" style="font-size:10px">سيتمكن المستخدم من تغيير كلمة المرور لاحقاً من نظام المصادقة.</span><button id="createUserButton" class="btn gold" onclick="createManagedUser()">إنشاء الحساب</button></div>
+ </div>
+ <div class="toolbar" style="margin-bottom:10px"><input id="usersSearch" class="search" placeholder="🔍 ابحث بالاسم أو البريد..." oninput="renderManagedUsers()"><button class="btn" onclick="loadManagedUsers()">↻ تحديث</button></div>
+ <div id="usersManagerMessage" class="muted" style="font-size:11px;margin-bottom:10px"></div>
+ <div style="overflow:auto"><table class="users-table"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور والصلاحيات</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody id="usersManagerBody"></tbody></table></div>
+</div></div>
+
 <div id="modal" class="modal" onclick="if(event.target===this)closeModal()"><div class="modalbox">
  <div class="modalhead"><h2 id="modalTitle">تفاصيل الوكيل</h2><button class="close" onclick="closeModal()">×</button></div>
  <div id="modalBody"></div>
 </div></div>
-
-<div id="userManagementModal" class="modal" onclick="if(event.target===this)closeUserManagement()">
-  <div class="modalbox" style="width:min(600px,100%)">
-    <div class="modalhead">
-      <h2>👥 إنشاء حساب مستخدم</h2>
-      <button class="close" onclick="closeUserManagement()">×</button>
-    </div>
-    <div class="formgrid">
-      <label>الاسم الكامل
-        <input id="newUserName" class="input" placeholder="اسم المستخدم">
-      </label>
-      <label>البريد الإلكتروني
-        <input id="newUserEmail" class="input" type="email" placeholder="name@example.com">
-      </label>
-      <label>كلمة المرور
-        <input id="newUserPassword" class="input" type="password" placeholder="8 أحرف على الأقل">
-      </label>
-      <label>الصلاحية
-        <select id="newUserRole" class="select">
-          <option value="viewer">مشاهد</option>
-          <option value="monitor">متابع</option>
-          <option value="accountant">محاسب</option>
-          <option value="admin">Admin</option>
-        </select>
-      </label>
-    </div>
-    <div id="userCreateMsg" class="muted" style="margin-top:12px;font-size:11px"></div>
-    <div class="actions" style="margin-top:14px">
-      <button id="createUserBtn" class="btn gold" onclick="createUser()">➕ إنشاء الحساب</button>
-      <button class="btn" onclick="closeUserManagement()">إلغاء</button>
-    </div>
-  </div>
-</div>
-
 <div id="toast" class="toast"></div>
 
 <script>
@@ -171,6 +451,7 @@ const ROLE_PERMISSIONS={
  monitor:{edit:false,payment:false,rates:false,users:false,delete:false},
  viewer:{edit:false,payment:false,rates:false,users:false,delete:false}
 };
+let managedUsers=[];
 function hasPermission(p){return !!(authProfile&&ROLE_PERMISSIONS[authProfile.role]?.[p])}
 function showLogin(){document.getElementById('loginScreen').style.display='flex';document.getElementById('appShell').style.display='none'}
 function showApp(){
@@ -456,6 +737,54 @@ async function ensurePermission(permission){
     return false;
   }
 }
+
+/* إدارة المستخدمين: جميع العمليات الحساسة تمر عبر Edge Function خادمية.
+   لا تضع SERVICE_ROLE_KEY في هذا الملف أو في المتصفح. */
+function roleOptions(selected){return Object.keys(ROLE_LABELS).map(role=>`<option value="${role}" ${role===selected?'selected':''}>${esc(ROLE_LABELS[role])}</option>`).join('')}
+function describeRole(role){const p=ROLE_PERMISSIONS[role]||{};const labels=[];if(p.edit)labels.push('تعديل');if(p.payment)labels.push('صرف');if(p.rates)labels.push('أسعار');if(p.users)labels.push('مستخدمون');if(p.delete)labels.push('حذف');return labels.length?labels.join(' • '):'عرض فقط'}
+function openUserManagement(){if(!hasPermission('users')){toast('ليس لديك صلاحية إدارة المستخدمين');return}document.getElementById('usersModal').classList.add('open');loadManagedUsers()}
+function closeUserManagement(){document.getElementById('usersModal').classList.remove('open')}
+function setUsersMessage(message,isError=false){const el=document.getElementById('usersManagerMessage');el.textContent=message||'';el.style.color=isError?'var(--red)':'var(--muted)'}
+async function callAdminUsers(action,payload={}){
+ if(!await ensurePermission('users'))throw new Error('ليس لديك صلاحية إدارة المستخدمين');
+ const {data,error}=await sb.functions.invoke('admin-users',{body:{action,...payload}});
+ if(error)throw error;
+ if(data?.error)throw new Error(data.error);
+ return data;
+}
+async function loadManagedUsers(){
+ if(!hasPermission('users'))return;
+ setUsersMessage('جارِ تحميل المستخدمين...');
+ try{const data=await callAdminUsers('list');managedUsers=Array.isArray(data?.users)?data.users:[];renderManagedUsers();setUsersMessage(`عدد الحسابات: ${managedUsers.length}`)}
+ catch(e){console.error(e);setUsersMessage(`تعذر تحميل الحسابات: ${e.message||'تحقق من دالة admin-users'}`,true);document.getElementById('usersManagerBody').innerHTML=''}
+}
+function renderManagedUsers(){
+ const q=(document.getElementById('usersSearch').value||'').trim().toLowerCase();
+ const rows=managedUsers.filter(u=>!q||[u.full_name,u.email,u.role].join(' ').toLowerCase().includes(q));
+ document.getElementById('usersManagerBody').innerHTML=rows.map(u=>{
+   const self=u.id===authUser?.id;
+   return `<tr><td><b>${esc(u.full_name||'—')}</b>${self?' <span class="badge bpartial">حسابك</span>':''}</td><td dir="ltr">${esc(u.email||'—')}</td><td><select class="tier" onchange="updateManagedUser('${esc(u.id)}',{role:this.value})">${roleOptions(u.role)}</select><div class="muted" style="font-size:9px;margin-top:3px">${esc(describeRole(u.role))}</div></td><td><span class="${u.is_active?'status-active':'status-disabled'}">${u.is_active?'● مفعل':'● معطل'}</span></td><td><div class="user-actions"><button class="smallbtn ${u.is_active?'danger':''}" onclick="toggleManagedUser('${esc(u.id)}',${!!u.is_active})" ${self?'disabled title="لا يمكنك تعطيل حسابك"':''}>${u.is_active?'تعطيل':'تفعيل'}</button><button class="smallbtn" onclick="resetManagedUserPassword('${esc(u.id)}','${esc(u.email||'')}')">تغيير كلمة المرور</button></div></td></tr>`
+ }).join('')||'<tr><td colspan="5" class="muted">لا توجد حسابات مطابقة.</td></tr>';
+}
+async function createManagedUser(){
+ const full_name=document.getElementById('newUserName').value.trim(),email=document.getElementById('newUserEmail').value.trim(),password=document.getElementById('newUserPassword').value,role=document.getElementById('newUserRole').value,b=document.getElementById('createUserButton');
+ if(!full_name||!email||!password){toast('أدخل الاسم والبريد وكلمة المرور');return}if(password.length<8){toast('كلمة المرور يجب ألا تقل عن 8 أحرف');return}
+ b.disabled=true;b.textContent='جارِ الإنشاء...';
+ try{await callAdminUsers('create',{full_name,email,password,role});document.getElementById('newUserName').value='';document.getElementById('newUserEmail').value='';document.getElementById('newUserPassword').value='';toast('تم إنشاء الحساب');await loadManagedUsers()}
+ catch(e){console.error(e);toast(`تعذر إنشاء الحساب: ${e.message||''}`)}finally{b.disabled=false;b.textContent='إنشاء الحساب'}
+}
+async function updateManagedUser(id,changes){
+ try{await callAdminUsers('update',{id,...changes});toast('تم تحديث صلاحيات الحساب');await loadManagedUsers()}
+ catch(e){console.error(e);toast(`تعذر تحديث الحساب: ${e.message||''}`);renderManagedUsers()}
+}
+async function toggleManagedUser(id,isActive){
+ if(!confirm(isActive?'تعطيل هذا الحساب؟':'تفعيل هذا الحساب؟'))return;await updateManagedUser(id,{is_active:!isActive})
+}
+async function resetManagedUserPassword(id,email){
+ const password=prompt(`كلمة مرور جديدة للحساب ${email}:`);if(password===null)return;if(password.length<8){toast('كلمة المرور يجب ألا تقل عن 8 أحرف');return}
+ try{await callAdminUsers('update',{id,password});toast('تم تغيير كلمة المرور')}
+ catch(e){console.error(e);toast(`تعذر تغيير كلمة المرور: ${e.message||''}`)}
+}
 function save(){
  localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog}));
  localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data));
@@ -695,55 +1024,9 @@ function parseCSV(text){const lines=text.replace(/\r/g,'').split('\n').filter(Bo
 function numFrom(o,keys){for(const k of keys){if(o[k]!==undefined&&o[k]!=='')return Number(String(o[k]).replace(/,/g,''))||0}return 0}
 function normalizeImport(o){const keys=Object.keys(o),get=names=>{const k=keys.find(x=>names.some(n=>x.trim().toLowerCase()===n.toLowerCase()));return k?o[k]:''},name=get(['Name','name','اسم الوكيل','اسم','FDT','fdt'])||o[keys[0]],zoneRaw=String(get(['Zone','zone','المنطقة'])||'').toLowerCase(),zone=zoneRaw.includes('new')||zoneRaw.includes('جديد')?'new':zoneRaw.includes('old')||zoneRaw.includes('قديم')?'old':String(name).toUpperCase().includes('FDT-')?'new':'old';return{name:String(name).trim(),p35:numFrom(o,['P35','p35','35']),p45:numFrom(o,['P45','p45','45']),p65:numFrom(o,['P65','p65','65']),paid:numFrom(o,['Paid','paid','المدفوع']),paymentDate:get(['PaymentDate','payment date','تاريخ الصرف'])||'',customTier:get(['Tier','tier','الفئة'])||'auto',zone}}
 
-
-function openUserManagement(){
-  if(!hasPermission('users')){toast('ليس لديك صلاحية إدارة المستخدمين');return}
-  document.getElementById('userCreateMsg').textContent='';
-  document.getElementById('userManagementModal').classList.add('open');
-}
-function closeUserManagement(){
-  document.getElementById('userManagementModal').classList.remove('open');
-}
-async function createUser(){
-  if(!hasPermission('users')){toast('ليس لديك صلاحية إنشاء المستخدمين');return}
-  const name=document.getElementById('newUserName').value.trim();
-  const email=document.getElementById('newUserEmail').value.trim().toLowerCase();
-  const password=document.getElementById('newUserPassword').value;
-  const role=document.getElementById('newUserRole').value;
-  const msg=document.getElementById('userCreateMsg');
-  const btn=document.getElementById('createUserBtn');
-
-  if(name.length<2){msg.textContent='اكتب الاسم الكامل.';return}
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){msg.textContent='البريد الإلكتروني غير صحيح.';return}
-  if(password.length<8){msg.textContent='كلمة المرور يجب أن تكون 8 أحرف على الأقل.';return}
-
-  btn.disabled=true;
-  btn.textContent='جاري الإنشاء...';
-  msg.textContent='';
-
-  try{
-    const {data,error}=await sb.functions.invoke('admin-create-user',{
-      body:{full_name:name,email,password,role,is_active:true}
-    });
-    if(error)throw new Error(error.message||'فشل إنشاء الحساب');
-    if(!data?.ok)throw new Error(data?.error||'فشل إنشاء الحساب');
-
-    msg.textContent='✅ تم إنشاء الحساب بنجاح: '+email;
-    document.getElementById('newUserName').value='';
-    document.getElementById('newUserEmail').value='';
-    document.getElementById('newUserPassword').value='';
-    toast('تم إنشاء حساب المستخدم');
-  }catch(e){
-    console.error(e);
-    msg.textContent='❌ '+(e.message||'حدث خطأ');
-  }finally{
-    btn.disabled=false;
-    btn.textContent='➕ إنشاء الحساب';
-  }
-}
-
 initAuth();
 </script>
 </div>
-</body>
-</html>
+
+
+</body></html>
