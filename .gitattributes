@@ -1,0 +1,2 @@
+# Preserve the exact reviewed bytes and checksum of vendored SheetJS.
+assets/vendor/xlsx.full.min.js -text
