@@ -23,6 +23,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 .no-permission{padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
 .users-table{min-width:780px}.users-table td{padding:9px 6px}.user-actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}.status-active{color:var(--green)}.status-disabled{color:var(--red)}
 .unsaved{display:none;color:var(--yellow);font-size:10px;font-weight:800}.unsaved.show{display:inline-block}
+.mode-banner{display:none;background:rgba(78,127,212,.12);border:1px solid var(--blue);color:var(--text);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:11px}.mode-banner.show{display:block}.mode-banner b{color:#8eb2ef}
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls{width:100%}.btn{padding:8px 9px}}
 </style>
 </head>
@@ -54,7 +55,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   <div class="session-user">👤 <b id="loggedUserName"></b><span id="loggedUserRole" class="role-pill"></span></div>
   <span class="muted" style="font-size:11px">الشهر:</span>
   <input id="monthInput" class="input" value="08/2026" placeholder="MM/YYYY" style="width:105px;text-align:center" title="اكتب الشهر بصيغة MM/YYYY">
-  <button class="btn" onclick="applyMonthInput()">تطبيق</button>
+  <button id="applyMonthButton" class="btn" onclick="applyMonthInput()">تطبيق</button>
   <select id="monthSelect" class="select" onchange="loadSelectedMonth()"></select>
   <button class="btn gold" data-permission="edit" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
   <span id="unsavedIndicator" class="unsaved">● تعديلات غير محفوظة</span>
@@ -65,10 +66,13 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  </div>
 </header>
 
+<div id="centralPreviewBanner" class="mode-banner" role="status"></div>
+
 <div class="toolbar">
  <input id="searchInput" class="search" placeholder="🔍 ابحث باسم الوكيل أو FDT..." oninput="renderAll()">
  <select id="zoneFilter" class="select" onchange="renderAll()"><option value="all">كل المناطق</option><option value="old">OLD ZONE</option><option value="new">NEW ZONE</option></select>
  <select id="statusFilter" class="select" onchange="renderAll()"><option value="all">كل حالات الصرف</option><option value="pending">غير مدفوع</option><option value="partial">مدفوع جزئياً</option><option value="paid">مدفوع</option></select>
+ <button id="centralPreviewButton" class="btn green" onclick="toggleCentralPreview()">☁️ معاينة البيانات المركزية</button>
  <button class="btn" data-permission="edit" onclick="document.getElementById(&#39;fileInput&#39;).click()">📥 استيراد Excel / CSV</button>
  <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden="" onchange="importFile(event)">
  <button class="btn" onclick="exportAll()">📤 تصدير الكل</button>
@@ -102,7 +106,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 <div id="panel-old" class="panel active"></div>
 <div id="panel-new" class="panel"></div>
 <footer class="muted" style="font-size:10px;text-align:center;margin-top:18px">
- المرحلة الأولى: الدخول والحسابات عبر Supabase، بينما بيانات العمولات ما زالت محلية في المتصفح. سيتم نقلها إلى قاعدة البيانات في المرحلة الثانية.
+ بيانات التشغيل المحلية تبقى محفوظة في هذا المتصفح. المعاينة المركزية اختيارية وللقراءة فقط ولا تستبدل النسخة المحلية.
 </footer>
 </div>
 
@@ -150,6 +154,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 const SUPABASE_URL='https://qolrsefpbvfuugwyqggu.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_XcVKdpASq1D23Fc1QzCmcA_kX-mkO7b';
 let authUser=null,authProfile=null;
+const centralPreview={active:false,localState:null,localUnsavedChanges:false,months:[]};
 /* عميل Supabase خفيف داخل الملف: لا يعتمد على مكتبة CDN خارجية. */
 const SB_SESSION_KEY='hrins_supabase_session';
 const sbListeners=[];
@@ -187,13 +192,15 @@ const ROLE_PERMISSIONS={
  viewer:{edit:false,payment:false,rates:false,users:false,delete:false,backup:false}
 };
 let managedUsers=[];
-function hasPermission(p){return !!(authProfile&&ROLE_PERMISSIONS[authProfile.role]?.[p])}
+function roleAllows(p){return !!(authProfile&&ROLE_PERMISSIONS[authProfile.role]?.[p])}
+function hasPermission(p){return !centralPreview.active&&roleAllows(p)}
 function showLogin(){document.getElementById('loginScreen').style.display='flex';document.getElementById('appShell').style.display='none'}
 function showApp(){
  document.getElementById('loginScreen').style.display='none';document.getElementById('appShell').style.display='block';
  document.getElementById('loggedUserName').textContent=authProfile?.full_name||authUser?.email||'مستخدم';
  document.getElementById('loggedUserRole').textContent=ROLE_LABELS[authProfile?.role]||authProfile?.role||'';
  applyPermissions();
+ updateCentralPreviewUI();
 }
 function applyPermissions(){
  document.querySelectorAll('[data-permission]').forEach(el=>{
@@ -201,7 +208,7 @@ function applyPermissions(){
    el.disabled=!allowed;
    el.style.display=allowed?'':'none';
  });
- document.getElementById('ratesDetails').style.display=hasPermission('rates')?'':'none';
+ document.getElementById('ratesDetails').style.display=roleAllows('rates')?'':'none';
 }
 function authError(msg){const e=document.getElementById('loginError');e.textContent=msg;e.style.display='block'}
 function clearAuthError(){const e=document.getElementById('loginError');e.textContent='';e.style.display='none'}
@@ -315,6 +322,7 @@ async function login(){
 }
 
 async function logout(){
+ if(centralPreview.active)exitCentralPreview(true);
  await sb.auth.signOut();
  authUser=null;
  authProfile=null;
@@ -344,6 +352,7 @@ async function initAuth(){
 
  sb.auth.onAuthStateChange(async(_event,session)=>{
    if(!session?.user){
+     if(centralPreview.active)exitCentralPreview(true);
      authUser=null;
      authProfile=null;
      showLogin();
@@ -403,6 +412,126 @@ const defaultData={
 let state={month:'08/2026',data:clone(defaultData),tiers:clone(defaultTiers),archive:{},auditLog:[],undo:null};
 
 function clone(x){return JSON.parse(JSON.stringify(x))}
+function centralNumber(value,label,{integer=false}={}){
+ const number=Number(value);
+ if(!Number.isFinite(number)||number<0||(integer&&!Number.isInteger(number)))throw new Error(`قيمة مركزية غير صالحة: ${label}`);
+ return number;
+}
+function normalizeCentralTiers(tiers,month){
+ if(!Array.isArray(tiers)||!tiers.length)throw new Error(`لا توجد شرائح أسعار صالحة للشهر ${month}`);
+ const normalized=tiers.map((tier,index)=>({
+   key:String(tier?.key||'').trim(),
+   label:String(tier?.label||tier?.key||'').trim(),
+   min:centralNumber(tier?.min,`${month}.tiers[${index}].min`),
+   max:tier?.max==null?null:centralNumber(tier.max,`${month}.tiers[${index}].max`),
+   p35:centralNumber(tier?.p35,`${month}.tiers[${index}].p35`),
+   p45:centralNumber(tier?.p45,`${month}.tiers[${index}].p45`),
+   p65:centralNumber(tier?.p65,`${month}.tiers[${index}].p65`)
+ })).sort((a,b)=>a.min-b.min);
+ if(normalized.some(tier=>!tier.key))throw new Error(`يوجد رمز شريحة مفقود في الشهر ${month}`);
+ if(normalized.some(tier=>tier.max!=null&&tier.max<tier.min))throw new Error(`يوجد نطاق شريحة غير صالح في الشهر ${month}`);
+ if(new Set(normalized.map(tier=>tier.key)).size!==normalized.length)throw new Error(`يوجد رمز شريحة مكرر في الشهر ${month}`);
+ return normalized;
+}
+function centralRowDue(tiers,row){
+ const quantity=row.p35+row.p45+row.p65;
+ const tier=row.customTier&&row.customTier!=='auto'
+   ?tiers.find(item=>item.key===row.customTier)
+   :tiers.find(item=>quantity>=item.min&&(item.max==null||quantity<=item.max));
+ if(!tier&&(quantity>0||row.customTier!=='auto'))throw new Error('تعذر تحديد شريحة صف مركزي');
+ return tier?row.p35*tier.p35+row.p45*tier.p45+row.p65*tier.p65:0;
+}
+function buildCentralPeriods(months,rows){
+ if(!Array.isArray(months)||!Array.isArray(rows))throw new Error('استجابة البيانات المركزية غير صالحة');
+ if(!months.length)throw new Error('لا توجد أشهر مركزية متاحة');
+ const periods=new Map(),monthById=new Map();
+ months.forEach(month=>{
+   const key=String(month?.month_key||'');
+   const id=String(month?.id||'');
+   if(!Number.isFinite(monthOrder(key)))throw new Error('يوجد مفتاح شهر مركزي غير صالح');
+   if(!id||periods.has(key)||monthById.has(id))throw new Error('يوجد شهر مركزي مفقود أو مكرر');
+   periods.set(key,{data:{old:[],new:[]},tiers:normalizeCentralTiers(month.tiers,key),savedAt:month.updated_at||month.created_at||''});
+   monthById.set(id,key);
+ });
+ rows.forEach(row=>{
+   const month=monthById.get(String(row?.month_id||'')),zone=String(row?.zone||'');
+   if(!month)throw new Error('يوجد صف مركزي مرتبط بشهر غير معروف');
+   if(zone!=='old'&&zone!=='new')throw new Error(`يوجد نطاق غير صالح في الشهر ${month}`);
+   const name=String(row?.name||'').trim();
+   if(!name)throw new Error(`يوجد اسم وكيل مفقود في الشهر ${month}`);
+   const normalized={
+     name,
+     p35:centralNumber(row.p35,`${month}.p35`,{integer:true}),
+     p45:centralNumber(row.p45,`${month}.p45`,{integer:true}),
+     p65:centralNumber(row.p65,`${month}.p65`,{integer:true}),
+     customTier:String(row.custom_tier||'auto'),
+     paid:centralNumber(row.paid,`${month}.paid`),
+     paymentDate:row.payment_date||'',
+     centralId:String(row.id||''),
+     centralUpdatedAt:row.updated_at||''
+   };
+   const period=periods.get(month);
+   if(period.data[zone].some(item=>item.name===name))throw new Error(`يوجد وكيل مكرر في النطاق نفسه للشهر ${month}`);
+   if(normalized.paid>centralRowDue(period.tiers,normalized))throw new Error(`يوجد مدفوع مركزي يتجاوز المستحق في الشهر ${month}`);
+   period.data[zone].push(normalized);
+ });
+ return periods;
+}
+async function fetchCentralPages(path,pageSize=500){
+ const all=[];
+ for(let offset=0;offset<50000;offset+=pageSize){
+   const separator=path.includes('?')?'&':'?',batch=await sbRequest(`${path}${separator}limit=${pageSize}&offset=${offset}`);
+   if(!Array.isArray(batch))throw new Error('استجابة جدول مركزي غير صالحة');
+   all.push(...batch);
+   if(batch.length<pageSize)return all;
+ }
+ throw new Error('تجاوزت البيانات المركزية حد المعاينة الآمن');
+}
+async function fetchCentralPeriods(){
+ const monthQuery='/rest/v1/commission_months?select=id,month_key,tiers,created_at,updated_at&order=month_key.asc';
+ const rowQuery='/rest/v1/commission_rows?select=id,month_id,zone,name,p35,p45,p65,custom_tier,paid,payment_date,updated_at&order=zone.asc,name.asc';
+ const [months,rows]=await Promise.all([fetchCentralPages(monthQuery),fetchCentralPages(rowQuery)]);
+ return buildCentralPeriods(months,rows);
+}
+function updateCentralPreviewUI(){
+ const button=document.getElementById('centralPreviewButton'),banner=document.getElementById('centralPreviewBanner');
+ if(!button||!banner)return;
+ button.textContent=centralPreview.active?'↩️ الرجوع إلى النسخة المحلية':'☁️ معاينة البيانات المركزية';
+ button.classList.toggle('gold',centralPreview.active);
+ document.getElementById('monthInput').disabled=centralPreview.active;
+ document.getElementById('applyMonthButton').disabled=centralPreview.active;
+ banner.classList.toggle('show',centralPreview.active);
+ banner.innerHTML=centralPreview.active
+   ?`<b>معاينة مركزية للقراءة فقط</b> — كل التعديل والصرف والحذف والنسخ الاحتياطي معطل. الأشهر المتاحة: ${centralPreview.months.map(esc).join('، ')}.`
+   :'';
+}
+async function enterCentralPreview(){
+ if(!authUser){showLogin();return}
+ const button=document.getElementById('centralPreviewButton');
+ button.disabled=true;button.textContent='جاري تحميل المعاينة...';
+ try{
+   if(!(await verifyCurrentUser()))return;
+   const periods=await fetchCentralPeriods(),months=[...periods.keys()].sort(compareMonthKeys),latest=months[months.length-1];
+   centralPreview.localState=clone(state);
+   centralPreview.localUnsavedChanges=hasUnsavedChanges;
+   centralPreview.months=months;
+   const archive={};periods.forEach((snapshot,month)=>archive[month]=clone(snapshot));
+   state={month:latest,data:clone(archive[latest].data),tiers:clone(archive[latest].tiers),archive,auditLog:[],undo:null};
+   centralPreview.active=true;hasUnsavedChanges=false;
+   applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
+   toast('تم تحميل المعاينة المركزية دون تغيير النسخة المحلية');
+ }catch(error){console.error('Central preview error:',error);toast(`تعذر تحميل المعاينة المركزية: ${error.message||''}`)}
+ finally{button.disabled=false;updateCentralPreviewUI()}
+}
+function exitCentralPreview(silent=false){
+ if(!centralPreview.active)return;
+ state=clone(centralPreview.localState);
+ hasUnsavedChanges=centralPreview.localUnsavedChanges;
+ centralPreview.active=false;centralPreview.localState=null;centralPreview.localUnsavedChanges=false;centralPreview.months=[];
+ applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
+ if(!silent)toast('تم الرجوع إلى النسخة المحلية كما كانت');
+}
+async function toggleCentralPreview(){if(centralPreview.active)exitCentralPreview();else await enterCentralPreview()}
 function fmt(n){return Math.round(Number(n)||0).toLocaleString('en-US')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function canEdit(){return hasPermission('edit')}
@@ -410,6 +539,10 @@ function canPay(){return hasPermission('payment')}
 function canDelete(){return hasPermission('delete')}
 
 async function ensurePermission(permission){
+  if(centralPreview.active){
+    toast('المعاينة المركزية للقراءة فقط. ارجع إلى النسخة المحلية لإجراء تعديل.');
+    return false;
+  }
   if(!authUser){
     showLogin();
     toast('يجب تسجيل الدخول أولاً');
@@ -529,6 +662,7 @@ function confirmDiscardUnsaved(){
  load();hasUnsavedChanges=false;updateUnsavedIndicator();return true;
 }
 function save(force=false){
+ if(centralPreview.active){toast('لا يمكن الحفظ أثناء المعاينة المركزية');return}
  if(!force){markUnsaved();return}
  localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog}));
  localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data));
@@ -569,6 +703,7 @@ function renderAuditLog(){
 function exportAuditLog(){const rows=(state.auditLog||[]).map(x=>({DateTime:auditDate(x.at),User:x.user,Month:x.month,Zone:x.zone,Agent:x.agent,Action:x.action,Field:fieldLabel(x.field),Before:x.oldValue,After:x.newValue}));if(!rows.length){toast('لا يوجد سجل لتصديره');return}downloadCSV(rows,`audit_log_${state.month.replace('/','-')}.csv`)}
 function clearAuditLog(){if(!canDelete()){toast('ليس لديك صلاحية مسح السجل');return}if(!(state.auditLog||[]).length){toast('السجل فارغ');return}if(!confirm('مسح سجل التعديلات بالكامل؟'))return;state.auditLog=[];save();renderAuditLog();toast('تم مسح السجل')}
 async function applyMonthInput(){
+ if(centralPreview.active){toast('اختر شهراً مركزياً من القائمة أثناء المعاينة');return}
  const raw=(document.getElementById('monthInput').value||'').trim(),m=raw.match(/^(0?[1-9]|1[0-2])[\/\-](\d{4})$/);
  if(!m){alert('اكتب الشهر بصيغة MM/YYYY مثل 08/2026');return}
  if(!(await ensurePermission('edit')))return;
@@ -737,6 +872,11 @@ async function saveCurrentMonth(){
 }
 function renderMonths(){const s=document.getElementById('monthSelect'),keys=[...new Set([state.month,...Object.keys(state.archive)])].sort(compareMonthKeys);s.innerHTML=keys.map(k=>`<option value="${k}" ${k===state.month?'selected':''}>${k}${state.archive[k]?' — محفوظ':''}</option>`).join('');syncMonthInput()}
 async function loadSelectedMonth(){
+ if(centralPreview.active){
+   const k=document.getElementById('monthSelect').value,snapshot=state.archive[k];
+   if(!snapshot){toast('تعذر تحميل الشهر المركزي المحدد');return}
+   state.month=k;state.data=clone(snapshot.data);state.tiers=clone(snapshot.tiers||defaultTiers);renderAll();syncMonthInput();return;
+ }
  if(!(await ensurePermission('edit'))) {
    renderMonths();
    return;

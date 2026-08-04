@@ -113,6 +113,7 @@ function loadCurrentApp() {
     globalThis.__characterization = {
       calc,
       backupStateSnapshot,
+      buildCentralPeriods,
       compareMonthKeys,
       createBackupDocument,
       defaultData,
