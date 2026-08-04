@@ -22,6 +22,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 .login-screen{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:#0f141a}.login-card{width:min(430px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.login-card h1{font-size:24px;text-align:center;margin:8px 0}.login-card .sub{text-align:center;color:var(--muted);font-size:12px;margin-bottom:22px}.login-card label{display:block;color:var(--muted);font-size:12px;margin:0 0 6px}.login-card input{width:100%;margin-bottom:13px}.login-error{display:none;background:rgba(212,99,78,.12);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:9px 11px;font-size:12px;margin-bottom:12px}.session-user{display:flex;align-items:center;gap:7px;font-size:11px}.role-pill{background:rgba(212,162,78,.13);color:var(--gold);border:1px solid rgba(212,162,78,.35);border-radius:20px;padding:3px 8px;font-size:10px;font-weight:800}
 .no-permission{padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
 .users-table{min-width:780px}.users-table td{padding:9px 6px}.user-actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}.status-active{color:var(--green)}.status-disabled{color:var(--red)}
+.unsaved{display:none;color:var(--yellow);font-size:10px;font-weight:800}.unsaved.show{display:inline-block}
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls{width:100%}.btn{padding:8px 9px}}
 </style>
 </head>
@@ -56,6 +57,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   <button class="btn" onclick="applyMonthInput()">تطبيق</button>
   <select id="monthSelect" class="select" onchange="loadSelectedMonth()"></select>
   <button class="btn gold" data-permission="edit" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
+  <span id="unsavedIndicator" class="unsaved">● تعديلات غير محفوظة</span>
   <button class="btn" data-permission="edit" onclick="startNewMonth()">✨ شهر جديد</button>
   <button class="btn" onclick="openAuditLog()">🧾 سجل التعديلات</button>
   <button class="btn gold" data-permission="users" onclick="openUserManagement()">👥 إدارة المستخدمين</button>
@@ -517,9 +519,19 @@ async function resetManagedUserPassword(id,email){
  try{await callAdminUsers('update',{id,password});toast('تم تغيير كلمة المرور')}
  catch(e){console.error(e);toast(`تعذر تغيير كلمة المرور: ${e.message||''}`)}
 }
-function save(){
+let hasUnsavedChanges=false;
+function updateUnsavedIndicator(){document.getElementById('unsavedIndicator')?.classList.toggle('show',hasUnsavedChanges)}
+function markUnsaved(){hasUnsavedChanges=true;updateUnsavedIndicator()}
+function confirmDiscardUnsaved(){
+ if(!hasUnsavedChanges)return true;
+ if(!confirm('لديك تعديلات غير محفوظة. هل تريد تجاهلها والانتقال؟'))return false;
+ load();hasUnsavedChanges=false;updateUnsavedIndicator();return true;
+}
+function save(force=false){
+ if(!force){markUnsaved();return}
  localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog}));
  localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data));
+ hasUnsavedChanges=false;updateUnsavedIndicator();
 }
 function load(){
  try{
@@ -559,6 +571,7 @@ async function applyMonthInput(){
  const raw=(document.getElementById('monthInput').value||'').trim(),m=raw.match(/^(0?[1-9]|1[0-2])[\/\-](\d{4})$/);
  if(!m){alert('اكتب الشهر بصيغة MM/YYYY مثل 08/2026');return}
  if(!(await ensurePermission('edit')))return;
+ if(!confirmDiscardUnsaved())return;
  const key=String(Number(m[1])).padStart(2,'0')+'/'+m[2];if(key===state.month){renderMonths();return}
  const old=state.month;
  if(state.archive[key]){state.month=key;state.data=clone(state.archive[key].data);state.tiers=clone(state.archive[key].tiers||defaultTiers);audit('تغيير الشهر','','','الشهر',old,key)}
@@ -714,9 +727,9 @@ async function saveCurrentMonth(){
   if(!(await ensurePermission('edit')))return;
   state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};
   audit('حفظ الشهر','','','الأرشيف','',state.month);
-  save();
+  save(true);
   renderMonths();
-  toast('تم حفظ الشهر مع الأسعار الحالية');
+  toast('تم حفظ جميع التعديلات للشهر مع الأسعار الحالية');
 }
 function renderMonths(){const s=document.getElementById('monthSelect'),keys=[...new Set([state.month,...Object.keys(state.archive)])].sort((a,b)=>{const[am,ay]=a.split('/').map(Number),[bm,by]=b.split('/').map(Number);return ay-by||am-bm});s.innerHTML=keys.map(k=>`<option value="${k}" ${k===state.month?'selected':''}>${k}${state.archive[k]?' — محفوظ':''}</option>`).join('');syncMonthInput()}
 async function loadSelectedMonth(){
@@ -724,11 +737,13 @@ async function loadSelectedMonth(){
    renderMonths();
    return;
  }
+ if(!confirmDiscardUnsaved()){renderMonths();return}
  const k=document.getElementById('monthSelect').value,old=state.month;if(state.archive[k]){state.month=k;state.data=clone(state.archive[k].data);state.tiers=clone(state.archive[k].tiers||defaultTiers);audit('تغيير الشهر','','','الشهر',old,k)}else{state.month=k;audit('تغيير الشهر','','','الشهر',old,k)}save();renderAll();syncMonthInput()}
 async function startNewMonth(){
   if(!(await ensurePermission('edit')))return;
   if(!confirm('بدء شهر جديد؟ سيتم أخذ نسخة من الشهر الحالي أولاً.'))return;
-  await saveCurrentMonth();
+  // إنشاء الشهر لا يكتب على التخزين؛ يبقى كل شيء مؤقتاً حتى ضغط «حفظ الشهر».
+  state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};
   const d=new Date();
   d.setMonth(d.getMonth()+1);
   const old=state.month;
@@ -756,6 +771,7 @@ function parseCSV(text){const lines=text.replace(/\r/g,'').split('\n').filter(Bo
 function numFrom(o,keys){for(const k of keys){if(o[k]!==undefined&&o[k]!=='')return Number(String(o[k]).replace(/,/g,''))||0}return 0}
 function normalizeImport(o){const keys=Object.keys(o),get=names=>{const k=keys.find(x=>names.some(n=>x.trim().toLowerCase()===n.toLowerCase()));return k?o[k]:''},name=get(['Name','name','اسم الوكيل','اسم','FDT','fdt'])||o[keys[0]],zoneRaw=String(get(['Zone','zone','المنطقة'])||'').toLowerCase(),zone=zoneRaw.includes('new')||zoneRaw.includes('جديد')?'new':zoneRaw.includes('old')||zoneRaw.includes('قديم')?'old':String(name).toUpperCase().includes('FDT-')?'new':'old';return{name:String(name).trim(),p35:numFrom(o,['P35','p35','35']),p45:numFrom(o,['P45','p45','45']),p65:numFrom(o,['P65','p65','65']),paid:numFrom(o,['Paid','paid','المدفوع']),paymentDate:get(['PaymentDate','payment date','تاريخ الصرف'])||'',customTier:get(['Tier','tier','الفئة'])||'auto',zone}}
 
+window.addEventListener('beforeunload',e=>{if(hasUnsavedChanges){e.preventDefault();e.returnValue='لديك تعديلات غير محفوظة.'}});
 initAuth();
 </script>
 </div>
