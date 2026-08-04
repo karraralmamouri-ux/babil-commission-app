@@ -5,7 +5,8 @@
   "description": "Characterization tests for the Babil Commission App baseline.",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "test:staging": "node scripts/verify-supabase-staging.mjs"
+    "test:staging": "node scripts/verify-supabase-staging.mjs",
+    "inspect:backup": "node scripts/inspect-local-backup.mjs"
   },
   "engines": {
     "node": ">=20"
