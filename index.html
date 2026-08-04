@@ -960,24 +960,9 @@ async function loadCloudData(){
 
     return false;
   }
-}async function testCloudConnection(){
-
-  const ok = await loadCloudData();
-
-  if(ok){
-
-    alert(
-      '✅ تم الاتصال بـ Supabase\n\n' +
-      'الشهر: ' + state.month + '\n' +
-      'OLD: ' + state.data.old.length + '\n' +
-      'NEW: ' + state.data.new.length
-    );
-
-  }
-
 async function save(){
 
-  // حفظ محلي كالعادة
+  // حفظ محلي احتياطي
   localStorage.setItem(
     STORAGE,
     JSON.stringify({
@@ -995,38 +980,23 @@ async function save(){
   );
 
   console.log('SAVE STARTED');
-  console.log('Current month:', state.month);
-  console.log('Current data:', state.data);
 
   try {
-
-    // ---------------------------------------
-    // Get logged-in user
-    // ---------------------------------------
 
     const {
       data: { user },
       error: userError
     } = await sb.auth.getUser();
 
-    console.log('USER:', user);
-
-    if(userError){
-      console.error('USER ERROR:', userError);
-      return;
-    }
+    if(userError) throw userError;
 
     if(!user){
-      console.error('NO LOGGED USER');
-      alert('المستخدم غير مسجل دخول');
+      console.warn('No logged-in user. Local save only.');
       return;
     }
 
-    // ---------------------------------------
-    // Get month
-    // ---------------------------------------
-
-    const {
+    // الحصول على الشهر الحالي
+    let {
       data: month,
       error: monthError
     } = await sb
@@ -1035,39 +1005,62 @@ async function save(){
       .eq('month_key', state.month)
       .maybeSingle();
 
-    console.log('MONTH:', month);
-    console.log('MONTH ERROR:', monthError);
+    if(monthError) throw monthError;
 
-    if(monthError){
-      console.error(monthError);
-      alert('خطأ بجلب الشهر: ' + monthError.message);
-      return;
-    }
-
+    // إذا الشهر غير موجود ننشئه
     if(!month){
-      alert(
-        'الشهر ' + state.month +
-        ' غير موجود في Supabase'
-      );
-      return;
+
+      const {
+        data: newMonth,
+        error: createError
+      } = await sb
+        .from('commission_months')
+        .insert({
+          month_key: state.month,
+          tiers: state.tiers || [],
+          created_by: user.id,
+          updated_by: user.id
+        })
+        .select()
+        .single();
+
+      if(createError) throw createError;
+
+      month = newMonth;
     }
 
-    // ---------------------------------------
-    // Prepare rows
-    // ---------------------------------------
+    cloudMonthId = month.id;
 
+    // تحديث أسعار الشهر
+    const {
+      error: updateMonthError
+    } = await sb
+      .from('commission_months')
+      .update({
+        tiers: state.tiers || [],
+        updated_by: user.id
+      })
+      .eq('id', month.id);
+
+    if(updateMonthError) throw updateMonthError;
+
+    // تجهيز البيانات
     const rows = [
 
       ...(state.data.old || []).map(r => ({
         month_id: month.id,
         zone: 'old',
         name: r.name,
+
         p35: Number(r.p35) || 0,
         p45: Number(r.p45) || 0,
         p65: Number(r.p65) || 0,
+
         custom_tier: r.customTier || 'auto',
+
         paid: Number(r.paid) || 0,
         payment_date: r.paymentDate || null,
+
         created_by: user.id,
         updated_by: user.id
       })),
@@ -1076,76 +1069,59 @@ async function save(){
         month_id: month.id,
         zone: 'new',
         name: r.name,
+
         p35: Number(r.p35) || 0,
         p45: Number(r.p45) || 0,
         p65: Number(r.p65) || 0,
+
         custom_tier: r.customTier || 'auto',
+
         paid: Number(r.paid) || 0,
         payment_date: r.paymentDate || null,
+
         created_by: user.id,
         updated_by: user.id
       }))
 
     ];
 
-    console.log('ROWS TO SAVE:', rows);
-
-    // ---------------------------------------
-    // UPSERT
-    // ---------------------------------------
-
-    const {
-      data: savedRows,
-      error: saveError
-    } = await sb
-      .from('commission_rows')
-      .upsert(
-        rows,
-        {
-          onConflict: 'month_id,zone,name'
-        }
-      )
-      .select();
-
-    console.log('SAVED ROWS:', savedRows);
-    console.log('SAVE ERROR:', saveError);
-
-    if(saveError){
-
-      console.error(
-        'SUPABASE SAVE ERROR:',
-        saveError
-      );
-
-      alert(
-        '❌ فشل الحفظ في Supabase\n\n' +
-        saveError.message
-      );
-
-      return;
-    }
-
-    alert(
-      '✅ تم الحفظ في Supabase\n\n' +
-      'عدد السجلات: ' +
-      (savedRows ? savedRows.length : 0)
+    console.log(
+      'ROWS TO SAVE:',
+      rows.length
     );
 
-  }catch(error){
+    if(rows.length){
+
+      const {
+        error: rowsError
+      } = await sb
+        .from('commission_rows')
+        .upsert(
+          rows,
+          {
+            onConflict: 'month_id,zone,name'
+          }
+        );
+
+      if(rowsError) throw rowsError;
+    }
+
+    console.log(
+      '✅ SUPABASE SAVE SUCCESS',
+      rows.length
+    );
+
+  } catch(error) {
 
     console.error(
-      'SAVE EXCEPTION:',
+      '❌ SUPABASE SAVE ERROR:',
       error
     );
 
-    alert(
-      '❌ خطأ:\n\n' +
-      (error.message || error)
-    );
+    // لا نوقف التطبيق
+    // LocalStorage يبقى محفوظاً
 
   }
-
-}
 function load(){
  try{
   const x=JSON.parse(localStorage.getItem(STORAGE)||'null');
