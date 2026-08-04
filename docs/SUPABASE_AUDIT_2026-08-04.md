@@ -63,10 +63,22 @@ The database enforces zone and role values but not non-negative P35/P45/P65 or `
 - `admin-users` verifies the bearer user, active profile, and `admin` role before constructing a service-role client.
 - The dashboard uses only the publishable key; service-role access remains inside Edge Functions.
 
+## Production deployment verification
+
+The reviewed migration was merged through PR #10 and then applied to the production project on 2026-08-04. Post-deployment queries verified:
+
+- 82 commission rows, 2 months, and 2 profiles remained intact.
+- `anon` has no public-table grants.
+- `authenticated` has `SELECT` only on `profiles`.
+- `profiles` has one read policy and no insert, update, or delete policies.
+- Neither audit table has a delete policy.
+- Transactional role simulation passed: an accountant can read only their own profile and cannot update it; an admin can read both profiles and still cannot mutate profiles directly.
+
+The temporary Supabase access token used for the authenticated audit was deleted after verification. The account token page reported no remaining access tokens.
+
 ## Remaining acceptance gates
 
-1. Apply the hardening migration and re-query policies/grants.
-2. Verify admin and accountant sign-in against the deployed dashboard.
-3. Create staging accounts for `monitor` and `viewer` without production data.
-4. Establish a full database dump and restorable staging environment.
-5. Add non-negative financial constraints and transactional audit writes.
+1. Verify real admin and accountant sign-in in a controlled staging environment.
+2. Create staging accounts for `monitor` and `viewer` without production data.
+3. Establish a full database dump and restorable staging environment.
+4. Add non-negative financial constraints and transactional audit writes.
