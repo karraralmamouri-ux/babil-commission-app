@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<!-- saved from url=(0091)file:///C:/Users/karar.haydar/Documents/Codex/2026-08-04/i/outputs/index-managed-users.html -->
+<!-- saved from url=(0077)file:///C:/Users/karar.haydar/Documents/Codex/2026-08-04/i/outputs/index.html -->
 <html lang="ar" dir="rtl"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>لوحة عمولات الوكلاء — HRINS</title>
 <meta name="theme-color" content="#12161c">
-<script src="./index.html 1_files/xlsx.full.min.js.download"></script>
-<script src="./index.html 1_files/supabase-js@2"></script>
+<script src="./index.html1_files/xlsx.full.min.js.download"></script>
+<script src="./index.html1_files/supabase-js@2"></script>
 <style>
 :root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
@@ -428,7 +428,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   <div class="zoneActions"><span class="muted" style="font-size:10px">سيتمكن المستخدم من تغيير كلمة المرور لاحقاً من نظام المصادقة.</span><button id="createUserButton" class="btn gold" onclick="createManagedUser()">إنشاء الحساب</button></div>
  </div>
  <div class="toolbar" style="margin-bottom:10px"><input id="usersSearch" class="search" placeholder="🔍 ابحث بالاسم أو البريد..." oninput="renderManagedUsers()"><button class="btn" onclick="loadManagedUsers()">↻ تحديث</button></div>
- <div id="usersManagerMessage" class="muted" style="font-size:11px;margin-bottom:10px"></div>
+ <div id="usersManagerMessage" class="muted" style="font-size: 11px; margin-bottom: 10px; color: var(--red);">تعذر تحميل الحسابات: Failed to send a request to the Edge Function</div>
  <div style="overflow:auto"><table class="users-table"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور والصلاحيات</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody id="usersManagerBody"></tbody></table></div>
 </div></div>
 
