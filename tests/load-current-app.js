@@ -37,11 +37,11 @@ function extractInlineApplicationScript(html) {
   return scripts[0].replace(/\ninitAuth\(\);\s*$/, '\n');
 }
 
-function loadCurrentApp() {
+function loadCurrentApp(options = {}) {
   const htmlPath = path.join(__dirname, '..', 'index.html');
   const html = fs.readFileSync(htmlPath, 'utf8');
   const applicationScript = extractInlineApplicationScript(html);
-  const storage = new Map();
+  const storage = options.storage || new Map();
   const document = {
     addEventListener() {},
     createElement,
@@ -81,9 +81,9 @@ function loadCurrentApp() {
     },
     console,
     document,
-    fetch: async () => {
+    fetch: options.fetch || (async () => {
       throw new Error('Network access is disabled in characterization tests.');
-    },
+    }),
     localStorage: {
       getItem(key) {
         return storage.has(key) ? storage.get(key) : null;
@@ -113,18 +113,25 @@ function loadCurrentApp() {
     globalThis.__characterization = {
       calc,
       backupStateSnapshot,
+      applyCentralPaymentResult,
+      buildCentralAuditLogs,
       buildCentralPeriods,
       compareMonthKeys,
       createBackupDocument,
       defaultData,
       defaultTiers,
+      getSbSession,
       getPreviousRow,
       monthKey,
       monthOrder,
       nextMonthKey,
       normalizeImport,
       parseCSV,
+      recordCentralPayment,
+      refreshSbSession,
       ROLE_PERMISSIONS,
+      sessionExpiresSoon,
+      setSbSession,
       state,
       status,
       tierFor,
