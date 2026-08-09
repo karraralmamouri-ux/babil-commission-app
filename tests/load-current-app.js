@@ -3,6 +3,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 const { TextEncoder } = require('node:util');
+const XLSX = require(path.join(__dirname, '..', 'assets', 'vendor', 'xlsx.full.min.js'));
 
 function createElement() {
   return {
@@ -107,17 +108,23 @@ function loadCurrentApp(options = {}) {
     window: {
       addEventListener() {},
     },
+    XLSX,
   });
 
   const exportsScript = `
     globalThis.__characterization = {
       calc,
+      calculateRawImport,
+      syncTierGroupBasis,
+      applyRawImportResult,
       backupStateSnapshot,
+      buildExcelReportWorkbook,
       applyCentralPaymentResult,
       buildCentralAuditLogs,
       buildCentralPeriods,
       compareMonthKeys,
       createBackupDocument,
+      createPeriodArchiveDocument,
       defaultData,
       defaultTiers,
       getSbSession,
@@ -127,7 +134,9 @@ function loadCurrentApp(options = {}) {
       nextMonthKey,
       normalizeImport,
       parseCSV,
+      preserveExistingCentralPayments,
       recordCentralPayment,
+      rowsForCentralPublish,
       refreshSbSession,
       ROLE_PERMISSIONS,
       sessionExpiresSoon,
@@ -135,7 +144,9 @@ function loadCurrentApp(options = {}) {
       state,
       status,
       tierFor,
-      verifyBackupDocument
+      validatePeriodArchiveSnapshot,
+      verifyBackupDocument,
+      verifyPeriodArchiveDocument
     };
   `;
 

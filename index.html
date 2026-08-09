@@ -24,7 +24,10 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 .users-table{min-width:780px}.users-table td{padding:9px 6px}.user-actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}.status-active{color:var(--green)}.status-disabled{color:var(--red)}
 .unsaved{display:none;color:var(--yellow);font-size:10px;font-weight:800}.unsaved.show{display:inline-block}
 .mode-banner{display:none;background:rgba(78,127,212,.12);border:1px solid var(--blue);color:var(--text);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:11px}.mode-banner.show{display:block}.mode-banner b{color:#8eb2ef}
-@media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls{width:100%}.btn{padding:8px 9px}}
+.raw-config-note{font-size:11px;color:var(--muted);margin:-2px 0 12px}.raw-config-table{min-width:900px}.raw-config-table input,.raw-config-table select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px}.raw-config-table .accounts-input{min-width:430px;text-align:left;direction:ltr}.raw-config-actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px 0}.import-report{display:none;background:rgba(78,161,160,.1);border:1px solid var(--green);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:11px}.import-report.show{display:block}
+.app-layout{width:min(1680px,100%);margin:auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:18px;padding:16px}.sidebar{position:sticky;top:16px;height:calc(100vh - 32px);background:linear-gradient(180deg,#17212b,#111922);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px;overflow:auto}.side-brand{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line)}.brand-mark{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--gold),#9b6921);color:#111;font-weight:900}.side-brand h2{font-size:14px;margin:0}.side-brand small{color:var(--muted);font-size:9px}.central-status{display:flex;align-items:center;gap:9px;background:rgba(78,161,160,.1);border:1px solid rgba(78,161,160,.35);border-radius:10px;padding:10px;font-size:11px}.central-status b,.central-status small{display:block}.central-status small{color:var(--muted);font-size:9px;margin-top:1px}.status-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}.side-section{padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.055)}.side-label{font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.6px;margin:0 4px 6px}.side-nav,.side-actions{display:grid;gap:5px}.side-btn{width:100%;display:flex;align-items:center;gap:9px;text-align:right;background:transparent;border:1px solid transparent;color:var(--muted);border-radius:9px;padding:9px 10px;cursor:pointer;font-size:11px;font-weight:700}.side-btn:hover,.side-btn.active{background:var(--panel2);border-color:var(--line);color:var(--text)}.side-btn.accent{color:var(--gold);border-color:rgba(212,162,78,.45);background:rgba(212,162,78,.09);margin-bottom:5px}.side-btn.danger{color:var(--red)}.side-bottom{margin-top:auto;display:grid;gap:8px}.side-user{background:var(--panel2);border-radius:10px;padding:10px}.side-user .session-user{margin-bottom:4px}.main-content{min-width:0;padding:6px 0 44px}.wrap{max-width:none;margin:0;padding:0}.mast{background:rgba(24,32,42,.72);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;backdrop-filter:blur(8px)}.mast h1{font-size:22px}.month-controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.toolbar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}.section-anchor{scroll-margin-top:18px}.preparation-note{color:var(--yellow)}#appShell.workspace-loading #workspaceContent{opacity:.28;pointer-events:none}#appShell.workspace-unavailable #workspaceContent{display:none}.workspace-loading .side-actions [data-permission],.workspace-unavailable .side-actions [data-permission]{display:none!important}.central-error{display:none;background:rgba(212,99,78,.1);border:1px solid var(--red);border-radius:12px;padding:22px;text-align:center;margin-top:14px}.workspace-unavailable .central-error{display:block}.workspace-central .central-only{display:flex}.workspace-preparation .central-only,.workspace-loading .central-only,.workspace-unavailable .central-only{display:none}
+@media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}.app-layout{grid-template-columns:210px minmax(0,1fr)}}@media(max-width:820px){.app-layout{display:block;padding:10px}.sidebar{position:relative;top:0;height:auto;margin-bottom:12px}.side-nav{grid-template-columns:repeat(4,1fr)}.side-actions{grid-template-columns:repeat(2,1fr)}.side-bottom{margin-top:0;grid-template-columns:1fr auto}.side-btn{justify-content:center}.main-content{padding:0 0 30px}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls,.month-controls{width:100%}.btn{padding:8px 9px}.side-nav{grid-template-columns:repeat(2,1fr)}}
+.lang-en .side-btn,.lang-en .name{text-align:left}.lang-en td:first-child,.lang-en th:first-child{text-align:left}.lang-en .toast{left:auto;right:20px}
 </style>
 </head>
 <body>
@@ -44,48 +47,90 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 </div>
 
 <div id="appShell" style="display:none">
+<div class="app-layout">
+<aside class="sidebar" aria-label="القائمة الرئيسية">
+ <div class="side-brand"><div class="brand-mark">HR</div><div><h2>عمولات الوكلاء</h2><small>HRINS • RESELLER FINANCE</small></div></div>
+ <div id="centralStatus" class="central-status"><span class="status-dot"></span><span><b>جاري الاتصال</b><small>تحميل البيانات المركزية...</small></span></div>
+ <div class="side-section">
+  <div class="side-label">العرض والمتابعة</div>
+  <nav class="side-nav">
+   <button class="side-btn active" data-nav-target="dashboardSection" onclick="scrollToSection('dashboardSection',this)">▦ ملخص العمولات</button>
+   <button class="side-btn" data-nav-target="agentsSection" onclick="scrollToSection('agentsSection',this)">♟ تفاصيل الوكلاء والكابينات</button>
+   <button class="side-btn" onclick="openAuditLog()">▤ سجل العمليات</button>
+  </nav>
+ </div>
+ <div class="side-section">
+  <div class="side-label">التقارير</div>
+  <div class="side-actions">
+   <button class="side-btn" onclick="exportAll()">⇩ تصدير تقرير العمولات</button>
+   <button class="side-btn" onclick="exportExcelReport()">▦ تقرير Excel متكامل</button>
+   <button class="side-btn" onclick="scrollToSection('comparisonSection')">↕ مقارنة الأشهر</button>
+  </div>
+ </div>
+ <div class="side-section" data-role-permission="edit">
+  <div class="side-label">تجهيز الشهر</div>
+  <div class="side-actions">
+   <button id="centralPreviewButton" class="side-btn accent" onclick="toggleCentralPreview()">⚙ فتح وضع تجهيز الشهر</button>
+   <button class="side-btn" data-permission="edit" onclick="document.getElementById('fileInput').click()">📥 استيراد ملف التفعيلات الخام</button>
+   <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden onchange="importFile(event)">
+   <button class="side-btn" data-permission="edit" onclick="saveCurrentMonth()">💾 حفظ بيانات الشهر</button>
+   <button class="side-btn gold" data-permission="edit" onclick="publishCurrentMonth()">✓ اعتماد الشهر مركزياً</button>
+   <button class="side-btn" data-permission="edit" onclick="focusMonthPicker()">🗓 اختيار أو تعديل شهر محفوظ</button>
+   <button class="side-btn" data-permission="edit" onclick="startNewMonth()">✨ إنشاء الشهر التالي</button>
+   <button class="side-btn" data-permission="rates" onclick="openSettingsSection('ratesDetails')">⚖ أسعار العمولات والتير</button>
+   <button class="side-btn" data-permission="rates" onclick="openSettingsSection('rawImportSettingsDetails')">🔗 ربط الوكلاء والكابينات</button>
+  </div>
+ </div>
+ <div class="side-section">
+  <div class="side-label">إدارة النظام</div>
+  <div class="side-actions">
+   <button id="refreshCentralSidebarButton" class="side-btn central-only" onclick="refreshCentralData()">↻ تحديث البيانات المركزية</button>
+   <button class="side-btn" data-role-permission="edit" onclick="openArchiveManager()">🗄 إدارة الأرشيف</button>
+   <button class="side-btn" data-role-permission="users" onclick="openUserManagement()">👥 المستخدمون والصلاحيات</button>
+   <button class="side-btn" data-permission="backup" onclick="exportBackup()">🛡 تنزيل نسخة احتياطية</button>
+   <button id="languageButton" class="side-btn" onclick="toggleLanguage()">EN English</button>
+  </div>
+ </div>
+ <div class="side-bottom">
+  <div class="side-user"><div class="session-user">👤 <b id="loggedUserName"></b></div><span id="loggedUserRole" class="role-pill"></span></div>
+  <button id="logoutButton" class="side-btn danger">تسجيل الخروج</button>
+ </div>
+</aside>
+<main class="main-content">
 <div class="wrap">
-<header class="mast">
+<header id="monthSection" class="mast section-anchor">
  <div>
   <div class="eyebrow">HRINS • RESELLER FINANCE</div>
   <h1>لوحة عمولات الوكلاء</h1>
-  <div class="muted" style="font-size:11px">إدارة العمولات • الصرف • الأرشيف • الأداء الشهري</div>
+  <div class="muted" style="font-size:11px">متابعة العمولات والصرف والأداء الشهري من مصدر مركزي واحد</div>
  </div>
- <div class="controls">
-  <div class="session-user">👤 <b id="loggedUserName"></b><span id="loggedUserRole" class="role-pill"></span></div>
+ <div class="month-controls">
   <span class="muted" style="font-size:11px">الشهر:</span>
   <input id="monthInput" class="input" value="08/2026" placeholder="MM/YYYY" style="width:105px;text-align:center" title="اكتب الشهر بصيغة MM/YYYY">
   <button id="applyMonthButton" class="btn" onclick="applyMonthInput()">تطبيق</button>
   <select id="monthSelect" class="select" onchange="loadSelectedMonth()"></select>
-  <button class="btn gold" data-permission="edit" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
   <span id="unsavedIndicator" class="unsaved">● تعديلات غير محفوظة</span>
-  <button class="btn" data-permission="edit" onclick="startNewMonth()">✨ شهر جديد</button>
-  <button class="btn" onclick="openAuditLog()">🧾 سجل التعديلات</button>
-  <button class="btn gold" data-permission="users" onclick="openUserManagement()">👥 إدارة المستخدمين</button>
-  <button id="logoutButton" class="btn danger">تسجيل الخروج</button>
  </div>
 </header>
 
 <div id="centralPreviewBanner" class="mode-banner" role="status"></div>
+<div id="centralError" class="central-error"><h3>تعذر الوصول إلى البيانات المركزية</h3><p class="muted">تحقق من الاتصال ثم أعد المحاولة.</p><div class="actions" style="justify-content:center"><button class="btn green" onclick="enterCentralPreview()">↻ إعادة المحاولة</button><button class="btn" data-role-permission="edit" onclick="openPreparationMode()">⚙ فتح وضع تجهيز الشهر</button></div></div>
 
+<div id="workspaceContent">
 <div class="toolbar">
  <input id="searchInput" class="search" placeholder="🔍 ابحث باسم الوكيل أو FDT..." oninput="renderAll()">
  <select id="zoneFilter" class="select" onchange="renderAll()"><option value="all">كل المناطق</option><option value="old">OLD ZONE</option><option value="new">NEW ZONE</option></select>
  <select id="statusFilter" class="select" onchange="renderAll()"><option value="all">كل حالات الصرف</option><option value="pending">غير مدفوع</option><option value="partial">مدفوع جزئياً</option><option value="paid">مدفوع</option></select>
- <button id="centralPreviewButton" class="btn green" onclick="toggleCentralPreview()">☁️ فتح البيانات المركزية</button>
- <button class="btn" data-permission="edit" onclick="document.getElementById(&#39;fileInput&#39;).click()">📥 استيراد Excel / CSV</button>
- <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden="" onchange="importFile(event)">
- <button class="btn" onclick="exportAll()">📤 تصدير الكل</button>
- <button class="btn" data-permission="backup" onclick="exportBackup()">🛡️ نسخة احتياطية JSON</button>
 </div>
+<div id="rawImportReport" class="import-report" role="status"></div>
 
-<section class="cards">
+<section id="dashboardSection" class="cards section-anchor">
  <div class="card goldline"><div class="label">إجمالي العمولات</div><div class="value" id="grandTotal">0</div><div class="sub">د.ع</div></div>
- <div class="card blueline"><div class="label">OLD ZONE</div><div class="value" id="oldTotal">0</div><div class="sub" id="oldCount">0 وكيل</div></div>
- <div class="card greenline"><div class="label">NEW ZONE</div><div class="value" id="newTotal">0</div><div class="sub" id="newCount">0 وكيل</div></div>
+ <div class="card blueline"><div class="label">OLD ZONE</div><div class="value" id="oldTotal">0</div><div class="sub" id="oldCount">0 حساب</div></div>
+ <div class="card greenline"><div class="label">NEW ZONE</div><div class="value" id="newTotal">0</div><div class="sub" id="newCount">0 كابينة</div></div>
  <div class="card"><div class="label">إجمالي المدفوع</div><div class="value" id="paidTotal">0</div><div class="sub">د.ع</div></div>
  <div class="card"><div class="label">المتبقي</div><div class="value" id="remainingTotal">0</div><div class="sub">د.ع</div></div>
- <div class="card redline"><div class="label">عدد الوكلاء</div><div class="value" id="agentCount">0</div><div class="sub" id="statusSummary">—</div></div>
+ <div class="card redline"><div class="label">عدد السجلات</div><div class="value" id="agentCount">0</div><div class="sub" id="statusSummary">—</div></div>
 </section>
 
 <div class="grid2">
@@ -99,15 +144,34 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  <div class="muted" style="font-size:10px;padding-bottom:12px">الأسعار تحفظ مع كل شهر عند الضغط على «حفظ الشهر»، لذلك تغيير الأسعار لاحقاً لا يغيّر الأشهر المؤرشفة.</div>
 </details>
 
-<div class="tabs">
+<details id="rawImportSettingsDetails" data-permission="rates">
+ <summary>🧩 إعدادات قراءة الملف الخام</summary>
+ <div class="raw-config-note">يمكن تعديل حسابات parent، أسماء الوكلاء، التير الافتراضي، ونطاقات كابينات الزون الجديد. بعد تطبيق تحديث قاعدة البيانات تحفظ الإعدادات مركزياً لكل المستخدمين، مع نسخة مؤقتة في المتصفح عند تعذر الاتصال.</div>
+ <h3 style="font-size:12px">الوكلاء وحسابات parent التابعة لهم</h3>
+ <div style="overflow:auto"><table class="raw-config-table"><thead><tr><th>اسم الوكيل</th><th>حسابات parent — افصل بينها بفاصلة</th><th>التير الافتراضي</th><th></th></tr></thead><tbody id="rawAgentConfigBody"></tbody></table></div>
+ <div class="raw-config-actions"><button class="btn" onclick="addRawAgentConfig()">+ إضافة وكيل</button></div>
+ <h3 style="font-size:12px">نطاقات كابينات الزون الجديد</h3>
+ <div style="overflow:auto"><table class="raw-config-table" style="min-width:650px"><thead><tr><th>من FDT</th><th>إلى FDT</th><th>الوكيل المالك</th><th></th></tr></thead><tbody id="rawCabinetConfigBody"></tbody></table></div>
+ <div class="raw-config-actions"><button class="btn" onclick="addRawCabinetRange()">+ إضافة نطاق</button><div class="actions"><button class="btn danger" onclick="resetRawImportConfig()">استعادة الافتراضي</button><button class="btn gold" onclick="saveRawImportConfig()">حفظ إعدادات القراءة</button></div></div>
+</details>
+
+<div id="agentsSection" class="tabs section-anchor">
  <button class="tab active" data-zone="old" onclick="switchTab(&#39;old&#39;)">🔵 OLD ZONE</button>
  <button class="tab" data-zone="new" onclick="switchTab(&#39;new&#39;)">🟢 NEW ZONE</button>
 </div>
 <div id="panel-old" class="panel active"></div>
 <div id="panel-new" class="panel"></div>
 <footer class="muted" style="font-size:10px;text-align:center;margin-top:18px">
- بيانات التشغيل المحلية تبقى محفوظة في هذا المتصفح. المعاينة المركزية اختيارية وللقراءة فقط ولا تستبدل النسخة المحلية.
+ البيانات المعروضة مرتبطة بالنظام المركزي، ويظهر آخر تحديث من شريط الحالة.
 </footer>
+</div>
+
+<section id="comparisonSection" class="grid2 section-anchor">
+ <div class="box"><h3 id="monthlyTrendTitle">↕ حركة العمولات بين الأشهر</h3><div id="monthlyTrend"></div></div>
+ <div class="box"><h3 id="agentMovementTitle">📈 صعود ونزول الوكلاء</h3><div id="agentMovement"></div></div>
+</section>
+</div>
+</main>
 </div>
 
 <div id="auditModal" class="modal" onclick="if(event.target===this)closeAuditLog()"><div class="modalbox" style="width:min(1200px,100%)">
@@ -144,6 +208,21 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  <div style="overflow:auto"><table class="users-table"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور والصلاحيات</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody id="usersManagerBody"></tbody></table></div>
 </div></div>
 
+<div id="archiveModal" class="modal" onclick="if(event.target===this)closeArchiveManager()"><div class="modalbox" style="width:min(1000px,100%)">
+ <div class="modalhead"><h2>🗄 إدارة أرشيف الفترات</h2><button class="close" onclick="closeArchiveManager()">×</button></div>
+ <p class="muted" style="font-size:11px;margin-top:0">اختر الفترة لعرضها أو تعديلها أو تصدير نسخة مستقلة منها. الاستيراد لا ينشر مركزياً إلا بعد المراجعة والاعتماد.</p>
+ <div class="toolbar" style="margin-bottom:12px">
+  <select id="archivePeriodSelect" class="select" onchange="renderArchiveManager()"></select>
+  <button class="btn" onclick="openSelectedArchivePeriod(false)">👁 عرض الفترة</button>
+  <button class="btn gold" onclick="openSelectedArchivePeriod(true)">✎ فتح للتعديل</button>
+  <button class="btn" onclick="exportSelectedPeriodArchive()">⇩ تصدير الفترة</button>
+  <button class="btn green" onclick="document.getElementById('periodArchiveInput').click()">⇧ استيراد للفترة المختارة</button>
+  <input id="periodArchiveInput" type="file" accept="application/json,.json" hidden onchange="importSelectedPeriodArchive(event)">
+ </div>
+ <div id="archiveManagerSummary" class="muted" style="font-size:11px;margin-bottom:10px"></div>
+ <div style="overflow:auto"><table style="min-width:760px"><thead><tr><th>الفترة</th><th>الحسابات</th><th>التفعيلات</th><th>إجمالي العمولات</th><th>آخر حفظ</th></tr></thead><tbody id="archiveManagerBody"></tbody></table></div>
+</div></div>
+
 <div id="modal" class="modal" onclick="if(event.target===this)closeModal()"><div class="modalbox">
  <div class="modalhead"><h2 id="modalTitle">تفاصيل الوكيل</h2><button class="close" onclick="closeModal()">×</button></div>
  <div id="modalBody"></div>
@@ -154,7 +233,31 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 const SUPABASE_URL='https://qolrsefpbvfuugwyqggu.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_XcVKdpASq1D23Fc1QzCmcA_kX-mkO7b';
 let authUser=null,authProfile=null;
-const centralPreview={active:false,localState:null,localUnsavedChanges:false,months:[]};
+const centralPreview={active:false,localState:null,localUnsavedChanges:false,months:[],lastUpdatedAt:null};
+let workspaceMode='loading';
+const LANGUAGE_STORAGE='babil_ui_language_v1';
+let currentLanguage=localStorage.getItem(LANGUAGE_STORAGE)==='en'?'en':'ar';
+const TEXT_PAIRS=[
+ ['لوحة عمولات الوكلاء','Agent Commissions Dashboard'],['تسجيل الدخول إلى النظام','Sign in to the system'],['البريد الإلكتروني','Email'],['كلمة المرور','Password'],['تسجيل الدخول','Sign in'],['متابعة العمولات والصرف والأداء الشهري من مصدر مركزي واحد','Monitor commissions, payments, and monthly performance from one central source'],
+ ['العرض والمتابعة','View & monitor'],['ملخص العمولات','Commission summary'],['تفاصيل الوكلاء والكابينات','Agents & cabinets'],['سجل العمليات','Activity log'],['التقارير','Reports'],['تصدير تقرير العمولات','Export commission report'],['تقرير Excel متكامل','Full Excel report'],['مقارنة الأشهر','Monthly comparison'],
+ ['تجهيز الشهر','Prepare month'],['فتح وضع تجهيز الشهر','Open month preparation'],['استيراد ملف التفعيلات الخام','Import raw activations'],['حفظ بيانات الشهر','Save month draft'],['اعتماد الشهر مركزياً','Publish month centrally'],['اختيار أو تعديل شهر محفوظ','Select or edit saved month'],['إنشاء الشهر التالي','Create next month'],['أسعار العمولات والتير','Rates & tiers'],['ربط الوكلاء والكابينات','Agent & cabinet mapping'],
+ ['إدارة النظام','System administration'],['تحديث البيانات المركزية','Refresh central data'],['إدارة الأرشيف','Archive management'],['إدارة أرشيف الفترات','Period archive management'],['المستخدمون والصلاحيات','Users & permissions'],['تنزيل نسخة احتياطية','Download backup'],['تسجيل الخروج','Sign out'],
+ ['إدارة العمولات • الصرف • الأرشيف • الأداء الشهري','Commission management • payments • archive • monthly performance'],['الشهر:','Month:'],['تطبيق','Apply'],['كل المناطق','All zones'],['كل حالات الصرف','All payment statuses'],['غير مدفوع','Unpaid'],['مدفوع جزئياً','Partially paid'],['مدفوع','Paid'],
+ ['إجمالي العمولات','Total commissions'],['إجمالي المدفوع','Total paid'],['المتبقي','Remaining'],['عدد السجلات','Records'],['أعلى الوكلاء بالعمولة','Top commissions'],['حالة الصرف','Payment status'],['حركة العمولات بين الأشهر','Monthly commission movement'],['صعود ونزول الوكلاء','Agent increases and decreases'],
+ ['إعدادات أسعار العمولات','Commission rate settings'],['إعدادات قراءة الملف الخام','Raw import settings'],['الوكلاء وحسابات parent التابعة لهم','Agents and their parent accounts'],['نطاقات كابينات الزون الجديد','New-zone cabinet ranges'],['إضافة وكيل','Add agent'],['إضافة نطاق','Add range'],['استعادة الافتراضي','Restore defaults'],['حفظ إعدادات القراءة','Save import settings'],
+ ['اسم الوكيل / FDT','Agent / FDT'],['الكمية','Quantity'],['الفئة','Tier'],['المستحق','Due'],['الحالة','Status'],['إجراء','Action'],['إجمالي المنطقة','Zone total'],['إضافة وكيل','Add agent'],['تصدير المنطقة','Export zone'],
+ ['البيانات المركزية','Central data'],['وضع تجهيز الشهر','Month preparation'],['عرض البيانات المركزية','View central data'],['خاص بالإدارة • غير معتمد مركزياً','Admin only • not published centrally'],['متصلة وجاهزة للاستخدام','Connected and ready'],['جاري الاتصال','Connecting'],['تحميل البيانات المركزية...','Loading central data...'],
+ ['إدارة المستخدمين والصلاحيات','User and permission management'],['إنشاء حساب جديد','Create account'],['الاسم الكامل','Full name'],['الدور','Role'],['إنشاء الحساب','Create account'],['كل المستخدمين','All users'],['كل العمليات','All actions'],['تصدير السجل','Export log'],['تفاصيل الوكيل','Agent details'],['إلغاء','Cancel'],['حفظ','Save']
+];
+const AR_TO_EN=new Map(TEXT_PAIRS),EN_TO_AR=new Map(TEXT_PAIRS.map(([ar,en])=>[en,ar]));
+function translatedText(text,language){const clean=String(text||'').trim(),map=language==='en'?AR_TO_EN:EN_TO_AR,pieces=clean.match(/^([^\p{L}\p{N}]*)([\s\S]*)$/u),prefix=pieces?.[1]||'',body=pieces?.[2]||clean;let translated=map.get(body);if(!translated&&language==='en'){translated=body.replace(/^مجموعة /,'Group ').replace(/ تفعيل$/,' activations').replace(/^يظهر (\d+) من (\d+) سجل$/,(_,a,b)=>`Showing ${a} of ${b} records`)}return translated?prefix+translated:clean}
+function applyLanguage(){
+ document.documentElement.lang=currentLanguage;document.documentElement.dir=currentLanguage==='en'?'ltr':'rtl';document.body.classList.toggle('lang-en',currentLanguage==='en');
+ const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let node;while((node=walker.nextNode())){const clean=node.nodeValue.trim();if(!clean)continue;const translated=translatedText(clean,currentLanguage);if(translated!==clean)node.nodeValue=node.nodeValue.replace(clean,translated)}
+ document.querySelectorAll('[placeholder],[title]').forEach(element=>['placeholder','title'].forEach(attribute=>{if(element.hasAttribute(attribute)){const value=element.getAttribute(attribute),translated=translatedText(value,currentLanguage);if(translated!==value)element.setAttribute(attribute,translated)}}));
+ const button=document.getElementById('languageButton');if(button)button.textContent=currentLanguage==='ar'?'EN English':'AR العربية';
+}
+function toggleLanguage(){currentLanguage=currentLanguage==='ar'?'en':'ar';localStorage.setItem(LANGUAGE_STORAGE,currentLanguage);renderAll();updateCentralPreviewUI();applyLanguage()}
 /* عميل Supabase خفيف داخل الملف: لا يعتمد على مكتبة CDN خارجية. */
 const SB_SESSION_KEY='hrins_supabase_session';
 const sbListeners=[];
@@ -218,14 +321,17 @@ const ROLE_PERMISSIONS={
 };
 let managedUsers=[];
 function roleAllows(p){return !!(authProfile&&ROLE_PERMISSIONS[authProfile.role]?.[p])}
-function hasPermission(p){if(p==='payment')return centralPreview.active&&roleAllows(p);return !centralPreview.active&&roleAllows(p)}
-function showLogin(){document.getElementById('loginScreen').style.display='flex';document.getElementById('appShell').style.display='none'}
+function hasPermission(p){if(p==='payment')return centralPreview.active&&roleAllows(p);if(['users','backup'].includes(p))return roleAllows(p);return !centralPreview.active&&roleAllows(p)}
+function showLogin(){document.getElementById('loginScreen').style.display='flex';document.getElementById('appShell').style.display='none';applyLanguage()}
 function showApp(){
  document.getElementById('loginScreen').style.display='none';document.getElementById('appShell').style.display='block';
+ setWorkspaceMode('loading');
  document.getElementById('loggedUserName').textContent=authProfile?.full_name||authUser?.email||'مستخدم';
  document.getElementById('loggedUserRole').textContent=ROLE_LABELS[authProfile?.role]||authProfile?.role||'';
  applyPermissions();
  updateCentralPreviewUI();
+ loadRawImportConfig().then(renderRawImportSettings).catch(error=>console.error('Raw import config:',error));
+ applyLanguage();
 }
 function applyPermissions(){
  document.querySelectorAll('[data-permission]').forEach(el=>{
@@ -233,8 +339,23 @@ function applyPermissions(){
    el.disabled=!allowed;
    el.style.display=allowed?'':'none';
  });
- document.getElementById('ratesDetails').style.display=roleAllows('rates')?'':'none';
+ document.querySelectorAll('[data-role-permission]').forEach(el=>{
+   const allowed=roleAllows(el.dataset.rolePermission);
+   el.disabled=!allowed;
+   el.style.display=allowed?'':'none';
+ });
+ document.getElementById('ratesDetails').style.display=hasPermission('rates')?'':'none';
 }
+function setWorkspaceMode(mode){
+ workspaceMode=mode;
+ const shell=document.getElementById('appShell');
+ if(!shell)return;
+ shell.classList.remove('workspace-loading','workspace-central','workspace-preparation','workspace-unavailable');
+ shell.classList.add(`workspace-${mode}`);
+}
+function scrollToSection(id,button){document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});if(button){document.querySelectorAll('[data-nav-target]').forEach(item=>item.classList.toggle('active',item===button))}}
+function openSettingsSection(id){const section=document.getElementById(id);if(!section)return;section.open=true;section.scrollIntoView({behavior:'smooth',block:'start'})}
+function focusMonthPicker(){scrollToSection('monthSection');setTimeout(()=>document.getElementById('monthInput')?.focus(),350)}
 function authError(msg){const e=document.getElementById('loginError');e.textContent=msg;e.style.display='block'}
 function clearAuthError(){const e=document.getElementById('loginError');e.textContent='';e.style.display='none'}
 async function loadProfile(user){
@@ -325,6 +446,7 @@ async function login(){
    load();
    renderMonths();
    renderAll();
+   await enterCentralPreview(true);
  }catch(e){
    console.error(e);
 
@@ -366,6 +488,7 @@ async function initAuth(){
      load();
      renderMonths();
      renderAll();
+     await enterCentralPreview(true);
    }catch(e){
      console.error(e);
      authUser=null;
@@ -409,39 +532,55 @@ document.addEventListener('visibilitychange',async()=>{
 
 
 const STORAGE='babil_commission_v2',LEGACY_DATA='babil_current_data',LEGACY_ARCHIVE='babil_archive';
+const RAW_IMPORT_CONFIG_STORAGE='babil_raw_import_config_v1',RAW_IMPORT_CONFIG_URL='./assets/data/raw-import-config.json';
 const defaultTiers=[
  {key:'t1',label:'T1',min:0,max:200,p35:4000,p45:5500,p65:8000},
  {key:'t2',label:'T2',min:201,max:400,p35:4750,p45:6000,p65:9000},
  {key:'t3',label:'T3',min:401,max:Infinity,p35:6000,p45:8000,p65:11500}
 ];
-const defaultData={
- old:[
- {name:'حيدر طالب',p35:252,p45:7,p65:1,customTier:'auto',paid:0},{name:'عمار خليل',p35:541,p45:23,p65:3,customTier:'auto',paid:0},
- {name:'مصطفى ضياء',p35:94,p45:8,p65:0,customTier:'auto',paid:0},{name:'كرار عباس',p35:96,p45:3,p65:0,customTier:'auto',paid:0},
- {name:'زياد جواد',p35:152,p45:6,p65:0,customTier:'auto',paid:0},{name:'عمار كامل',p35:331,p45:28,p65:8,customTier:'auto',paid:0},
- {name:'باسم محمد',p35:125,p45:1,p65:0,customTier:'auto',paid:0},{name:'سعيد عمار',p35:87,p45:6,p65:0,customTier:'auto',paid:0},
- {name:'سعيد عمار sub1',p35:41,p45:0,p65:0,customTier:'auto',paid:0},{name:'سعيد عمار sub2',p35:124,p45:3,p65:0,customTier:'auto',paid:0},
- {name:'سعيد عمار sub8',p35:13,p45:0,p65:0,customTier:'auto',paid:0},{name:'احمد عبدالعباس',p35:153,p45:6,p65:0,customTier:'auto',paid:0},
- {name:'احمد عبدالعباس sub1',p35:26,p45:2,p65:0,customTier:'auto',paid:0},{name:'احمد عبدالعباس sub2',p35:47,p45:0,p65:0,customTier:'auto',paid:0},
- {name:'احمد عبدالعباس sub3',p35:194,p45:0,p65:1,customTier:'auto',paid:0},{name:'علي طارق',p35:179,p45:1,p65:0,customTier:'auto',paid:0},
- {name:'بارق ليث',p35:395,p45:9,p65:0,customTier:'auto',paid:0}],
- new:[
- {name:'FDT-94',p35:397,p45:15,p65:0,customTier:'auto',paid:0},{name:'FDT-95',p35:377,p45:12,p65:0,customTier:'auto',paid:0},
- {name:'FDT-96',p35:369,p45:8,p65:1,customTier:'auto',paid:0},{name:'FDT-97',p35:272,p45:4,p65:1,customTier:'auto',paid:0},
- {name:'FDT-98',p35:405,p45:8,p65:1,customTier:'auto',paid:0},{name:'FDT-99',p35:301,p45:12,p65:0,customTier:'auto',paid:0},
- {name:'FDT-100',p35:206,p45:6,p65:0,customTier:'auto',paid:0},{name:'FDT-101',p35:138,p45:2,p65:0,customTier:'auto',paid:0},
- {name:'FDT-102',p35:269,p45:5,p65:0,customTier:'auto',paid:0},{name:'FDT-108',p35:119,p45:0,p65:0,customTier:'auto',paid:0},
- {name:'FDT-109',p35:12,p45:0,p65:1,customTier:'auto',paid:0},{name:'FDT-110',p35:56,p45:0,p65:0,customTier:'auto',paid:0},
- {name:'FDT-111',p35:35,p45:0,p65:0,customTier:'auto',paid:0},{name:'FDT-112',p35:44,p45:2,p65:0,customTier:'auto',paid:0},
- {name:'FDT-113',p35:150,p45:0,p65:0,customTier:'auto',paid:0},{name:'FDT-114',p35:105,p45:2,p65:0,customTier:'auto',paid:0},
- {name:'FDT-115',p35:38,p45:2,p65:0,customTier:'auto',paid:0},{name:'FDT-116',p35:54,p45:1,p65:0,customTier:'auto',paid:0},
- {name:'FDT-117',p35:8,p45:0,p65:1,customTier:'auto',paid:0},{name:'FDT-103',p35:252,p45:5,p65:0,customTier:'auto',paid:0},
- {name:'FDT-104',p35:184,p45:2,p65:0,customTier:'auto',paid:0},{name:'FDT-105',p35:286,p45:2,p65:1,customTier:'auto',paid:0},
- {name:'FDT-106',p35:215,p45:3,p65:0,customTier:'auto',paid:0},{name:'FDT-107',p35:154,p45:4,p65:0,customTier:'auto',paid:0}]
-};
-let state={month:'08/2026',data:clone(defaultData),tiers:clone(defaultTiers),archive:{},auditLog:[],undo:null};
+const defaultData={old:[],new:[]};
+let state={month:monthKey(),data:clone(defaultData),tiers:clone(defaultTiers),archive:{},auditLog:[],undo:null};
+let rawImportConfig=null,defaultRawImportConfig=null;
 
 function clone(x){return JSON.parse(JSON.stringify(x))}
+async function loadRawImportConfig(forceDefault=false){
+ if(!defaultRawImportConfig){const response=await fetch(RAW_IMPORT_CONFIG_URL,{cache:'no-store'});if(!response.ok)throw new Error('تعذر تحميل إعدادات قراءة الملف الخام');defaultRawImportConfig=await response.json()}
+ if(forceDefault){rawImportConfig=clone(defaultRawImportConfig);return rawImportConfig}
+ if(authUser){try{const central=await sbRequest('/rest/v1/app_settings?key=eq.raw_import&select=value&limit=1');if(Array.isArray(central)&&central[0]?.value){rawImportConfig=central[0].value;return rawImportConfig}}catch(error){if(error?.status!==400&&error?.status!==404)console.warn('Central import settings:',error)}}
+ try{const saved=JSON.parse(localStorage.getItem(RAW_IMPORT_CONFIG_STORAGE)||'null');rawImportConfig=saved||clone(defaultRawImportConfig)}catch(_){rawImportConfig=clone(defaultRawImportConfig)}
+ return rawImportConfig;
+}
+function rawField(row,wanted){const key=Object.keys(row||{}).find(candidate=>candidate.trim().toLowerCase()===wanted.toLowerCase());return key?row[key]:''}
+function rawText(value){return String(value??'').trim()}
+function normalizeRawProfile(value){const compact=rawText(value).toUpperCase().replace(/[\s_-]/g,'');return compact==='P35000'?'P-35000':compact==='P45000'?'P-45000':compact==='P65000'?'P-65000':rawText(value).toUpperCase()}
+function rawFdt(value){const match=rawText(value).match(/FDT\s*[:\-]?\s*(\d+)/i);return match?Number(match[1]):undefined}
+function validateRawImportConfig(config){
+ if(!config||!Array.isArray(config.profiles)||!config.profiles.length||!Array.isArray(config.agents)||!Array.isArray(config.cabinetRanges))throw new Error('إعدادات قراءة الملف الخام غير صالحة');
+ const ids=new Set(config.agents.map(agent=>agent.id));config.cabinetRanges.forEach(range=>{if(!ids.has(range.ownerId)||!Number.isInteger(Number(range.from))||!Number.isInteger(Number(range.to))||Number(range.from)>Number(range.to))throw new Error('يوجد نطاق كابينات غير صالح')});return config;
+}
+function oldAccountLabel(agent,account,accountIndex){
+ const sub=rawText(account).match(/\.sub(\d+)$/i);
+ if(sub)return `${agent.name} sub${Number(sub[1])}`;
+ return accountIndex===0?agent.name:`${agent.name} — ${account}`;
+}
+function calculateRawImport(rows,config){
+ validateRawImportConfig(config);const profiles=new Set(config.profiles.map(normalizeRawProfile)),accounts=new Map(),agents=new Map(config.agents.map(agent=>[agent.id,agent]));
+ config.agents.forEach((agent,agentOrder)=>(agent.accounts||[]).forEach((account,accountOrder)=>accounts.set(rawText(account).toLowerCase(),{agent,account:rawText(account),agentOrder,accountOrder,label:oldAccountLabel(agent,account,accountOrder)})));
+ const seenIds=new Set(),oldBuckets=new Map(),newBuckets=new Map(),exceptions=[];let duplicateIds=0,ignoredProfiles=0,ignoredAccounts=0;
+ const emptyCounts=()=>({p35:0,p45:0,p65:0});
+ rows.forEach((row,index)=>{const sheetRow=index+2,id=rawText(rawField(row,'id')),profile=normalizeRawProfile(rawField(row,'profile_name')),parent=rawText(rawField(row,'parent'));
+  if(!profiles.has(profile)){ignoredProfiles++;return}if(!id){exceptions.push({row:sheetRow,reason:'معرّف id فارغ',parent});return}if(seenIds.has(id)){duplicateIds++;return}seenIds.add(id);
+  const fdt=rawFdt(rawField(row,'lastname')),range=fdt===undefined?null:config.cabinetRanges.find(item=>fdt>=Number(item.from)&&fdt<=Number(item.to));let bucket;
+  if(range){const owner=agents.get(range.ownerId);if(!owner){exceptions.push({row:sheetRow,reason:'مالك الكابينة غير معرّف',parent,fdt});return}bucket=newBuckets.get(fdt)||{name:`FDT-${fdt}`,owner:owner.name,fdt,counts:emptyCounts()};newBuckets.set(fdt,bucket)}
+  else{const account=accounts.get(parent.toLowerCase());if(!account){if(parent.toLowerCase().startsWith('r.'))exceptions.push({row:sheetRow,reason:'حساب parent غير معرّف',parent,fdt});else ignoredAccounts++;return}const key=account.account.toLowerCase();bucket=oldBuckets.get(key)||{name:account.label,owner:account.agent.name,agentId:account.agent.id,sourceAccount:account.account,agentOrder:account.agentOrder,accountOrder:account.accountOrder,defaultTier:account.agent.defaultTier||'auto',counts:emptyCounts()};oldBuckets.set(key,bucket)}
+  const field=profile==='P-35000'?'p35':profile==='P-45000'?'p45':'p65';bucket.counts[field]++;
+ });
+ const eligibleIds=[...oldBuckets.values(),...newBuckets.values()].reduce((sum,bucket)=>sum+bucket.counts.p35+bucket.counts.p45+bucket.counts.p65,0),groupTotals=new Map();
+ oldBuckets.forEach(bucket=>groupTotals.set(bucket.agentId,(groupTotals.get(bucket.agentId)||0)+bucket.counts.p35+bucket.counts.p45+bucket.counts.p65));
+ return{old:[...oldBuckets.values()].sort((a,b)=>a.agentOrder-b.agentOrder||a.accountOrder-b.accountOrder).map(bucket=>({name:bucket.name,...bucket.counts,customTier:bucket.defaultTier,paid:0,owner:bucket.owner,sourceAccount:bucket.sourceAccount,tierGroupId:bucket.agentId,tierGroupName:bucket.owner,tierBasisQty:groupTotals.get(bucket.agentId)||0})),new:[...newBuckets.values()].sort((a,b)=>a.fdt-b.fdt).map(bucket=>({name:bucket.name,...bucket.counts,customTier:'auto',paid:0,owner:bucket.owner})),stats:{sourceRows:rows.length,eligibleIds,duplicateIds,ignoredProfiles,ignoredAccounts,exceptions}};
+}
+function preserveImportedRowSettings(imported,previous){const match=(previous||[]).find(row=>row.name===imported.name);return match?{...imported,customTier:match.customTier||imported.customTier||'auto',paid:Number(match.paid)||0,paymentDate:match.paymentDate||''}:imported}
+function applyRawImportResult(result){state.data={old:result.old.map(row=>preserveImportedRowSettings(row,state.data.old)),new:result.new.map(row=>preserveImportedRowSettings(row,state.data.new))}}
 function centralNumber(value,label,{integer=false}={}){
  const number=Number(value);
  if(!Number.isFinite(number)||number<0||(integer&&!Number.isInteger(number)))throw new Error(`قيمة مركزية غير صالحة: ${label}`);
@@ -464,16 +603,16 @@ function normalizeCentralTiers(tiers,month){
  return normalized;
 }
 function centralRowDue(tiers,row){
- const quantity=row.p35+row.p45+row.p65;
- const tier=row.customTier&&row.customTier!=='auto'
-   ?tiers.find(item=>item.key===row.customTier)
+ const quantity=Number.isFinite(Number(row.tierBasisQty))?Number(row.tierBasisQty):row.p35+row.p45+row.p65;
+ const selected=row.appliedTier||(row.customTier&&row.customTier!=='auto'?row.customTier:'');
+ const tier=selected
+   ?tiers.find(item=>item.key===selected)
    :tiers.find(item=>quantity>=item.min&&(item.max==null||quantity<=item.max));
  if(!tier&&(quantity>0||row.customTier!=='auto'))throw new Error('تعذر تحديد شريحة صف مركزي');
  return tier?row.p35*tier.p35+row.p45*tier.p45+row.p65*tier.p65:0;
 }
 function buildCentralPeriods(months,rows){
  if(!Array.isArray(months)||!Array.isArray(rows))throw new Error('استجابة البيانات المركزية غير صالحة');
- if(!months.length)throw new Error('لا توجد أشهر مركزية متاحة');
  const periods=new Map(),monthById=new Map();
  months.forEach(month=>{
    const key=String(month?.month_key||'');
@@ -494,7 +633,13 @@ function buildCentralPeriods(months,rows){
      p35:centralNumber(row.p35,`${month}.p35`,{integer:true}),
      p45:centralNumber(row.p45,`${month}.p45`,{integer:true}),
      p65:centralNumber(row.p65,`${month}.p65`,{integer:true}),
-     customTier:String(row.custom_tier||'auto'),
+     customTier:String(row.tier_mode||row.custom_tier||'auto'),
+     appliedTier:row.custom_tier&&row.custom_tier!=='auto'?String(row.custom_tier):'',
+     tierBasisQty:row.tier_basis_qty==null?undefined:centralNumber(row.tier_basis_qty,`${month}.tier_basis_qty`,{integer:true}),
+     tierGroupId:row.tier_group_id||'',
+     tierGroupName:row.tier_group_name||'',
+     sourceAccount:row.source_account||'',
+     owner:row.owner_name||'',
      paid:centralNumber(row.paid,`${month}.paid`),
      paymentDate:row.payment_date||'',
      centralId:String(row.id||''),
@@ -515,18 +660,20 @@ async function fetchCentralPages(path,pageSize=500){
    all.push(...batch);
    if(batch.length<pageSize)return all;
  }
- throw new Error('تجاوزت البيانات المركزية حد المعاينة الآمن');
+ throw new Error('تجاوزت البيانات المركزية حد التحميل الآمن');
 }
 async function fetchCentralPeriods(){
- const monthQuery='/rest/v1/commission_months?select=id,month_key,tiers,created_at,updated_at&order=month_key.asc';
- const rowQuery='/rest/v1/commission_rows?select=id,month_id,zone,name,p35,p45,p65,custom_tier,paid,payment_date,updated_at&order=zone.asc,name.asc';
- const [months,rows]=await Promise.all([fetchCentralPages(monthQuery),fetchCentralPages(rowQuery)]);
+ const monthQuery='/rest/v1/commission_months?is_visible=eq.true&status=eq.approved&select=id,month_key,tiers,created_at,updated_at&order=month_key.asc';
+ const expandedRowQuery='/rest/v1/commission_rows?select=id,month_id,zone,name,p35,p45,p65,custom_tier,tier_mode,tier_basis_qty,tier_group_id,tier_group_name,source_account,owner_name,paid,payment_date,updated_at&order=zone.asc,name.asc';
+ const legacyRowQuery='/rest/v1/commission_rows?select=id,month_id,zone,name,p35,p45,p65,custom_tier,paid,payment_date,updated_at&order=zone.asc,name.asc';
+ const months=await fetchCentralPages(monthQuery);let rows;
+ try{rows=await fetchCentralPages(expandedRowQuery)}catch(error){if(error?.status!==400)throw error;rows=await fetchCentralPages(legacyRowQuery)}
  return buildCentralPeriods(months,rows);
 }
 function buildCentralAuditLogs(rows,profiles){
  const profileById=new Map((profiles||[]).map(profile=>[String(profile.id),profile]));
  return (rows||[]).map(row=>{
-   const profile=profileById.get(String(row.actor_id||'')),before=row.before_data||{},after=row.after_data||{};
+   const profile=profileById.get(String(row.actor_id||'')),before=row.before_data||{},after=row.after_data||{},actionLabels={'commission.payment.recorded':'تسجيل صرف مركزي','commission.month.published':'اعتماد شهر مركزي','settings.import.saved':'حفظ إعدادات الربط المركزية'};
    const paymentAction=row.action==='commission.payment.recorded';
    return {
      id:row.id,
@@ -535,7 +682,7 @@ function buildCentralAuditLogs(rows,profiles){
      month:row.month_key||'',
      zone:row.zone||'',
      agent:row.agent||'',
-     action:paymentAction?'تسجيل صرف مركزي':row.action||'',
+     action:actionLabels[row.action]||row.action||'',
      field:paymentAction?'paid,payment_date':row.field||'',
      oldValue:paymentAction?`${before.paid??0} / ${before.payment_date||'—'}`:row.old_value||'',
      newValue:paymentAction?`${after.paid??0} / ${after.payment_date||'—'}`:row.new_value||'',
@@ -555,7 +702,7 @@ async function fetchCentralSnapshot(){
 }
 function applyCentralSnapshot(snapshot,preferredMonth){
  const months=[...snapshot.periods.keys()].sort(compareMonthKeys);
- if(!months.length)throw new Error('لا توجد أشهر في البيانات المركزية');
+ if(!months.length){centralPreview.months=[];state={month:monthKey(),data:clone(defaultData),tiers:clone(defaultTiers),archive:{},auditLog:clone(snapshot.auditLog),undo:null};hasUnsavedChanges=false;return}
  const selected=months.includes(preferredMonth)?preferredMonth:months[months.length-1];
  const archive={};snapshot.periods.forEach((period,month)=>archive[month]=clone(period));
  centralPreview.months=months;
@@ -563,32 +710,36 @@ function applyCentralSnapshot(snapshot,preferredMonth){
  hasUnsavedChanges=false;
 }
 function updateCentralPreviewUI(){
- const button=document.getElementById('centralPreviewButton'),banner=document.getElementById('centralPreviewBanner');
- if(!button||!banner)return;
- button.textContent=centralPreview.active?'↩️ الرجوع إلى النسخة المحلية':'☁️ فتح البيانات المركزية';
- button.classList.toggle('gold',centralPreview.active);
- document.getElementById('monthInput').disabled=centralPreview.active;
- document.getElementById('applyMonthButton').disabled=centralPreview.active;
- banner.classList.toggle('show',centralPreview.active);
- banner.innerHTML=centralPreview.active
-   ?`<b>البيانات المركزية المشتركة</b> — الصرف متاح للمدير والمحاسب ويُحفظ للجميع مع سجل تدقيق. بقية التعديل والحذف معطل. <button id="refreshCentralButton" class="smallbtn" onclick="refreshCentralData()">↻ تحديث</button> الأشهر: ${centralPreview.months.map(esc).join('، ')}.`
+ const button=document.getElementById('centralPreviewButton'),banner=document.getElementById('centralPreviewBanner'),status=document.getElementById('centralStatus');
+ if(!button||!banner||!status)return;
+ const updated=centralPreview.lastUpdatedAt?new Intl.DateTimeFormat('ar-IQ',{hour:'2-digit',minute:'2-digit'}).format(centralPreview.lastUpdatedAt):'';
+ button.textContent=centralPreview.active?'⚙ فتح وضع تجهيز الشهر':'☁ عرض البيانات المركزية';
+ document.getElementById('monthInput').disabled=false;
+ document.getElementById('applyMonthButton').disabled=false;
+ banner.classList.toggle('show',workspaceMode==='preparation');
+ banner.innerHTML=workspaceMode==='preparation'
+   ?'<b class="preparation-note">وضع تجهيز الشهر</b> — ارفع ملف التفعيلات، راجع التير والأسعار، ثم احفظ الشهر. هذه المساحة متاحة للإدارة فقط.'
    :'';
+ if(workspaceMode==='central')status.innerHTML=`<span class="status-dot"></span><span><b>البيانات المركزية</b><small>${updated?`آخر تحديث ${updated}`:'متصلة وجاهزة للاستخدام'}</small></span>`;
+ else if(workspaceMode==='preparation')status.innerHTML='<span class="status-dot" style="background:var(--yellow);box-shadow:0 0 10px var(--yellow)"></span><span><b>وضع تجهيز الشهر</b><small>خاص بالإدارة • غير معتمد مركزياً</small></span>';
+ else if(workspaceMode==='unavailable')status.innerHTML='<span class="status-dot" style="background:var(--red);box-shadow:0 0 10px var(--red)"></span><span><b>تعذر الاتصال بالمركز</b><small>أعد المحاولة أو راجع الاتصال</small></span>';
+ else status.innerHTML='<span class="status-dot"></span><span><b>جاري الاتصال</b><small>تحميل البيانات المركزية...</small></span>';
 }
-async function enterCentralPreview(){
+async function enterCentralPreview(silent=false){
  if(!authUser){showLogin();return}
  const button=document.getElementById('centralPreviewButton');
- button.disabled=true;button.textContent='جاري تحميل البيانات المركزية...';
+ setWorkspaceMode('loading');updateCentralPreviewUI();
+ if(button){button.disabled=true;button.textContent='جاري تحميل البيانات المركزية...'}
  try{
    if(!(await verifyCurrentUser()))return;
    const snapshot=await fetchCentralSnapshot();
-   centralPreview.localState=clone(state);
-   centralPreview.localUnsavedChanges=hasUnsavedChanges;
+   if(!centralPreview.localState){centralPreview.localState=clone(state);centralPreview.localUnsavedChanges=hasUnsavedChanges}
    applyCentralSnapshot(snapshot);
-   centralPreview.active=true;hasUnsavedChanges=false;
+   centralPreview.active=true;centralPreview.lastUpdatedAt=new Date();hasUnsavedChanges=false;setWorkspaceMode('central');
    applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
-   toast('تم تحميل البيانات المركزية المشتركة دون تغيير النسخة المحلية');
- }catch(error){console.error('Central data error:',error);toast(`تعذر تحميل البيانات المركزية: ${error.message||''}`)}
- finally{button.disabled=false;updateCentralPreviewUI()}
+   if(!silent)toast('تم تحديث البيانات المركزية');
+ }catch(error){console.error('Central data error:',error);centralPreview.active=false;setWorkspaceMode('unavailable');updateCentralPreviewUI();if(!silent)toast(`تعذر تحميل البيانات المركزية: ${error.message||''}`)}
+ finally{if(button)button.disabled=false;updateCentralPreviewUI()}
 }
 async function refreshCentralData(silent=false){
  if(!centralPreview.active)return;
@@ -596,6 +747,7 @@ async function refreshCentralData(silent=false){
  try{
    const selected=state.month,snapshot=await fetchCentralSnapshot();
    applyCentralSnapshot(snapshot,selected);
+   centralPreview.lastUpdatedAt=new Date();setWorkspaceMode('central');
    applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
    if(!silent)toast('تم تحديث البيانات المركزية وسجل التدقيق');
  }catch(error){console.error('Central refresh error:',error);if(!silent)toast(`تعذر تحديث البيانات المركزية: ${error.message||''}`);throw error}
@@ -606,10 +758,37 @@ function exitCentralPreview(silent=false){
  state=clone(centralPreview.localState);
  hasUnsavedChanges=centralPreview.localUnsavedChanges;
  centralPreview.active=false;centralPreview.localState=null;centralPreview.localUnsavedChanges=false;centralPreview.months=[];
+ setWorkspaceMode('preparation');
  applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
- if(!silent)toast('تم الرجوع إلى النسخة المحلية كما كانت');
+ if(!silent)toast('تم فتح وضع تجهيز الشهر للإدارة');
 }
-async function toggleCentralPreview(){if(centralPreview.active)exitCentralPreview();else await enterCentralPreview()}
+function prepareSelectedCentralMonth(){
+ if(!centralPreview.active||!roleAllows('edit'))return;
+ const selectedMonth=state.month;
+ const selectedSnapshot=state.archive[selectedMonth]||{data:state.data,tiers:state.tiers};
+ const localArchive=centralPreview.localState?.archive||{};
+ const centralArchive=state.archive||{};
+ state={
+  month:selectedMonth,
+  data:clone(selectedSnapshot.data),
+  tiers:clone(selectedSnapshot.tiers||defaultTiers),
+  archive:{...clone(localArchive),...clone(centralArchive)},
+  auditLog:clone(centralPreview.localState?.auditLog||[]),
+  undo:null
+ };
+ hasUnsavedChanges=false;
+ centralPreview.active=false;centralPreview.localState=null;centralPreview.localUnsavedChanges=false;centralPreview.months=[];
+ setWorkspaceMode('preparation');
+ applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
+ toast(`تم فتح شهر ${selectedMonth} للتعديل؛ لن تتغير البيانات المركزية حتى تضغط اعتماد الشهر مركزياً`);
+}
+function openPreparationMode(){
+ if(!roleAllows('edit'))return;
+ if(centralPreview.active){prepareSelectedCentralMonth();return}
+ setWorkspaceMode('preparation');applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
+ toast('تم فتح وضع تجهيز الشهر للإدارة');
+}
+async function toggleCentralPreview(){if(centralPreview.active)prepareSelectedCentralMonth();else await enterCentralPreview()}
 function fmt(n){return Math.round(Number(n)||0).toLocaleString('en-US')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function canEdit(){return hasPermission('edit')}
@@ -677,7 +856,7 @@ async function ensurePermission(permission){
       return false;
     }
 
-    if(centralPreview.active&&permission!=='payment'){
+    if(centralPreview.active&&!['payment','users','backup'].includes(permission)){
       toast('في البيانات المركزية يتاح الصرف فقط حالياً. بقية التعديل والحذف معطل.');
       return false;
     }
@@ -716,7 +895,7 @@ function renderManagedUsers(){
  document.getElementById('usersManagerBody').innerHTML=rows.map(u=>{
    const self=u.id===authUser?.id;
    return `<tr><td><b>${esc(u.full_name||'—')}</b>${self?' <span class="badge bpartial">حسابك</span>':''}</td><td dir="ltr">${esc(u.email||'—')}</td><td><select class="tier" onchange="updateManagedUser('${esc(u.id)}',{role:this.value})">${roleOptions(u.role)}</select><div class="muted" style="font-size:9px;margin-top:3px">${esc(describeRole(u.role))}</div></td><td><span class="${u.is_active?'status-active':'status-disabled'}">${u.is_active?'● مفعل':'● معطل'}</span></td><td><div class="user-actions"><button class="smallbtn ${u.is_active?'danger':''}" onclick="toggleManagedUser('${esc(u.id)}',${!!u.is_active})" ${self?'disabled title="لا يمكنك تعطيل حسابك"':''}>${u.is_active?'تعطيل':'تفعيل'}</button><button class="smallbtn" onclick="resetManagedUserPassword('${esc(u.id)}','${esc(u.email||'')}')">تغيير كلمة المرور</button></div></td></tr>`
- }).join('')||'<tr><td colspan="5" class="muted">لا توجد حسابات مطابقة.</td></tr>';
+ }).join('')||'<tr><td colspan="5" class="muted">لا توجد حسابات مطابقة.</td></tr>';applyLanguage();
 }
 async function createManagedUser(){
  const full_name=document.getElementById('newUserName').value.trim(),email=document.getElementById('newUserEmail').value.trim(),password=document.getElementById('newUserPassword').value,role=document.getElementById('newUserRole').value,b=document.getElementById('createUserButton');
@@ -746,7 +925,7 @@ function confirmDiscardUnsaved(){
  load();hasUnsavedChanges=false;updateUnsavedIndicator();return true;
 }
 function save(force=false){
- if(centralPreview.active){toast('لا يمكن الحفظ أثناء المعاينة المركزية');return}
+ if(centralPreview.active){toast('انتقل إلى وضع تجهيز الشهر لإجراء التعديلات');return}
  if(!force){markUnsaved();return}
  localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog}));
  localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data));
@@ -782,17 +961,18 @@ function renderAuditLog(){
  as.innerHTML='<option value="all">كل العمليات</option>'+actions.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');as.value=actions.includes(curA)?curA:'all';
  const filtered=logs.filter(x=>{const hay=[x.user,x.agent,x.field,x.oldValue,x.newValue,x.month,x.zone,x.action,x.extra].join(' ').toLowerCase();return(!search||hay.includes(search))&&(uf==='all'||x.user===uf)&&(af==='all'||x.action===af)});
  document.getElementById('auditStats').textContent=`إجمالي السجلات: ${logs.length.toLocaleString('en-US')} • الظاهر: ${filtered.length.toLocaleString('en-US')}`;
- document.getElementById('auditBody').innerHTML=filtered.map(x=>`<tr><td style="white-space:nowrap">${esc(auditDate(x.at))}</td><td><b>${esc(x.user)}</b></td><td>${esc(x.month)}</td><td>${esc(x.zone==='old'?'OLD':x.zone==='new'?'NEW':x.zone||'—')}</td><td>${esc(x.agent||'—')}</td><td><span class="badge ${x.action==='حذف'?'bpending':x.action==='إضافة'?'bpaid':'bpartial'}">${esc(x.action)}</span></td><td>${esc(fieldLabel(x.field))}</td><td>${esc(displayValue(x.oldValue))}</td><td>${esc(displayValue(x.newValue))}</td></tr>`).join('')||'<tr><td colspan="9" class="muted">لا توجد تعديلات مسجلة.</td></tr>';
+ document.getElementById('auditBody').innerHTML=filtered.map(x=>`<tr><td style="white-space:nowrap">${esc(auditDate(x.at))}</td><td><b>${esc(x.user)}</b></td><td>${esc(x.month)}</td><td>${esc(x.zone==='old'?'OLD':x.zone==='new'?'NEW':x.zone||'—')}</td><td>${esc(x.agent||'—')}</td><td><span class="badge ${x.action==='حذف'?'bpending':x.action==='إضافة'?'bpaid':'bpartial'}">${esc(x.action)}</span></td><td>${esc(fieldLabel(x.field))}</td><td>${esc(displayValue(x.oldValue))}</td><td>${esc(displayValue(x.newValue))}</td></tr>`).join('')||'<tr><td colspan="9" class="muted">لا توجد تعديلات مسجلة.</td></tr>';applyLanguage();
 }
 function exportAuditLog(){const rows=(state.auditLog||[]).map(x=>({DateTime:auditDate(x.at),User:x.user,Month:x.month,Zone:x.zone,Agent:x.agent,Action:x.action,Field:fieldLabel(x.field),Before:x.oldValue,After:x.newValue}));if(!rows.length){toast('لا يوجد سجل لتصديره');return}downloadCSV(rows,`audit_log_${state.month.replace('/','-')}.csv`)}
 function clearAuditLog(){if(!canDelete()){toast('ليس لديك صلاحية مسح السجل');return}if(!(state.auditLog||[]).length){toast('السجل فارغ');return}if(!confirm('مسح سجل التعديلات بالكامل؟'))return;state.auditLog=[];save();renderAuditLog();toast('تم مسح السجل')}
 async function applyMonthInput(){
- if(centralPreview.active){toast('اختر شهراً مركزياً من القائمة أثناء المعاينة');return}
  const raw=(document.getElementById('monthInput').value||'').trim(),m=raw.match(/^(0?[1-9]|1[0-2])[\/\-](\d{4})$/);
  if(!m){alert('اكتب الشهر بصيغة MM/YYYY مثل 08/2026');return}
+ const key=String(Number(m[1])).padStart(2,'0')+'/'+m[2];
+ if(centralPreview.active){const snapshot=state.archive[key];if(!snapshot){toast('هذا الشهر غير موجود في البيانات المركزية');syncMonthInput();return}state.month=key;state.data=clone(snapshot.data);state.tiers=clone(snapshot.tiers||defaultTiers);renderMonths();renderAll();syncMonthInput();toast(`تم عرض شهر ${key}`);return}
  if(!(await ensurePermission('edit')))return;
  if(!confirmDiscardUnsaved())return;
- const key=String(Number(m[1])).padStart(2,'0')+'/'+m[2];if(key===state.month){renderMonths();return}
+ if(key===state.month){renderMonths();return}
  const old=state.month;
  if(state.archive[key]){state.month=key;state.data=clone(state.archive[key].data);state.tiers=clone(state.archive[key].tiers||defaultTiers);audit('تغيير الشهر','','','الشهر',old,key)}
  else{state.month=key;audit('إنشاء شهر','','','الشهر',old,key)}
@@ -800,7 +980,9 @@ async function applyMonthInput(){
 }
 function syncMonthInput(){document.getElementById('monthInput').value=state.month}
 function tierFor(q,custom){if(custom&&custom!=='auto')return state.tiers.find(t=>t.key===custom)||null;if(q<=0)return null;return state.tiers.find(t=>q>=t.min&&q<=t.max)||state.tiers[state.tiers.length-1]}
-function calc(r){const p35=Number(r.p35)||0,p45=Number(r.p45)||0,p65=Number(r.p65)||0,qty=p35+p45+p65,t=tierFor(qty,r.customTier),total=t?(p35*t.p35+p45*t.p45+p65*t.p65):0,paid=Math.min(Math.max(Number(r.paid)||0,0),total);return{p35,p45,p65,qty,t,total,paid,remaining:Math.max(0,total-paid)}}
+function syncTierGroupBasis(groupId){if(!groupId)return;const group=(state.data?.old||[]).filter(row=>row.tierGroupId===groupId),total=group.reduce((sum,row)=>sum+(Number(row.p35)||0)+(Number(row.p45)||0)+(Number(row.p65)||0),0);group.forEach(row=>row.tierBasisQty=total)}
+function pooledTierQuantity(r,qty){return r.tierGroupId&&Number.isFinite(Number(r.tierBasisQty))?Number(r.tierBasisQty):qty}
+function calc(r){const p35=Number(r.p35)||0,p45=Number(r.p45)||0,p65=Number(r.p65)||0,qty=p35+p45+p65,tierQty=pooledTierQuantity(r,qty),tierChoice=r.customTier&&r.customTier!=='auto'?r.customTier:(r.appliedTier||'auto'),t=tierFor(tierQty,tierChoice),total=t?(p35*t.p35+p45*t.p45+p65*t.p65):0,paid=Math.min(Math.max(Number(r.paid)||0,0),total);return{p35,p45,p65,qty,tierQty,t,total,paid,remaining:Math.max(0,total-paid)}}
 function status(r){const c=calc(r);return c.paid<=0?'pending':c.paid>=c.total?'paid':'partial'}
 function renderSettings(){
  const el=document.getElementById('settings');el.innerHTML='';
@@ -822,6 +1004,19 @@ function renderSettings(){
    el.appendChild(d);
  }))
 }
+function renderRawImportSettings(){
+ const agentBody=document.getElementById('rawAgentConfigBody'),cabinetBody=document.getElementById('rawCabinetConfigBody');if(!agentBody||!cabinetBody||!rawImportConfig)return;const disabled=roleAllows('rates')?'':'disabled';
+ agentBody.innerHTML=rawImportConfig.agents.map((agent,index)=>`<tr><td><input ${disabled} value="${esc(agent.name)}" onchange="updateRawAgentConfig(${index},'name',this.value)"></td><td><input ${disabled} class="accounts-input" value="${esc((agent.accounts||[]).join(', '))}" onchange="updateRawAgentConfig(${index},'accounts',this.value)"></td><td><select ${disabled} onchange="updateRawAgentConfig(${index},'defaultTier',this.value)"><option value="auto" ${!agent.defaultTier||agent.defaultTier==='auto'?'selected':''}>تلقائي</option>${state.tiers.map(tier=>`<option value="${tier.key}" ${agent.defaultTier===tier.key?'selected':''}>${tier.label}</option>`).join('')}</select></td><td><button class="smallbtn" ${disabled} onclick="removeRawAgentConfig(${index})">✕</button></td></tr>`).join('');
+ cabinetBody.innerHTML=rawImportConfig.cabinetRanges.map((range,index)=>`<tr><td><input ${disabled} type="number" min="1" value="${range.from}" onchange="updateRawCabinetRange(${index},'from',this.value)"></td><td><input ${disabled} type="number" min="1" value="${range.to}" onchange="updateRawCabinetRange(${index},'to',this.value)"></td><td><select ${disabled} onchange="updateRawCabinetRange(${index},'ownerId',this.value)">${rawImportConfig.agents.map(agent=>`<option value="${agent.id}" ${range.ownerId===agent.id?'selected':''}>${esc(agent.name)}</option>`).join('')}</select></td><td><button class="smallbtn" ${disabled} onclick="removeRawCabinetRange(${index})">✕</button></td></tr>`).join('');applyLanguage();
+}
+function updateRawAgentConfig(index,field,value){if(!roleAllows('rates'))return;rawImportConfig.agents[index][field]=field==='accounts'?String(value).split(',').map(item=>item.trim()).filter(Boolean):value}
+function updateRawCabinetRange(index,field,value){if(!roleAllows('rates'))return;rawImportConfig.cabinetRanges[index][field]=field==='ownerId'?value:Math.max(1,Number(value)||1)}
+function addRawAgentConfig(){if(!roleAllows('rates'))return;const id=`agent-${Date.now()}`;rawImportConfig.agents.push({id,name:'وكيل جديد',accounts:[],defaultTier:'auto'});renderRawImportSettings()}
+function removeRawAgentConfig(index){if(!roleAllows('rates')||!confirm('حذف هذا الوكيل من إعدادات القراءة؟'))return;const id=rawImportConfig.agents[index]?.id;rawImportConfig.agents.splice(index,1);rawImportConfig.cabinetRanges=rawImportConfig.cabinetRanges.filter(range=>range.ownerId!==id);renderRawImportSettings()}
+function addRawCabinetRange(){if(!roleAllows('rates'))return;rawImportConfig.cabinetRanges.push({id:`range-${Date.now()}`,from:1,to:1,ownerId:rawImportConfig.agents[0]?.id||''});renderRawImportSettings()}
+function removeRawCabinetRange(index){if(!roleAllows('rates'))return;rawImportConfig.cabinetRanges.splice(index,1);renderRawImportSettings()}
+async function saveRawImportConfig(){if(!(await ensurePermission('rates')))return;try{validateRawImportConfig(rawImportConfig);localStorage.setItem(RAW_IMPORT_CONFIG_STORAGE,JSON.stringify(rawImportConfig));try{await sbRequest('/rest/v1/rpc/save_import_settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_value:rawImportConfig,p_request_id:createRequestId()})});toast('تم حفظ إعدادات الربط مركزياً')}catch(error){if(error?.status===404||error?.status===400)toast('تم حفظ الإعدادات للتجربة؛ يلزم تطبيق تحديث قاعدة البيانات للمشاركة المركزية');else throw error}}catch(error){alert(error.message)}}
+async function resetRawImportConfig(){if(!(await ensurePermission('rates'))||!confirm('استعادة إعدادات قراءة الملف الخام الافتراضية؟'))return;localStorage.removeItem(RAW_IMPORT_CONFIG_STORAGE);await loadRawImportConfig(true);renderRawImportSettings();toast('تمت استعادة الإعدادات الافتراضية')}
 function filtered(zone){
  const q=(document.getElementById('searchInput').value||'').trim().toLowerCase(),zf=document.getElementById('zoneFilter').value,sf=document.getElementById('statusFilter').value;
  if(zf!=='all'&&zf!==zone)return[];return state.data[zone].map((r,i)=>({r,i})).filter(x=>(!q||x.r.name.toLowerCase().includes(q))&&(sf==='all'||status(x.r)===sf))
@@ -836,7 +1031,7 @@ function renderZone(zone){
   <td><div class="qwrap"><button class="step" ${disabled} onclick="step('${zone}',${i},'p35',-1)">−</button><input class="qty" type="number" min="0" value="${c.p35}" ${disabled} onchange="setNum('${zone}',${i},'p35',this.value)"><button class="step" ${disabled} onclick="step('${zone}',${i},'p35',1)">+</button></div></td>
   <td><div class="qwrap"><button class="step" ${disabled} onclick="step('${zone}',${i},'p45',-1)">−</button><input class="qty" type="number" min="0" value="${c.p45}" ${disabled} onchange="setNum('${zone}',${i},'p45',this.value)"><button class="step" ${disabled} onclick="step('${zone}',${i},'p45',1)">+</button></div></td>
   <td><div class="qwrap"><button class="step" ${disabled} onclick="step('${zone}',${i},'p65',-1)">−</button><input class="qty" type="number" min="0" value="${c.p65}" ${disabled} onchange="setNum('${zone}',${i},'p65',this.value)"><button class="step" ${disabled} onclick="step('${zone}',${i},'p65',1)">+</button></div></td>
-  <td>${c.qty}</td><td><select class="tier" ${disabled} onchange="setField('${zone}',${i},'customTier',this.value)"><option value="auto" ${r.customTier==='auto'?'selected':''}>تلقائي (${c.t?c.t.label:'-'})</option><option value="t1" ${r.customTier==='t1'?'selected':''}>يدوي T1</option><option value="t2" ${r.customTier==='t2'?'selected':''}>يدوي T2</option><option value="t3" ${r.customTier==='t3'?'selected':''}>يدوي T3</option></select></td>
+  <td>${c.qty}</td><td><select class="tier" ${disabled} onchange="setField('${zone}',${i},'customTier',this.value)"><option value="auto" ${r.customTier==='auto'?'selected':''}>تلقائي${r.tierGroupId?' مجمّع':''} (${c.t?c.t.label:'-'})</option><option value="t1" ${r.customTier==='t1'?'selected':''}>يدوي T1</option><option value="t2" ${r.customTier==='t2'?'selected':''}>يدوي T2</option><option value="t3" ${r.customTier==='t3'?'selected':''}>يدوي T3</option></select>${r.tierGroupId?`<div class="muted" style="font-size:9px">مجموعة ${esc(r.tierGroupName)}: ${c.tierQty}</div>`:''}</td>
   <td class="money">${fmt(c.total)}</td><td>${fmt(c.paid)}</td><td class="money">${fmt(c.remaining)}</td><td><span class="badge ${stClass}">${stText}</span></td>
   <td><button class="smallbtn" ${payDisabled} title="${centralPreview.active?'حفظ الصرف مركزياً':'افتح البيانات المركزية للصرف'}" onclick="editPayment('${zone}',${i})">💳 صرف</button> <button class="smallbtn" onclick="details('${zone}',${i})">👁</button> <button class="smallbtn" ${delDisabled} onclick="removeAgent('${zone}',${i})">✕</button></td></tr>`
  });
@@ -845,11 +1040,23 @@ function renderZone(zone){
 function totals(){let x={old:{total:0,paid:0,rem:0,count:0},new:{total:0,paid:0,rem:0,count:0}},all=[];['old','new'].forEach(z=>state.data[z].forEach((r,i)=>{const c=calc(r);x[z].total+=c.total;x[z].paid+=c.paid;x[z].rem+=c.remaining;x[z].count++;all.push({r,i,z,c})}));x.grand={total:x.old.total+x.new.total,paid:x.old.paid+x.new.paid,rem:x.old.rem+x.new.rem,count:all.length};return{x,all}}
 function renderDashboard(){
  const {x,all}=totals();document.getElementById('grandTotal').textContent=fmt(x.grand.total);document.getElementById('oldTotal').textContent=fmt(x.old.total);document.getElementById('newTotal').textContent=fmt(x.new.total);document.getElementById('paidTotal').textContent=fmt(x.grand.paid);document.getElementById('remainingTotal').textContent=fmt(x.grand.rem);document.getElementById('agentCount').textContent=x.grand.count;
- const s={paid:0,partial:0,pending:0};all.forEach(a=>s[status(a.r)]++);document.getElementById('oldCount').textContent=x.old.count+' وكيل';document.getElementById('newCount').textContent=x.new.count+' وكيل';document.getElementById('statusSummary').textContent=`مدفوع ${s.paid} • جزئي ${s.partial} • غير مدفوع ${s.pending}`;
+ const s={paid:0,partial:0,pending:0};all.forEach(a=>s[status(a.r)]++);document.getElementById('oldCount').textContent=x.old.count+' حساب';document.getElementById('newCount').textContent=x.new.count+' كابينة';document.getElementById('statusSummary').textContent=`مدفوع ${s.paid} • جزئي ${s.partial} • غير مدفوع ${s.pending}`;
  document.getElementById('paymentSummary').innerHTML=`<div class="minirow"><span>🟢 مدفوع بالكامل</span><b>${s.paid}</b></div><div class="minirow"><span>🟡 مدفوع جزئياً</span><b>${s.partial}</b></div><div class="minirow"><span>🔴 غير مدفوع</span><b>${s.pending}</b></div><div class="minirow"><span>المتبقي</span><b class="money">${fmt(x.grand.rem)} د.ع</b></div>`;
  all.sort((a,b)=>b.c.total-a.c.total);document.getElementById('topAgents').innerHTML=all.slice(0,7).map((a,i)=>`<div class="minirow"><span>${i+1}. ${esc(a.r.name)} <small class="muted">(${a.z==='old'?'OLD':'NEW'})</small></span><b class="money">${fmt(a.c.total)}</b></div>`).join('')||'<span class="muted">لا توجد بيانات</span>'
 }
-function renderAll(){renderZone('old');renderZone('new');renderDashboard();renderSettings()}
+function periodSnapshot(month){if(month===state.month)return{data:state.data,tiers:state.tiers};return state.archive[month]||null}
+function calculatedPeriodRows(snapshot){if(!snapshot)return[];const backup=state.tiers;state.tiers=snapshot.tiers||defaultTiers;const rows=['old','new'].flatMap(zone=>(snapshot.data?.[zone]||[]).map(row=>({zone,row,calculated:calc(row)})));state.tiers=backup;return rows}
+function renderComparisons(){
+ const trend=document.getElementById('monthlyTrend'),movement=document.getElementById('agentMovement');if(!trend||!movement)return;
+ const months=[...new Set([...Object.keys(state.archive),state.month])].filter(month=>Number.isFinite(monthOrder(month))).sort(compareMonthKeys),summaries=months.map(month=>{const rows=calculatedPeriodRows(periodSnapshot(month));return{month,total:rows.reduce((sum,item)=>sum+item.calculated.total,0),qty:rows.reduce((sum,item)=>sum+item.calculated.qty,0)}});
+ trend.innerHTML=summaries.slice(-8).reverse().map((item,index,array)=>{const previous=summaries.find(summary=>monthOrder(summary.month)<monthOrder(item.month)&&summary.month===months[months.indexOf(item.month)-1]),delta=previous?item.total-previous.total:null,arrow=delta==null?'•':delta>0?'▲':delta<0?'▼':'■',cls=delta>0?'status-active':delta<0?'status-disabled':'muted';return`<div class="minirow"><span><b>${item.month}</b><small class="muted" style="display:block">${fmt(item.qty)} تفعيل</small></span><span style="text-align:left"><b class="money">${fmt(item.total)}</b>${delta==null?'':`<small class="${cls}" style="display:block">${arrow} ${fmt(Math.abs(delta))}</small>`}</span></div>`}).join('')||'<span class="muted">لا توجد أشهر محفوظة للمقارنة</span>';
+ const currentIndex=months.indexOf(state.month),previousMonth=currentIndex>0?months[currentIndex-1]:null;
+ if(!previousMonth){movement.innerHTML='<span class="muted">لا يوجد شهر سابق للمقارنة</span>';return}
+ const toMap=snapshot=>new Map(calculatedPeriodRows(snapshot).map(item=>[`${item.zone}:${item.row.name}`,{name:item.row.name,total:item.calculated.total}])),current=toMap(periodSnapshot(state.month)),previous=toMap(periodSnapshot(previousMonth)),changes=[];
+ new Set([...current.keys(),...previous.keys()]).forEach(key=>{const now=current.get(key),before=previous.get(key),change=(now?.total||0)-(before?.total||0);if(change)changes.push({name:now?.name||before?.name||key,change})});changes.sort((a,b)=>Math.abs(b.change)-Math.abs(a.change));
+ movement.innerHTML=`<div class="muted" style="font-size:10px;margin-bottom:7px">${previousMonth} ← ${state.month}</div>`+(changes.slice(0,7).map(item=>`<div class="minirow"><span>${esc(item.name)}</span><b class="${item.change>0?'status-active':'status-disabled'}">${item.change>0?'▲':'▼'} ${fmt(Math.abs(item.change))} د.ع</b></div>`).join('')||'<span class="muted">لا توجد تغييرات بين الشهرين</span>');
+}
+function renderAll(){renderZone('old');renderZone('new');renderDashboard();renderComparisons();renderSettings();applyLanguage()}
 async function setField(z,i,f,v){
   if(!(await ensurePermission('edit')))return;
   const r=state.data[z][i],old=r[f];
@@ -862,6 +1069,7 @@ async function setNum(z,i,f,v){
   if(!(await ensurePermission('edit')))return;
   const r=state.data[z][i],old=Number(r[f])||0,nv=Math.max(0,Number(v)||0);
   r[f]=nv;
+  syncTierGroupBasis(r.tierGroupId);
   audit('تعديل',z,r.name,f,old,nv);
   save();
   renderAll();
@@ -870,6 +1078,7 @@ async function step(z,i,f,d){
   if(!(await ensurePermission('edit')))return;
   const r=state.data[z][i],old=Number(r[f])||0,nv=Math.max(0,old+d);
   r[f]=nv;
+  syncTierGroupBasis(r.tierGroupId);
   audit('تعديل',z,r.name,f,old,nv);
   save();
   renderAll();
@@ -890,6 +1099,7 @@ async function removeAgent(z,i){
   state.undo={z,row:clone(r),index:i};
   audit('حذف',z,r.name,'الوكيل',JSON.stringify(r),'—');
   state.data[z].splice(i,1);
+  syncTierGroupBasis(r.tierGroupId);
   save();
   renderAll();
   toast('تم الحذف — يمكنك التراجع',true);
@@ -898,6 +1108,7 @@ async function undoDelete(){
   if(!(await ensurePermission('delete')) || !state.undo)return;
   const u=state.undo;
   state.data[u.z].splice(u.index,0,u.row);
+  syncTierGroupBasis(u.row.tierGroupId);
   audit('تراجع عن حذف',u.z,u.row.name,'الوكيل','محذوف',u.row.name);
   state.undo=null;
   save();
@@ -993,6 +1204,22 @@ function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'
 function monthOrder(key){const m=String(key||'').match(/^(0[1-9]|1[0-2])\/(\d{4})$/);if(!m)return NaN;return Number(m[2])*12+Number(m[1])-1}
 function compareMonthKeys(a,b){return monthOrder(a)-monthOrder(b)}
 function nextMonthKey(key){const order=monthOrder(key);if(!Number.isFinite(order))throw new Error(`صيغة شهر غير صالحة: ${key}`);const next=order+1,year=Math.floor(next/12),month=next%12+1;return String(month).padStart(2,'0')+'/'+year}
+function archivePeriodKeys(){return[...new Set([...Object.keys(state.archive||{}),state.month])].filter(key=>Number.isFinite(monthOrder(key))).sort(compareMonthKeys)}
+function archivePeriodSnapshot(month){if(month===state.month)return{data:clone(state.data),tiers:clone(state.tiers),savedAt:state.archive?.[month]?.savedAt||''};return state.archive?.[month]?clone(state.archive[month]):null}
+function archivePeriodMetrics(snapshot){const rows=calculatedPeriodRows(snapshot),qty=rows.reduce((sum,item)=>sum+item.calculated.qty,0),total=rows.reduce((sum,item)=>sum+item.calculated.total,0);return{rows:rows.length,qty,total}}
+function openArchiveManager(){if(!roleAllows('edit')){toast('إدارة الأرشيف متاحة لمسؤول النظام فقط');return}document.getElementById('archiveModal').classList.add('open');renderArchiveManager()}
+function closeArchiveManager(){document.getElementById('archiveModal').classList.remove('open')}
+function renderArchiveManager(){
+ const select=document.getElementById('archivePeriodSelect'),keys=archivePeriodKeys(),preferred=select.value||state.month;select.innerHTML=keys.map(key=>`<option value="${key}">${key}${key===state.month?' — الحالية':''}</option>`).join('');select.value=keys.includes(preferred)?preferred:(keys.includes(state.month)?state.month:keys.at(-1)||'');
+ const selected=select.value;document.getElementById('archiveManagerSummary').textContent=selected?`الفترة المختارة: ${selected} • المصدر: ${centralPreview.active?'البيانات المركزية':'وضع التجهيز'}`:'لا توجد فترات محفوظة';
+ document.getElementById('archiveManagerBody').innerHTML=keys.slice().reverse().map(key=>{const snapshot=archivePeriodSnapshot(key),metrics=archivePeriodMetrics(snapshot),saved=snapshot?.savedAt?auditDate(snapshot.savedAt):'—';return`<tr class="${key===selected?'selected-period':''}"><td><b>${key}</b>${key===state.month?' <span class="badge bpartial">الحالية</span>':''}</td><td>${fmt(metrics.rows)}</td><td>${fmt(metrics.qty)}</td><td class="money">${fmt(metrics.total)} د.ع</td><td>${esc(saved)}</td></tr>`}).join('')||'<tr><td colspan="5" class="muted">لا توجد فترات في الأرشيف.</td></tr>';applyLanguage()
+}
+async function openSelectedArchivePeriod(forEdit=false){
+ if(!roleAllows('edit')||!(await verifyCurrentUser()))return;
+ const month=document.getElementById('archivePeriodSelect').value;if(!centralPreview.active&&!confirmDiscardUnsaved())return;const snapshot=archivePeriodSnapshot(month);if(!snapshot){toast('الفترة المختارة غير موجودة');return}
+ state.month=month;state.data=clone(snapshot.data);state.tiers=clone(snapshot.tiers||defaultTiers);closeArchiveManager();renderMonths();renderAll();syncMonthInput();
+ if(forEdit&&centralPreview.active)prepareSelectedCentralMonth();else toast(forEdit?`تم فتح فترة ${month} للتعديل`:`تم عرض فترة ${month}`)
+}
 async function saveCurrentMonth(){
   if(!(await ensurePermission('edit')))return;
   state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};
@@ -1000,6 +1227,21 @@ async function saveCurrentMonth(){
   save(true);
   renderMonths();
   toast('تم حفظ جميع التعديلات للشهر مع الأسعار الحالية');
+}
+function rowsForCentralPublish(){return ['old','new'].flatMap(zone=>state.data[zone].map(row=>{const calculated=calc(row);if(!calculated.t)throw new Error(`تعذر تحديد التير للسجل ${row.name}`);return{zone,name:row.name,p35:calculated.p35,p45:calculated.p45,p65:calculated.p65,tier_mode:row.customTier||'auto',applied_tier:calculated.t.key,tier_basis_qty:calculated.tierQty,tier_group_id:row.tierGroupId||null,tier_group_name:row.tierGroupName||null,source_account:row.sourceAccount||null,owner_name:row.owner||null}}))}
+async function publishCurrentMonth(){
+ if(!(await ensurePermission('edit')))return;
+ if(centralPreview.active){toast('افتح وضع تجهيز الشهر أولاً');return}
+ if(!state.data.old.length&&!state.data.new.length){toast('لا توجد بيانات لاعتمادها');return}
+ if(!confirm(`اعتماد شهر ${state.month} مركزياً؟ سيتم تحديث بيانات الشهر لجميع المستخدمين مع الاحتفاظ بعمليات الصرف المسجلة.`))return;
+ const rows=rowsForCentralPublish(),button=document.querySelector('[onclick="publishCurrentMonth()"]');if(button){button.disabled=true;button.textContent='جاري الاعتماد...'}
+ try{
+  const result=await sbRequest('/rest/v1/rpc/publish_commission_month',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_month_key:state.month,p_tiers:state.tiers,p_rows:rows,p_request_id:createRequestId()})});
+  state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};save(true);renderMonths();
+  toast(result?.replayed?'الشهر معتمد مركزياً مسبقاً':'تم اعتماد الشهر مركزياً وأصبح متاحاً للجميع');
+  await enterCentralPreview(true);
+ }catch(error){console.error('Central month publish error:',error);if(error?.status===404||String(error?.message||'').includes('publish_commission_month'))toast('ميزة الاعتماد جاهزة في التطبيق وتحتاج تطبيق تحديث قاعدة البيانات على بيئة التجربة');else toast(`تعذر اعتماد الشهر مركزياً: ${error.message||''}`)}
+ finally{if(button){button.disabled=false;button.textContent='✓ اعتماد الشهر مركزياً'}}
 }
 function renderMonths(){const s=document.getElementById('monthSelect'),keys=[...new Set([state.month,...Object.keys(state.archive)])].sort(compareMonthKeys);s.innerHTML=keys.map(k=>`<option value="${k}" ${k===state.month?'selected':''}>${k}${state.archive[k]?' — محفوظ':''}</option>`).join('');syncMonthInput()}
 async function loadSelectedMonth(){
@@ -1035,6 +1277,36 @@ function rowsFor(zone){return state.data[zone].map(r=>{const c=calc(r);return{Zo
 function downloadCSV(rows,name){const keys=Object.keys(rows[0]||{Zone:'',Name:''}),text='\uFEFF'+[keys.map(csvEscape).join(','),...rows.map(r=>keys.map(k=>csvEscape(r[k])).join(','))].join('\r\n'),blob=new Blob([text],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
 function exportZone(z){downloadCSV(rowsFor(z),`${state.month.replace('/','-')}_${z}_commission.csv`)}
 function exportAll(){downloadCSV([...rowsFor('old'),...rowsFor('new')],`${state.month.replace('/','-')}_all_commissions.csv`)}
+function buildExcelReportWorkbook(){
+ if(typeof XLSX==='undefined')throw new Error('مكتبة Excel غير متاحة');
+ const workbook=XLSX.utils.book_new(),english=currentLanguage==='en',labels=english?{title:'Babil Agent Commission Report',month:'Month',generated:'Generated at',zone:'Zone',name:'Agent / Cabinet',quantity:'Quantity',tier:'Tier',groupQty:'Tier group quantity',due:'Due',paid:'Paid',remaining:'Remaining',status:'Status',paymentDate:'Payment date',parent:'Parent account',owner:'Owner',total:'Total commissions',activations:'Total activations',records:'Records',comparison:'Monthly comparison'}:{title:'تقرير عمولات وكلاء بابل',month:'الشهر',generated:'وقت إنشاء التقرير',zone:'المنطقة',name:'الوكيل / الكابينة',quantity:'الكمية',tier:'التير',groupQty:'كمية مجموعة التير',due:'المستحق',paid:'المدفوع',remaining:'المتبقي',status:'الحالة',paymentDate:'تاريخ الصرف',parent:'حساب parent',owner:'المالك',total:'إجمالي العمولات',activations:'إجمالي التفعيلات',records:'عدد السجلات',comparison:'مقارنة الأشهر'};
+ const flat=['old','new'].flatMap(zone=>state.data[zone].map(row=>({zone,row,calculated:calc(row)}))),settingsRows=state.tiers.map(tier=>[tier.key,tier.p35,tier.p45,tier.p65,tier.min,Number.isFinite(tier.max)?tier.max:'']),commissionRows=[[labels.zone,labels.name,'P35','P45','P65',labels.quantity,labels.tier,labels.groupQty,labels.due,labels.paid,labels.remaining,labels.status,labels.paymentDate,labels.parent,labels.owner]];
+ flat.forEach(({zone,row,calculated},index)=>{const excelRow=index+2;commissionRows.push([zone.toUpperCase(),row.name,calculated.p35,calculated.p45,calculated.p65,{f:`SUM(C${excelRow}:E${excelRow})`},calculated.t?.key||'',calculated.tierQty,{f:`C${excelRow}*VLOOKUP(G${excelRow},Settings!$A$2:$D$${settingsRows.length+1},2,FALSE)+D${excelRow}*VLOOKUP(G${excelRow},Settings!$A$2:$D$${settingsRows.length+1},3,FALSE)+E${excelRow}*VLOOKUP(G${excelRow},Settings!$A$2:$D$${settingsRows.length+1},4,FALSE)`},calculated.paid,{f:`MAX(0,I${excelRow}-J${excelRow})`},status(row),row.paymentDate||'',row.sourceAccount||'',row.owner||''])});
+ const commissions=XLSX.utils.aoa_to_sheet(commissionRows),lastRow=Math.max(2,commissionRows.length);commissions['!cols']=[{wch:10},{wch:28},{wch:9},{wch:9},{wch:9},{wch:11},{wch:9},{wch:18},{wch:16},{wch:16},{wch:16},{wch:14},{wch:14},{wch:28},{wch:22}];commissions['!autofilter']={ref:`A1:O${lastRow}`};commissions['!freeze']={xSplit:0,ySplit:1};for(let row=2;row<=lastRow;row++)['I','J','K'].forEach(column=>{if(commissions[`${column}${row}`])commissions[`${column}${row}`].z='#,##0'});
+ const settings=XLSX.utils.aoa_to_sheet([['Tier','P35','P45','P65','Min Qty','Max Qty'],...settingsRows]);settings['!cols']=[{wch:12},{wch:14},{wch:14},{wch:14},{wch:12},{wch:12}];
+ const summary=XLSX.utils.aoa_to_sheet([[labels.title],[labels.month,state.month],[labels.generated,new Date().toLocaleString(english?'en-GB':'ar-IQ')],[],[labels.total,{f:`SUM(Commissions!I2:I${lastRow})`}],[labels.paid,{f:`SUM(Commissions!J2:J${lastRow})`}],[labels.remaining,{f:`SUM(Commissions!K2:K${lastRow})`}],[labels.activations,{f:`SUM(Commissions!F2:F${lastRow})`}],[labels.records,flat.length]]);summary['!cols']=[{wch:28},{wch:22}];['B5','B6','B7'].forEach(cell=>{if(summary[cell])summary[cell].z='#,##0'});
+ const months=[...new Set([...Object.keys(state.archive),state.month])].filter(month=>Number.isFinite(monthOrder(month))).sort(compareMonthKeys),comparisonRows=[[labels.month,labels.total,labels.activations,english?'Change':'التغيير']];months.forEach((month,index)=>{const rows=calculatedPeriodRows(periodSnapshot(month)),excelRow=index+2;comparisonRows.push([month,rows.reduce((sum,item)=>sum+item.calculated.total,0),rows.reduce((sum,item)=>sum+item.calculated.qty,0),index?{f:`B${excelRow}-B${excelRow-1}`}:0])});const comparison=XLSX.utils.aoa_to_sheet(comparisonRows);comparison['!cols']=[{wch:14},{wch:20},{wch:18},{wch:20}];
+ XLSX.utils.book_append_sheet(workbook,summary,'Summary');XLSX.utils.book_append_sheet(workbook,commissions,'Commissions');XLSX.utils.book_append_sheet(workbook,comparison,'Comparison');XLSX.utils.book_append_sheet(workbook,settings,'Settings');workbook.Props={Title:labels.title,Subject:state.month,Author:authProfile?.full_name||authUser?.email||'HRINS',CreatedDate:new Date()};return workbook
+}
+function exportExcelReport(){try{const workbook=buildExcelReportWorkbook();XLSX.writeFile(workbook,`babil_commissions_${state.month.replace('/','-')}.xlsx`,{compression:true});toast(currentLanguage==='en'?'Excel report created':'تم إنشاء تقرير Excel المتكامل')}catch(error){console.error(error);toast(error.message||'تعذر إنشاء تقرير Excel')}}
+function validatePeriodArchiveSnapshot(snapshot,month){
+ if(!snapshot||typeof snapshot!=='object'||!snapshot.data||!Array.isArray(snapshot.data.old)||!Array.isArray(snapshot.data.new))throw new Error('بيانات الفترة غير مكتملة');
+ const tiers=normalizeCentralTiers(snapshot.tiers,month),data={old:[],new:[]};
+ for(const zone of ['old','new']){const seen=new Set();for(const source of snapshot.data[zone]){const name=String(source?.name||'').trim();if(!name||seen.has(name))throw new Error(`يوجد اسم مفقود أو مكرر في ${zone.toUpperCase()}`);seen.add(name);const row={...clone(source),name,p35:centralNumber(source.p35,`${month}.${name}.p35`,{integer:true}),p45:centralNumber(source.p45,`${month}.${name}.p45`,{integer:true}),p65:centralNumber(source.p65,`${month}.${name}.p65`,{integer:true}),paid:centralNumber(source.paid||0,`${month}.${name}.paid`),customTier:String(source.customTier||'auto'),appliedTier:source.appliedTier?String(source.appliedTier):''};if(!['auto','t1','t2','t3'].includes(row.customTier)||row.appliedTier&&!['t1','t2','t3'].includes(row.appliedTier))throw new Error(`تير غير صالح للسجل ${name}`);const ownQty=row.p35+row.p45+row.p65;if(source.tierBasisQty!=null){row.tierBasisQty=centralNumber(source.tierBasisQty,`${month}.${name}.tierBasisQty`,{integer:true});if(row.tierBasisQty<ownQty)throw new Error(`كمية مجموعة التير أقل من كمية السجل ${name}`)}if(row.paid>centralRowDue(tiers,row))throw new Error(`المدفوع يتجاوز المستحق للسجل ${name}`);data[zone].push(row)}}
+ return{data,tiers,savedAt:snapshot.savedAt||new Date().toISOString()}
+}
+async function createPeriodArchiveDocument(month,snapshot=archivePeriodSnapshot(month),exportedAt=new Date().toISOString()){if(!Number.isFinite(monthOrder(month))||!snapshot)throw new Error('الفترة المختارة غير صالحة');const normalized=validatePeriodArchiveSnapshot(snapshot,month),payload={month,snapshot:normalized};return{format:'babil-commission-period',version:1,exportedAt,exportedBy:currentUser(),integrity:{algorithm:'SHA-256',scope:'period',value:await sha256Hex(JSON.stringify(payload))},...payload}}
+async function verifyPeriodArchiveDocument(document){if(!document||document.format!=='babil-commission-period'||document.version!==1||document.integrity?.algorithm!=='SHA-256'||document.integrity?.scope!=='period'||!Number.isFinite(monthOrder(document.month))||!document.snapshot)return false;return(await sha256Hex(JSON.stringify({month:document.month,snapshot:document.snapshot})))===document.integrity.value}
+async function exportSelectedPeriodArchive(){
+ if(!(await ensurePermission('backup')))return;const month=document.getElementById('archivePeriodSelect').value||state.month;
+ try{const archiveDocument=await createPeriodArchiveDocument(month),blob=new Blob([JSON.stringify(archiveDocument,null,2)],{type:'application/json;charset=utf-8'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=`babil_period_${month.replace('/','-')}.json`;link.click();URL.revokeObjectURL(link.href);toast(`تم تصدير فترة ${month}`)}catch(error){console.error(error);toast(`تعذر تصدير الفترة: ${error.message||''}`)}
+}
+function preserveExistingCentralPayments(imported,existing){const index=new Map();for(const zone of ['old','new'])for(const row of existing?.data?.[zone]||[])index.set(`${zone}:${row.name}`,row);for(const zone of ['old','new'])imported.data[zone]=imported.data[zone].map(row=>{const current=index.get(`${zone}:${row.name}`);return current?.centralId?{...row,paid:current.paid,paymentDate:current.paymentDate||'',centralId:current.centralId,centralUpdatedAt:current.centralUpdatedAt||''}:row});return imported}
+async function importSelectedPeriodArchive(event){
+ const input=event.target,file=input.files?.[0];if(!file)return;
+ try{if(!roleAllows('edit')||!(await verifyCurrentUser()))throw new Error('الاستيراد متاح لمسؤول النظام فقط');if(file.size>10*1024*1024)throw new Error('حجم الملف أكبر من الحد المسموح');const document=JSON.parse(await file.text());if(!(await verifyPeriodArchiveDocument(document)))throw new Error('بصمة الملف غير صحيحة أو صيغة الملف غير مدعومة');const target=document.getElementById('archivePeriodSelect').value||state.month;if(document.month!==target)throw new Error(`الملف يخص ${document.month} بينما الفترة المختارة هي ${target}`);let snapshot=validatePeriodArchiveSnapshot(document.snapshot,target),existing=archivePeriodSnapshot(target);snapshot=preserveExistingCentralPayments(snapshot,existing);if(!confirm(`استيراد بيانات فترة ${target} إلى وضع التجهيز؟ لن تتغير البيانات المركزية قبل اعتماد الشهر.`))return;if(centralPreview.active){state.month=target;state.data=clone(existing.data);state.tiers=clone(existing.tiers||defaultTiers);prepareSelectedCentralMonth()}state.month=target;state.data=clone(snapshot.data);state.tiers=clone(snapshot.tiers);state.archive[target]=clone(snapshot);audit('استيراد أرشيف فترة','','','الفترة','',target,file.name);save(true);closeArchiveManager();renderMonths();renderAll();syncMonthInput();toast(`تم استيراد فترة ${target} إلى وضع التجهيز`)
+ }catch(error){console.error(error);alert(`فشل استيراد الفترة: ${error.message||''}`)}finally{input.value=''}
+}
 function backupStateSnapshot(source=state){return JSON.parse(JSON.stringify({month:source.month,data:source.data,tiers:source.tiers,archive:source.archive,auditLog:source.auditLog||[]}))}
 async function sha256Hex(value){const bytes=new TextEncoder().encode(value),digest=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('')}
 async function createBackupDocument(source=state,exportedAt=new Date().toISOString(),exportedBy=authProfile?.email||authUser?.email||authProfile?.full_name||'unknown'){
@@ -1048,11 +1320,17 @@ async function exportBackup(){
  try{const backup=await createBackupDocument(),blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json;charset=utf-8'}),a=document.createElement('a'),stamp=backup.exportedAt.replace(/[:.]/g,'-');a.href=URL.createObjectURL(blob);a.download=`babil_commission_backup_${stamp}.json`;a.click();URL.revokeObjectURL(a.href);toast('تم إنشاء النسخة الاحتياطية الآمنة')}
  catch(error){console.error(error);toast('تعذر إنشاء النسخة الاحتياطية')}
 }
+function hasRawColumns(rows){const keys=new Set(Object.keys(rows?.[0]||{}).map(key=>key.trim().toLowerCase()));return['id','parent','profile_name','lastname'].every(key=>keys.has(key))}
+function rawRowsFromWorkbook(workbook){for(const sheetName of workbook.SheetNames){const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{defval:''});if(rows.length&&hasRawColumns(rows))return{rows,sheetName}}throw new Error('لم أجد ورقة تحتوي الأعمدة id وparent وprofile_name وlastname')}
+function showRawImportReport(stats,sheetName){const report=document.getElementById('rawImportReport');report.innerHTML=`<b>تمت قراءة الملف الخام من ورقة ${esc(sheetName)}</b> — ${fmt(stats.sourceRows)} صف • ${fmt(stats.eligibleIds)} تفعيل مؤهل • ${fmt(stats.duplicateIds)} ID مكرر تم تجاهله • ${fmt(stats.ignoredProfiles)} باقة غير معتمدة • ${fmt(stats.exceptions.length)} حالة تحتاج مراجعة`;report.classList.add('show')}
 async function importFile(e){
-  if(!(await ensurePermission('edit'))){
-    e.target.value='';
-    return;
-  }const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{let rows=[];if(file.name.toLowerCase().endsWith('.csv'))rows=parseCSV(ev.target.result);else{if(typeof XLSX==='undefined')throw Error('XLSX library not loaded');const wb=XLSX.read(ev.target.result,{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})}if(!rows.length)throw Error('الملف فارغ');const mapped=rows.map(normalizeImport).filter(x=>x.name);if(!mapped.length)throw Error('لم أجد أسماء وكلاء في الملف');if(!confirm(`تم العثور على ${mapped.length} سجل. استبدال البيانات الحالية؟`))return;state.data={old:mapped.filter(x=>x.zone==='old'),new:mapped.filter(x=>x.zone==='new')};audit('استيراد بيانات','','','عدد السجلات','',mapped.length);save();renderAll();toast('تم استيراد البيانات بنجاح')}catch(err){alert('فشل الاستيراد: '+err.message)}e.target.value=''};if(file.name.toLowerCase().endsWith('.csv'))reader.readAsText(file,'UTF-8');else reader.readAsArrayBuffer(file)}
+  if(!(await ensurePermission('edit'))){e.target.value='';return}const file=e.target.files[0];if(!file)return;
+  try{if(typeof XLSX==='undefined')throw Error('XLSX library not loaded');const config=await loadRawImportConfig(),buffer=await file.arrayBuffer(),workbook=XLSX.read(buffer,{type:'array'}),source=rawRowsFromWorkbook(workbook),result=calculateRawImport(source.rows,config),totalRows=result.old.length+result.new.length;
+   if(!totalRows)throw new Error('لم ينتج عن الملف أي وكيل أو كابينة حسب الإعدادات الحالية');
+   const message=`تمت قراءة ${result.stats.sourceRows} صف وحساب ${result.stats.eligibleIds} تفعيل مؤهل.\nالنتيجة: ${result.old.length} حساب رئيسي/فرعي في OLD ZONE و${result.new.length} كابينة NEW ZONE.\n\nسيتم الاحتفاظ بالتير اليدوي والمدفوعات للسجلات الموجودة بنفس الاسم. هل تريد استبدال كميات الشهر الحالي؟`;
+   if(!confirm(message))return;applyRawImportResult(result);audit('استيراد ملف خام','','','عدد التفعيلات','',result.stats.eligibleIds,`الورقة: ${source.sheetName}`);save();renderAll();showRawImportReport(result.stats,source.sheetName);toast('تم حساب الملف الخام وتوزيع التفعيلات بنجاح')
+  }catch(error){console.error(error);alert('فشل استيراد الملف الخام: '+error.message)}finally{e.target.value=''}
+}
 function parseCSV(text){const lines=text.replace(/\r/g,'').split('\n').filter(Boolean),out=[],parse=s=>{let a=[],cur='',q=false;for(let i=0;i<s.length;i++){const ch=s[i];if(ch==='"'&&s[i+1]==='"'){cur+='"';i++;continue}if(ch==='"'){q=!q;continue}if(ch===','&&!q){a.push(cur);cur=''}else cur+=ch}a.push(cur);return a};const h=parse(lines[0]).map(x=>x.trim());for(let i=1;i<lines.length;i++){const a=parse(lines[i]),o={};h.forEach((k,j)=>o[k]=a[j]??'');out.push(o)}return out}
 function numFrom(o,keys){for(const k of keys){if(o[k]!==undefined&&o[k]!=='')return Number(String(o[k]).replace(/,/g,''))||0}return 0}
 function normalizeImport(o){const keys=Object.keys(o),get=names=>{const k=keys.find(x=>names.some(n=>x.trim().toLowerCase()===n.toLowerCase()));return k?o[k]:''},name=get(['Name','name','اسم الوكيل','اسم','FDT','fdt'])||o[keys[0]],zoneRaw=String(get(['Zone','zone','المنطقة'])||'').toLowerCase(),zone=zoneRaw.includes('new')||zoneRaw.includes('جديد')?'new':zoneRaw.includes('old')||zoneRaw.includes('قديم')?'old':String(name).toUpperCase().includes('FDT-')?'new':'old';return{name:String(name).trim(),p35:numFrom(o,['P35','p35','35']),p45:numFrom(o,['P45','p45','45']),p65:numFrom(o,['P65','p65','65']),paid:numFrom(o,['Paid','paid','المدفوع']),paymentDate:get(['PaymentDate','payment date','تاريخ الصرف'])||'',customTier:get(['Tier','tier','الفئة'])||'auto',zone}}
