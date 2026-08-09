@@ -262,7 +262,7 @@ function toggleLanguage(){currentLanguage=currentLanguage==='ar'?'en':'ar';local
 const SB_SESSION_KEY='hrins_supabase_session';
 const sbListeners=[];
 let sbRefreshPromise=null;
-function sbError(response,body){return {message:body?.msg||body?.message||body?.error_description||`خطأ بالخدمة (${response.status})`,status:response.status}}
+function sbError(response,body){return {message:body?.msg||body?.message||body?.error_description||body?.error||`خطأ بالخدمة (${response.status})`,status:response.status}}
 function getSbSession(){try{return JSON.parse(localStorage.getItem(SB_SESSION_KEY)||'null')}catch(_){return null}}
 function setSbSession(session){if(session)localStorage.setItem(SB_SESSION_KEY,JSON.stringify(session));else localStorage.removeItem(SB_SESSION_KEY);sbListeners.forEach(fn=>{try{fn(session?'SIGNED_IN':'SIGNED_OUT',session)}catch(_){}})}
 function sessionExpiresSoon(session,leewaySeconds=60){const expiresAt=Number(session?.expires_at);return Number.isFinite(expiresAt)&&expiresAt*1000<=Date.now()+leewaySeconds*1000}
