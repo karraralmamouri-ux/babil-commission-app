@@ -113,6 +113,7 @@ function loadCurrentApp(options = {}) {
     globalThis.__characterization = {
       calc,
       calculateRawImport,
+      syncTierGroupBasis,
       applyRawImportResult,
       backupStateSnapshot,
       applyCentralPaymentResult,

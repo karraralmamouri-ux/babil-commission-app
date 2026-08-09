@@ -69,6 +69,9 @@ test('central workspace is default, allows only audited payments, and preserves 
   assert.match(html, /البيانات المركزية/);
   assert.match(html, /class="sidebar"/);
   assert.match(html, /وضع تجهيز الشهر/);
+  assert.match(html, /العرض والمتابعة/);
+  assert.match(html, /تجهيز الشهر/);
+  assert.match(html, /عرض البيانات المركزية/);
   assert.match(html, /await enterCentralPreview\(true\)/);
   assert.doesNotMatch(html, /النسخة المحلية/);
   assert.match(html, /if\(p==='payment'\)return centralPreview\.active&&roleAllows\(p\)/);

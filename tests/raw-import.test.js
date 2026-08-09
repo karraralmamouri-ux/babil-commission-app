@@ -13,7 +13,7 @@ function config() {
   };
 }
 
-test('raw import counts unique ids and pools main and sub parent accounts in old zone', () => {
+test('raw import keeps main and sub accounts separate while sharing the pooled old-zone tier', () => {
   const app = loadCurrentApp();
   const result = app.calculateRawImport([
     { id: 1, parent: 'r.main', profile_name: 'p35000', lastname: 'FDT:20 FAT:1 PORT:1' },
@@ -22,10 +22,37 @@ test('raw import counts unique ids and pools main and sub parent accounts in old
     { id: 3, parent: 'r.main', profile_name: 'P-25000', lastname: 'FDT:20 FAT:1 PORT:2' },
   ], config());
 
-  assert.equal(result.old.length, 1);
-  assert.deepEqual(JSON.parse(JSON.stringify(result.old[0])), { name: 'Main agent', p35: 1, p45: 1, p65: 0, customTier: 'auto', paid: 0 });
+  assert.equal(result.old.length, 2);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.old.map(row => ({ name: row.name, p35: row.p35, p45: row.p45, tierBasisQty: row.tierBasisQty })))), [
+    { name: 'Main agent', p35: 1, p45: 0, tierBasisQty: 2 },
+    { name: 'Main agent sub1', p35: 0, p45: 1, tierBasisQty: 2 },
+  ]);
   assert.equal(result.stats.duplicateIds, 1);
   assert.equal(result.stats.ignoredProfiles, 1);
+});
+
+test('each old-zone account is priced with the tier selected from its whole principal group', () => {
+  const app = loadCurrentApp();
+  const rows = Array.from({ length: 201 }, (_, index) => ({
+    id: index + 1,
+    parent: index < 100 ? 'r.main' : 'r.main.sub1',
+    profile_name: 'P-35000',
+    lastname: 'FDT:20 FAT:1 PORT:1',
+  }));
+  const result = app.calculateRawImport(rows, config());
+  app.state.data = { old: result.old, new: [] };
+
+  assert.deepEqual(JSON.parse(JSON.stringify(result.old.map(row => row.tierBasisQty))), [201, 201]);
+  assert.equal(app.calc(result.old[0]).t.key, 't2');
+  assert.equal(app.calc(result.old[1]).t.key, 't2');
+  assert.equal(app.calc(result.old[0]).total, 100 * 4750);
+  assert.equal(app.calc(result.old[1]).total, 101 * 4750);
+
+  result.old[0].p35 += 200;
+  app.syncTierGroupBasis('main');
+  assert.equal(result.old[0].tierBasisQty, 401);
+  assert.equal(result.old[1].tierBasisQty, 401);
+  assert.equal(app.calc(result.old[1]).t.key, 't3');
 });
 
 test('new-zone cabinet ownership overrides parent and calculates each FDT separately', () => {
