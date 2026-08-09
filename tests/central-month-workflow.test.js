@@ -10,6 +10,8 @@ const migration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '202
 
 test('central month workflow stores group identity and shared import settings', () => {
   assert.match(migration, /add column tier_group_id text/);
+  assert.match(migration, /add column is_visible boolean not null default false/);
+  assert.match(migration, /alter column is_visible set default true/);
   assert.match(migration, /add column source_account text/);
   assert.match(migration, /add column tier_basis_qty integer/);
   assert.match(migration, /create table public\.app_settings/);
@@ -52,6 +54,7 @@ test('admin operations, manual month selection, language and Excel report are ex
   assert.match(html, /archive:\{\.\.\.clone\(localArchive\),\.\.\.clone\(centralArchive\)\}/);
   assert.match(html, /if\(centralPreview\.active\)\{prepareSelectedCentralMonth\(\);return\}/);
   assert.match(html, /const defaultData=\{old:\[\],new:\[\]\}/);
+  assert.match(html, /commission_months\?is_visible=eq\.true&status=eq\.approved/);
   assert.doesNotMatch(html, /\{name:'حيدر طالب',p35:/);
 });
 

@@ -613,7 +613,6 @@ function centralRowDue(tiers,row){
 }
 function buildCentralPeriods(months,rows){
  if(!Array.isArray(months)||!Array.isArray(rows))throw new Error('استجابة البيانات المركزية غير صالحة');
- if(!months.length)throw new Error('لا توجد أشهر مركزية متاحة');
  const periods=new Map(),monthById=new Map();
  months.forEach(month=>{
    const key=String(month?.month_key||'');
@@ -664,7 +663,7 @@ async function fetchCentralPages(path,pageSize=500){
  throw new Error('تجاوزت البيانات المركزية حد التحميل الآمن');
 }
 async function fetchCentralPeriods(){
- const monthQuery='/rest/v1/commission_months?select=id,month_key,tiers,created_at,updated_at&order=month_key.asc';
+ const monthQuery='/rest/v1/commission_months?is_visible=eq.true&status=eq.approved&select=id,month_key,tiers,created_at,updated_at&order=month_key.asc';
  const expandedRowQuery='/rest/v1/commission_rows?select=id,month_id,zone,name,p35,p45,p65,custom_tier,tier_mode,tier_basis_qty,tier_group_id,tier_group_name,source_account,owner_name,paid,payment_date,updated_at&order=zone.asc,name.asc';
  const legacyRowQuery='/rest/v1/commission_rows?select=id,month_id,zone,name,p35,p45,p65,custom_tier,paid,payment_date,updated_at&order=zone.asc,name.asc';
  const months=await fetchCentralPages(monthQuery);let rows;
@@ -703,7 +702,7 @@ async function fetchCentralSnapshot(){
 }
 function applyCentralSnapshot(snapshot,preferredMonth){
  const months=[...snapshot.periods.keys()].sort(compareMonthKeys);
- if(!months.length)throw new Error('لا توجد أشهر في البيانات المركزية');
+ if(!months.length){centralPreview.months=[];state={month:monthKey(),data:clone(defaultData),tiers:clone(defaultTiers),archive:{},auditLog:clone(snapshot.auditLog),undo:null};hasUnsavedChanges=false;return}
  const selected=months.includes(preferredMonth)?preferredMonth:months[months.length-1];
  const archive={};snapshot.periods.forEach((period,month)=>archive[month]=clone(period));
  centralPreview.months=months;

@@ -5,8 +5,13 @@ begin;
 
 alter table public.commission_months
   add column status text not null default 'approved',
+  add column is_visible boolean not null default false,
   add column approved_by uuid references auth.users(id),
   add column approved_at timestamptz;
+
+-- Existing periods remain recoverable but are hidden from the new clean launch.
+-- Periods created after this migration are visible by default.
+alter table public.commission_months alter column is_visible set default true;
 
 alter table public.commission_months
   add constraint commission_months_status_check
@@ -231,13 +236,14 @@ begin
   where m.month_key = p_month_key;
 
   insert into public.commission_months (
-    month_key, tiers, status, approved_by, approved_at, created_by, updated_by
+    month_key, tiers, status, is_visible, approved_by, approved_at, created_by, updated_by
   ) values (
-    p_month_key, p_tiers, 'approved', v_actor, now(), v_actor, v_actor
+    p_month_key, p_tiers, 'approved', true, v_actor, now(), v_actor, v_actor
   )
   on conflict (month_key) do update
   set tiers = excluded.tiers,
       status = 'approved',
+      is_visible = true,
       approved_by = v_actor,
       approved_at = now(),
       updated_by = v_actor,

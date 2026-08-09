@@ -47,6 +47,12 @@ test('central export is validated and converted into the existing view model', (
   assert.equal(period.tiers[2].max, null);
 });
 
+test('a clean central launch accepts no visible periods', () => {
+  const { buildCentralPeriods } = loadCurrentApp();
+  const periods = buildCentralPeriods([], []);
+  assert.equal(periods.size, 0);
+});
+
 test('central preview rejects invalid financial rows before rendering', () => {
   const { buildCentralPeriods } = loadCurrentApp();
   const { months, rows } = centralFixture();
