@@ -124,6 +124,7 @@ function loadCurrentApp(options = {}) {
       buildCentralPeriods,
       compareMonthKeys,
       createBackupDocument,
+      createPeriodArchiveDocument,
       defaultData,
       defaultTiers,
       getSbSession,
@@ -133,6 +134,7 @@ function loadCurrentApp(options = {}) {
       nextMonthKey,
       normalizeImport,
       parseCSV,
+      preserveExistingCentralPayments,
       recordCentralPayment,
       rowsForCentralPublish,
       refreshSbSession,
@@ -142,7 +144,9 @@ function loadCurrentApp(options = {}) {
       state,
       status,
       tierFor,
-      verifyBackupDocument
+      validatePeriodArchiveSnapshot,
+      verifyBackupDocument,
+      verifyPeriodArchiveDocument
     };
   `;
 

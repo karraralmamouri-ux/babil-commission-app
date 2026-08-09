@@ -85,6 +85,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   <div class="side-label">إدارة النظام</div>
   <div class="side-actions">
    <button id="refreshCentralSidebarButton" class="side-btn central-only" onclick="refreshCentralData()">↻ تحديث البيانات المركزية</button>
+   <button class="side-btn" data-role-permission="edit" onclick="openArchiveManager()">🗄 إدارة الأرشيف</button>
    <button class="side-btn" data-role-permission="users" onclick="openUserManagement()">👥 المستخدمون والصلاحيات</button>
    <button class="side-btn" data-permission="backup" onclick="exportBackup()">🛡 تنزيل نسخة احتياطية</button>
    <button id="languageButton" class="side-btn" onclick="toggleLanguage()">EN English</button>
@@ -207,6 +208,21 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  <div style="overflow:auto"><table class="users-table"><thead><tr><th>الاسم</th><th>البريد</th><th>الدور والصلاحيات</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody id="usersManagerBody"></tbody></table></div>
 </div></div>
 
+<div id="archiveModal" class="modal" onclick="if(event.target===this)closeArchiveManager()"><div class="modalbox" style="width:min(1000px,100%)">
+ <div class="modalhead"><h2>🗄 إدارة أرشيف الفترات</h2><button class="close" onclick="closeArchiveManager()">×</button></div>
+ <p class="muted" style="font-size:11px;margin-top:0">اختر الفترة لعرضها أو تعديلها أو تصدير نسخة مستقلة منها. الاستيراد لا ينشر مركزياً إلا بعد المراجعة والاعتماد.</p>
+ <div class="toolbar" style="margin-bottom:12px">
+  <select id="archivePeriodSelect" class="select" onchange="renderArchiveManager()"></select>
+  <button class="btn" onclick="openSelectedArchivePeriod(false)">👁 عرض الفترة</button>
+  <button class="btn gold" onclick="openSelectedArchivePeriod(true)">✎ فتح للتعديل</button>
+  <button class="btn" onclick="exportSelectedPeriodArchive()">⇩ تصدير الفترة</button>
+  <button class="btn green" onclick="document.getElementById('periodArchiveInput').click()">⇧ استيراد للفترة المختارة</button>
+  <input id="periodArchiveInput" type="file" accept="application/json,.json" hidden onchange="importSelectedPeriodArchive(event)">
+ </div>
+ <div id="archiveManagerSummary" class="muted" style="font-size:11px;margin-bottom:10px"></div>
+ <div style="overflow:auto"><table style="min-width:760px"><thead><tr><th>الفترة</th><th>الحسابات</th><th>التفعيلات</th><th>إجمالي العمولات</th><th>آخر حفظ</th></tr></thead><tbody id="archiveManagerBody"></tbody></table></div>
+</div></div>
+
 <div id="modal" class="modal" onclick="if(event.target===this)closeModal()"><div class="modalbox">
  <div class="modalhead"><h2 id="modalTitle">تفاصيل الوكيل</h2><button class="close" onclick="closeModal()">×</button></div>
  <div id="modalBody"></div>
@@ -225,7 +241,7 @@ const TEXT_PAIRS=[
  ['لوحة عمولات الوكلاء','Agent Commissions Dashboard'],['تسجيل الدخول إلى النظام','Sign in to the system'],['البريد الإلكتروني','Email'],['كلمة المرور','Password'],['تسجيل الدخول','Sign in'],['متابعة العمولات والصرف والأداء الشهري من مصدر مركزي واحد','Monitor commissions, payments, and monthly performance from one central source'],
  ['العرض والمتابعة','View & monitor'],['ملخص العمولات','Commission summary'],['تفاصيل الوكلاء والكابينات','Agents & cabinets'],['سجل العمليات','Activity log'],['التقارير','Reports'],['تصدير تقرير العمولات','Export commission report'],['تقرير Excel متكامل','Full Excel report'],['مقارنة الأشهر','Monthly comparison'],
  ['تجهيز الشهر','Prepare month'],['فتح وضع تجهيز الشهر','Open month preparation'],['استيراد ملف التفعيلات الخام','Import raw activations'],['حفظ بيانات الشهر','Save month draft'],['اعتماد الشهر مركزياً','Publish month centrally'],['اختيار أو تعديل شهر محفوظ','Select or edit saved month'],['إنشاء الشهر التالي','Create next month'],['أسعار العمولات والتير','Rates & tiers'],['ربط الوكلاء والكابينات','Agent & cabinet mapping'],
- ['إدارة النظام','System administration'],['تحديث البيانات المركزية','Refresh central data'],['المستخدمون والصلاحيات','Users & permissions'],['تنزيل نسخة احتياطية','Download backup'],['تسجيل الخروج','Sign out'],
+ ['إدارة النظام','System administration'],['تحديث البيانات المركزية','Refresh central data'],['إدارة الأرشيف','Archive management'],['إدارة أرشيف الفترات','Period archive management'],['المستخدمون والصلاحيات','Users & permissions'],['تنزيل نسخة احتياطية','Download backup'],['تسجيل الخروج','Sign out'],
  ['إدارة العمولات • الصرف • الأرشيف • الأداء الشهري','Commission management • payments • archive • monthly performance'],['الشهر:','Month:'],['تطبيق','Apply'],['كل المناطق','All zones'],['كل حالات الصرف','All payment statuses'],['غير مدفوع','Unpaid'],['مدفوع جزئياً','Partially paid'],['مدفوع','Paid'],
  ['إجمالي العمولات','Total commissions'],['إجمالي المدفوع','Total paid'],['المتبقي','Remaining'],['عدد السجلات','Records'],['أعلى الوكلاء بالعمولة','Top commissions'],['حالة الصرف','Payment status'],['حركة العمولات بين الأشهر','Monthly commission movement'],['صعود ونزول الوكلاء','Agent increases and decreases'],
  ['إعدادات أسعار العمولات','Commission rate settings'],['إعدادات قراءة الملف الخام','Raw import settings'],['الوكلاء وحسابات parent التابعة لهم','Agents and their parent accounts'],['نطاقات كابينات الزون الجديد','New-zone cabinet ranges'],['إضافة وكيل','Add agent'],['إضافة نطاق','Add range'],['استعادة الافتراضي','Restore defaults'],['حفظ إعدادات القراءة','Save import settings'],
@@ -1189,6 +1205,22 @@ function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'
 function monthOrder(key){const m=String(key||'').match(/^(0[1-9]|1[0-2])\/(\d{4})$/);if(!m)return NaN;return Number(m[2])*12+Number(m[1])-1}
 function compareMonthKeys(a,b){return monthOrder(a)-monthOrder(b)}
 function nextMonthKey(key){const order=monthOrder(key);if(!Number.isFinite(order))throw new Error(`صيغة شهر غير صالحة: ${key}`);const next=order+1,year=Math.floor(next/12),month=next%12+1;return String(month).padStart(2,'0')+'/'+year}
+function archivePeriodKeys(){return[...new Set([...Object.keys(state.archive||{}),state.month])].filter(key=>Number.isFinite(monthOrder(key))).sort(compareMonthKeys)}
+function archivePeriodSnapshot(month){if(month===state.month)return{data:clone(state.data),tiers:clone(state.tiers),savedAt:state.archive?.[month]?.savedAt||''};return state.archive?.[month]?clone(state.archive[month]):null}
+function archivePeriodMetrics(snapshot){const rows=calculatedPeriodRows(snapshot),qty=rows.reduce((sum,item)=>sum+item.calculated.qty,0),total=rows.reduce((sum,item)=>sum+item.calculated.total,0);return{rows:rows.length,qty,total}}
+function openArchiveManager(){if(!roleAllows('edit')){toast('إدارة الأرشيف متاحة لمسؤول النظام فقط');return}document.getElementById('archiveModal').classList.add('open');renderArchiveManager()}
+function closeArchiveManager(){document.getElementById('archiveModal').classList.remove('open')}
+function renderArchiveManager(){
+ const select=document.getElementById('archivePeriodSelect'),keys=archivePeriodKeys(),preferred=select.value||state.month;select.innerHTML=keys.map(key=>`<option value="${key}">${key}${key===state.month?' — الحالية':''}</option>`).join('');select.value=keys.includes(preferred)?preferred:(keys.includes(state.month)?state.month:keys.at(-1)||'');
+ const selected=select.value;document.getElementById('archiveManagerSummary').textContent=selected?`الفترة المختارة: ${selected} • المصدر: ${centralPreview.active?'البيانات المركزية':'وضع التجهيز'}`:'لا توجد فترات محفوظة';
+ document.getElementById('archiveManagerBody').innerHTML=keys.slice().reverse().map(key=>{const snapshot=archivePeriodSnapshot(key),metrics=archivePeriodMetrics(snapshot),saved=snapshot?.savedAt?auditDate(snapshot.savedAt):'—';return`<tr class="${key===selected?'selected-period':''}"><td><b>${key}</b>${key===state.month?' <span class="badge bpartial">الحالية</span>':''}</td><td>${fmt(metrics.rows)}</td><td>${fmt(metrics.qty)}</td><td class="money">${fmt(metrics.total)} د.ع</td><td>${esc(saved)}</td></tr>`}).join('')||'<tr><td colspan="5" class="muted">لا توجد فترات في الأرشيف.</td></tr>';applyLanguage()
+}
+async function openSelectedArchivePeriod(forEdit=false){
+ if(!roleAllows('edit')||!(await verifyCurrentUser()))return;
+ const month=document.getElementById('archivePeriodSelect').value;if(!centralPreview.active&&!confirmDiscardUnsaved())return;const snapshot=archivePeriodSnapshot(month);if(!snapshot){toast('الفترة المختارة غير موجودة');return}
+ state.month=month;state.data=clone(snapshot.data);state.tiers=clone(snapshot.tiers||defaultTiers);closeArchiveManager();renderMonths();renderAll();syncMonthInput();
+ if(forEdit&&centralPreview.active)prepareSelectedCentralMonth();else toast(forEdit?`تم فتح فترة ${month} للتعديل`:`تم عرض فترة ${month}`)
+}
 async function saveCurrentMonth(){
   if(!(await ensurePermission('edit')))return;
   state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};
@@ -1258,6 +1290,24 @@ function buildExcelReportWorkbook(){
  XLSX.utils.book_append_sheet(workbook,summary,'Summary');XLSX.utils.book_append_sheet(workbook,commissions,'Commissions');XLSX.utils.book_append_sheet(workbook,comparison,'Comparison');XLSX.utils.book_append_sheet(workbook,settings,'Settings');workbook.Props={Title:labels.title,Subject:state.month,Author:authProfile?.full_name||authUser?.email||'HRINS',CreatedDate:new Date()};return workbook
 }
 function exportExcelReport(){try{const workbook=buildExcelReportWorkbook();XLSX.writeFile(workbook,`babil_commissions_${state.month.replace('/','-')}.xlsx`,{compression:true});toast(currentLanguage==='en'?'Excel report created':'تم إنشاء تقرير Excel المتكامل')}catch(error){console.error(error);toast(error.message||'تعذر إنشاء تقرير Excel')}}
+function validatePeriodArchiveSnapshot(snapshot,month){
+ if(!snapshot||typeof snapshot!=='object'||!snapshot.data||!Array.isArray(snapshot.data.old)||!Array.isArray(snapshot.data.new))throw new Error('بيانات الفترة غير مكتملة');
+ const tiers=normalizeCentralTiers(snapshot.tiers,month),data={old:[],new:[]};
+ for(const zone of ['old','new']){const seen=new Set();for(const source of snapshot.data[zone]){const name=String(source?.name||'').trim();if(!name||seen.has(name))throw new Error(`يوجد اسم مفقود أو مكرر في ${zone.toUpperCase()}`);seen.add(name);const row={...clone(source),name,p35:centralNumber(source.p35,`${month}.${name}.p35`,{integer:true}),p45:centralNumber(source.p45,`${month}.${name}.p45`,{integer:true}),p65:centralNumber(source.p65,`${month}.${name}.p65`,{integer:true}),paid:centralNumber(source.paid||0,`${month}.${name}.paid`),customTier:String(source.customTier||'auto'),appliedTier:source.appliedTier?String(source.appliedTier):''};if(!['auto','t1','t2','t3'].includes(row.customTier)||row.appliedTier&&!['t1','t2','t3'].includes(row.appliedTier))throw new Error(`تير غير صالح للسجل ${name}`);const ownQty=row.p35+row.p45+row.p65;if(source.tierBasisQty!=null){row.tierBasisQty=centralNumber(source.tierBasisQty,`${month}.${name}.tierBasisQty`,{integer:true});if(row.tierBasisQty<ownQty)throw new Error(`كمية مجموعة التير أقل من كمية السجل ${name}`)}if(row.paid>centralRowDue(tiers,row))throw new Error(`المدفوع يتجاوز المستحق للسجل ${name}`);data[zone].push(row)}}
+ return{data,tiers,savedAt:snapshot.savedAt||new Date().toISOString()}
+}
+async function createPeriodArchiveDocument(month,snapshot=archivePeriodSnapshot(month),exportedAt=new Date().toISOString()){if(!Number.isFinite(monthOrder(month))||!snapshot)throw new Error('الفترة المختارة غير صالحة');const normalized=validatePeriodArchiveSnapshot(snapshot,month),payload={month,snapshot:normalized};return{format:'babil-commission-period',version:1,exportedAt,exportedBy:currentUser(),integrity:{algorithm:'SHA-256',scope:'period',value:await sha256Hex(JSON.stringify(payload))},...payload}}
+async function verifyPeriodArchiveDocument(document){if(!document||document.format!=='babil-commission-period'||document.version!==1||document.integrity?.algorithm!=='SHA-256'||document.integrity?.scope!=='period'||!Number.isFinite(monthOrder(document.month))||!document.snapshot)return false;return(await sha256Hex(JSON.stringify({month:document.month,snapshot:document.snapshot})))===document.integrity.value}
+async function exportSelectedPeriodArchive(){
+ if(!(await ensurePermission('backup')))return;const month=document.getElementById('archivePeriodSelect').value||state.month;
+ try{const archiveDocument=await createPeriodArchiveDocument(month),blob=new Blob([JSON.stringify(archiveDocument,null,2)],{type:'application/json;charset=utf-8'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=`babil_period_${month.replace('/','-')}.json`;link.click();URL.revokeObjectURL(link.href);toast(`تم تصدير فترة ${month}`)}catch(error){console.error(error);toast(`تعذر تصدير الفترة: ${error.message||''}`)}
+}
+function preserveExistingCentralPayments(imported,existing){const index=new Map();for(const zone of ['old','new'])for(const row of existing?.data?.[zone]||[])index.set(`${zone}:${row.name}`,row);for(const zone of ['old','new'])imported.data[zone]=imported.data[zone].map(row=>{const current=index.get(`${zone}:${row.name}`);return current?.centralId?{...row,paid:current.paid,paymentDate:current.paymentDate||'',centralId:current.centralId,centralUpdatedAt:current.centralUpdatedAt||''}:row});return imported}
+async function importSelectedPeriodArchive(event){
+ const input=event.target,file=input.files?.[0];if(!file)return;
+ try{if(!roleAllows('edit')||!(await verifyCurrentUser()))throw new Error('الاستيراد متاح لمسؤول النظام فقط');if(file.size>10*1024*1024)throw new Error('حجم الملف أكبر من الحد المسموح');const document=JSON.parse(await file.text());if(!(await verifyPeriodArchiveDocument(document)))throw new Error('بصمة الملف غير صحيحة أو صيغة الملف غير مدعومة');const target=document.getElementById('archivePeriodSelect').value||state.month;if(document.month!==target)throw new Error(`الملف يخص ${document.month} بينما الفترة المختارة هي ${target}`);let snapshot=validatePeriodArchiveSnapshot(document.snapshot,target),existing=archivePeriodSnapshot(target);snapshot=preserveExistingCentralPayments(snapshot,existing);if(!confirm(`استيراد بيانات فترة ${target} إلى وضع التجهيز؟ لن تتغير البيانات المركزية قبل اعتماد الشهر.`))return;if(centralPreview.active){state.month=target;state.data=clone(existing.data);state.tiers=clone(existing.tiers||defaultTiers);prepareSelectedCentralMonth()}state.month=target;state.data=clone(snapshot.data);state.tiers=clone(snapshot.tiers);state.archive[target]=clone(snapshot);audit('استيراد أرشيف فترة','','','الفترة','',target,file.name);save(true);closeArchiveManager();renderMonths();renderAll();syncMonthInput();toast(`تم استيراد فترة ${target} إلى وضع التجهيز`)
+ }catch(error){console.error(error);alert(`فشل استيراد الفترة: ${error.message||''}`)}finally{input.value=''}
+}
 function backupStateSnapshot(source=state){return JSON.parse(JSON.stringify({month:source.month,data:source.data,tiers:source.tiers,archive:source.archive,auditLog:source.auditLog||[]}))}
 async function sha256Hex(value){const bytes=new TextEncoder().encode(value),digest=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('')}
 async function createBackupDocument(source=state,exportedAt=new Date().toISOString(),exportedBy=authProfile?.email||authUser?.email||authProfile?.full_name||'unknown'){
