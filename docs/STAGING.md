@@ -1,6 +1,6 @@
 # بيئة Staging
 
-آخر تحقق: 2026-08-04
+آخر تحقق: 2026-08-09
 
 ## الهوية والنطاق
 
@@ -16,10 +16,13 @@
 - migration `20260804183000_harden_authorization.sql`.
 - migration `20260804203000_add_nonnegative_financial_constraints.sql`.
 - migration `20260804230000_add_atomic_financial_rpcs.sql`.
+- migration `20260809190000_add_central_month_workflow.sql`.
 - Edge Function `admin-users` مع التحقق من JWT.
 - لم تُنشر `admin-create-user` القديمة لأنها غير مستخدمة وJWT معطل في نسختها التاريخية.
 
 أُعيد ضبط Staging وبناؤه بالكامل من migrations، ثم ظهر الإصداران متطابقين محلياً وبعيداً في سجل Supabase.
+
+في 2026-08-09 طُبقت مهاجرة سير عمل الشهر المركزي يدوياً من الملف المراجع وسُجل إصدارها. تحقق بعدها وجود جدول الإعدادات ودالتي الاعتماد والحفظ، مع صفر فترات ظاهرة على Staging.
 
 ## تحقق التطابق مع الإنتاج
 
