@@ -24,6 +24,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 .users-table{min-width:780px}.users-table td{padding:9px 6px}.user-actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}.status-active{color:var(--green)}.status-disabled{color:var(--red)}
 .unsaved{display:none;color:var(--yellow);font-size:10px;font-weight:800}.unsaved.show{display:inline-block}
 .mode-banner{display:none;background:rgba(78,127,212,.12);border:1px solid var(--blue);color:var(--text);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:11px}.mode-banner.show{display:block}.mode-banner b{color:#8eb2ef}
+.raw-config-note{font-size:11px;color:var(--muted);margin:-2px 0 12px}.raw-config-table{min-width:900px}.raw-config-table input,.raw-config-table select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px}.raw-config-table .accounts-input{min-width:430px;text-align:left;direction:ltr}.raw-config-actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px 0}.import-report{display:none;background:rgba(78,161,160,.1);border:1px solid var(--green);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:11px}.import-report.show{display:block}
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls{width:100%}.btn{padding:8px 9px}}
 </style>
 </head>
@@ -73,11 +74,12 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  <select id="zoneFilter" class="select" onchange="renderAll()"><option value="all">كل المناطق</option><option value="old">OLD ZONE</option><option value="new">NEW ZONE</option></select>
  <select id="statusFilter" class="select" onchange="renderAll()"><option value="all">كل حالات الصرف</option><option value="pending">غير مدفوع</option><option value="partial">مدفوع جزئياً</option><option value="paid">مدفوع</option></select>
  <button id="centralPreviewButton" class="btn green" onclick="toggleCentralPreview()">☁️ فتح البيانات المركزية</button>
- <button class="btn" data-permission="edit" onclick="document.getElementById(&#39;fileInput&#39;).click()">📥 استيراد Excel / CSV</button>
+ <button class="btn" data-permission="edit" onclick="document.getElementById(&#39;fileInput&#39;).click()">📥 رفع ملف التفعيلات الخام</button>
  <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden="" onchange="importFile(event)">
  <button class="btn" onclick="exportAll()">📤 تصدير الكل</button>
  <button class="btn" data-permission="backup" onclick="exportBackup()">🛡️ نسخة احتياطية JSON</button>
 </div>
+<div id="rawImportReport" class="import-report" role="status"></div>
 
 <section class="cards">
  <div class="card goldline"><div class="label">إجمالي العمولات</div><div class="value" id="grandTotal">0</div><div class="sub">د.ع</div></div>
@@ -97,6 +99,17 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  <summary>⚙️ إعدادات أسعار العمولات</summary>
  <div class="settings" id="settings"></div>
  <div class="muted" style="font-size:10px;padding-bottom:12px">الأسعار تحفظ مع كل شهر عند الضغط على «حفظ الشهر»، لذلك تغيير الأسعار لاحقاً لا يغيّر الأشهر المؤرشفة.</div>
+</details>
+
+<details id="rawImportSettingsDetails" data-permission="rates">
+ <summary>🧩 إعدادات قراءة الملف الخام</summary>
+ <div class="raw-config-note">يمكن تعديل حسابات parent، أسماء الوكلاء، التير الافتراضي، ونطاقات كابينات الزون الجديد. الإعدادات تحفظ في هذا المتصفح ولا توضع داخل كود الحساب.</div>
+ <h3 style="font-size:12px">الوكلاء وحسابات parent التابعة لهم</h3>
+ <div style="overflow:auto"><table class="raw-config-table"><thead><tr><th>اسم الوكيل</th><th>حسابات parent — افصل بينها بفاصلة</th><th>التير الافتراضي</th><th></th></tr></thead><tbody id="rawAgentConfigBody"></tbody></table></div>
+ <div class="raw-config-actions"><button class="btn" onclick="addRawAgentConfig()">+ إضافة وكيل</button></div>
+ <h3 style="font-size:12px">نطاقات كابينات الزون الجديد</h3>
+ <div style="overflow:auto"><table class="raw-config-table" style="min-width:650px"><thead><tr><th>من FDT</th><th>إلى FDT</th><th>الوكيل المالك</th><th></th></tr></thead><tbody id="rawCabinetConfigBody"></tbody></table></div>
+ <div class="raw-config-actions"><button class="btn" onclick="addRawCabinetRange()">+ إضافة نطاق</button><div class="actions"><button class="btn danger" onclick="resetRawImportConfig()">استعادة الافتراضي</button><button class="btn gold" onclick="saveRawImportConfig()">حفظ إعدادات القراءة</button></div></div>
 </details>
 
 <div class="tabs">
@@ -226,6 +239,7 @@ function showApp(){
  document.getElementById('loggedUserRole').textContent=ROLE_LABELS[authProfile?.role]||authProfile?.role||'';
  applyPermissions();
  updateCentralPreviewUI();
+ loadRawImportConfig().then(renderRawImportSettings).catch(error=>console.error('Raw import config:',error));
 }
 function applyPermissions(){
  document.querySelectorAll('[data-permission]').forEach(el=>{
@@ -409,6 +423,7 @@ document.addEventListener('visibilitychange',async()=>{
 
 
 const STORAGE='babil_commission_v2',LEGACY_DATA='babil_current_data',LEGACY_ARCHIVE='babil_archive';
+const RAW_IMPORT_CONFIG_STORAGE='babil_raw_import_config_v1',RAW_IMPORT_CONFIG_URL='./assets/data/raw-import-config.json';
 const defaultTiers=[
  {key:'t1',label:'T1',min:0,max:200,p35:4000,p45:5500,p65:8000},
  {key:'t2',label:'T2',min:201,max:400,p35:4750,p45:6000,p65:9000},
@@ -424,7 +439,7 @@ const defaultData={
  {name:'سعيد عمار sub8',p35:13,p45:0,p65:0,customTier:'auto',paid:0},{name:'احمد عبدالعباس',p35:153,p45:6,p65:0,customTier:'auto',paid:0},
  {name:'احمد عبدالعباس sub1',p35:26,p45:2,p65:0,customTier:'auto',paid:0},{name:'احمد عبدالعباس sub2',p35:47,p45:0,p65:0,customTier:'auto',paid:0},
  {name:'احمد عبدالعباس sub3',p35:194,p45:0,p65:1,customTier:'auto',paid:0},{name:'علي طارق',p35:179,p45:1,p65:0,customTier:'auto',paid:0},
- {name:'بارق ليث',p35:395,p45:9,p65:0,customTier:'auto',paid:0}],
+ {name:'بارق ليث',p35:395,p45:9,p65:0,customTier:'t1',paid:0}],
  new:[
  {name:'FDT-94',p35:397,p45:15,p65:0,customTier:'auto',paid:0},{name:'FDT-95',p35:377,p45:12,p65:0,customTier:'auto',paid:0},
  {name:'FDT-96',p35:369,p45:8,p65:1,customTier:'auto',paid:0},{name:'FDT-97',p35:272,p45:4,p65:1,customTier:'auto',paid:0},
@@ -440,8 +455,40 @@ const defaultData={
  {name:'FDT-106',p35:215,p45:3,p65:0,customTier:'auto',paid:0},{name:'FDT-107',p35:154,p45:4,p65:0,customTier:'auto',paid:0}]
 };
 let state={month:'08/2026',data:clone(defaultData),tiers:clone(defaultTiers),archive:{},auditLog:[],undo:null};
+let rawImportConfig=null,defaultRawImportConfig=null;
 
 function clone(x){return JSON.parse(JSON.stringify(x))}
+async function loadRawImportConfig(forceDefault=false){
+ if(!defaultRawImportConfig){const response=await fetch(RAW_IMPORT_CONFIG_URL,{cache:'no-store'});if(!response.ok)throw new Error('تعذر تحميل إعدادات قراءة الملف الخام');defaultRawImportConfig=await response.json()}
+ if(forceDefault){rawImportConfig=clone(defaultRawImportConfig);return rawImportConfig}
+ try{const saved=JSON.parse(localStorage.getItem(RAW_IMPORT_CONFIG_STORAGE)||'null');rawImportConfig=saved||clone(defaultRawImportConfig)}catch(_){rawImportConfig=clone(defaultRawImportConfig)}
+ return rawImportConfig;
+}
+function rawField(row,wanted){const key=Object.keys(row||{}).find(candidate=>candidate.trim().toLowerCase()===wanted.toLowerCase());return key?row[key]:''}
+function rawText(value){return String(value??'').trim()}
+function normalizeRawProfile(value){const compact=rawText(value).toUpperCase().replace(/[\s_-]/g,'');return compact==='P35000'?'P-35000':compact==='P45000'?'P-45000':compact==='P65000'?'P-65000':rawText(value).toUpperCase()}
+function rawFdt(value){const match=rawText(value).match(/FDT\s*[:\-]?\s*(\d+)/i);return match?Number(match[1]):undefined}
+function validateRawImportConfig(config){
+ if(!config||!Array.isArray(config.profiles)||!config.profiles.length||!Array.isArray(config.agents)||!Array.isArray(config.cabinetRanges))throw new Error('إعدادات قراءة الملف الخام غير صالحة');
+ const ids=new Set(config.agents.map(agent=>agent.id));config.cabinetRanges.forEach(range=>{if(!ids.has(range.ownerId)||!Number.isInteger(Number(range.from))||!Number.isInteger(Number(range.to))||Number(range.from)>Number(range.to))throw new Error('يوجد نطاق كابينات غير صالح')});return config;
+}
+function calculateRawImport(rows,config){
+ validateRawImportConfig(config);const profiles=new Set(config.profiles.map(normalizeRawProfile)),accounts=new Map(),agents=new Map(config.agents.map(agent=>[agent.id,agent]));
+ config.agents.forEach(agent=>(agent.accounts||[]).forEach(account=>accounts.set(rawText(account).toLowerCase(),agent)));
+ const seenIds=new Set(),oldBuckets=new Map(),newBuckets=new Map(),exceptions=[];let duplicateIds=0,ignoredProfiles=0,ignoredAccounts=0;
+ const emptyCounts=()=>({p35:0,p45:0,p65:0});
+ rows.forEach((row,index)=>{const sheetRow=index+2,id=rawText(rawField(row,'id')),profile=normalizeRawProfile(rawField(row,'profile_name')),parent=rawText(rawField(row,'parent'));
+  if(!profiles.has(profile)){ignoredProfiles++;return}if(!id){exceptions.push({row:sheetRow,reason:'معرّف id فارغ',parent});return}if(seenIds.has(id)){duplicateIds++;return}seenIds.add(id);
+  const fdt=rawFdt(rawField(row,'lastname')),range=fdt===undefined?null:config.cabinetRanges.find(item=>fdt>=Number(item.from)&&fdt<=Number(item.to));let bucket;
+  if(range){const owner=agents.get(range.ownerId);if(!owner){exceptions.push({row:sheetRow,reason:'مالك الكابينة غير معرّف',parent,fdt});return}bucket=newBuckets.get(fdt)||{name:`FDT-${fdt}`,owner:owner.name,fdt,counts:emptyCounts()};newBuckets.set(fdt,bucket)}
+  else{const agent=accounts.get(parent.toLowerCase());if(!agent){if(parent.toLowerCase().startsWith('r.'))exceptions.push({row:sheetRow,reason:'حساب parent غير معرّف',parent,fdt});else ignoredAccounts++;return}bucket=oldBuckets.get(agent.id)||{name:agent.name,owner:agent.name,agentId:agent.id,defaultTier:agent.defaultTier||'auto',counts:emptyCounts()};oldBuckets.set(agent.id,bucket)}
+  const field=profile==='P-35000'?'p35':profile==='P-45000'?'p45':'p65';bucket.counts[field]++;
+ });
+ const eligibleIds=[...oldBuckets.values(),...newBuckets.values()].reduce((sum,bucket)=>sum+bucket.counts.p35+bucket.counts.p45+bucket.counts.p65,0);
+ return{old:[...oldBuckets.values()].map(bucket=>({name:bucket.name,...bucket.counts,customTier:bucket.defaultTier,paid:0})),new:[...newBuckets.values()].sort((a,b)=>a.fdt-b.fdt).map(bucket=>({name:bucket.name,...bucket.counts,customTier:'auto',paid:0,owner:bucket.owner})),stats:{sourceRows:rows.length,eligibleIds,duplicateIds,ignoredProfiles,ignoredAccounts,exceptions}};
+}
+function preserveImportedRowSettings(imported,previous){const match=(previous||[]).find(row=>row.name===imported.name);return match?{...imported,customTier:match.customTier||imported.customTier||'auto',paid:Number(match.paid)||0,paymentDate:match.paymentDate||''}:imported}
+function applyRawImportResult(result){state.data={old:result.old.map(row=>preserveImportedRowSettings(row,state.data.old)),new:result.new.map(row=>preserveImportedRowSettings(row,state.data.new))}}
 function centralNumber(value,label,{integer=false}={}){
  const number=Number(value);
  if(!Number.isFinite(number)||number<0||(integer&&!Number.isInteger(number)))throw new Error(`قيمة مركزية غير صالحة: ${label}`);
@@ -822,6 +869,19 @@ function renderSettings(){
    el.appendChild(d);
  }))
 }
+function renderRawImportSettings(){
+ const agentBody=document.getElementById('rawAgentConfigBody'),cabinetBody=document.getElementById('rawCabinetConfigBody');if(!agentBody||!cabinetBody||!rawImportConfig)return;const disabled=roleAllows('rates')?'':'disabled';
+ agentBody.innerHTML=rawImportConfig.agents.map((agent,index)=>`<tr><td><input ${disabled} value="${esc(agent.name)}" onchange="updateRawAgentConfig(${index},'name',this.value)"></td><td><input ${disabled} class="accounts-input" value="${esc((agent.accounts||[]).join(', '))}" onchange="updateRawAgentConfig(${index},'accounts',this.value)"></td><td><select ${disabled} onchange="updateRawAgentConfig(${index},'defaultTier',this.value)"><option value="auto" ${!agent.defaultTier||agent.defaultTier==='auto'?'selected':''}>تلقائي</option>${state.tiers.map(tier=>`<option value="${tier.key}" ${agent.defaultTier===tier.key?'selected':''}>${tier.label}</option>`).join('')}</select></td><td><button class="smallbtn" ${disabled} onclick="removeRawAgentConfig(${index})">✕</button></td></tr>`).join('');
+ cabinetBody.innerHTML=rawImportConfig.cabinetRanges.map((range,index)=>`<tr><td><input ${disabled} type="number" min="1" value="${range.from}" onchange="updateRawCabinetRange(${index},'from',this.value)"></td><td><input ${disabled} type="number" min="1" value="${range.to}" onchange="updateRawCabinetRange(${index},'to',this.value)"></td><td><select ${disabled} onchange="updateRawCabinetRange(${index},'ownerId',this.value)">${rawImportConfig.agents.map(agent=>`<option value="${agent.id}" ${range.ownerId===agent.id?'selected':''}>${esc(agent.name)}</option>`).join('')}</select></td><td><button class="smallbtn" ${disabled} onclick="removeRawCabinetRange(${index})">✕</button></td></tr>`).join('');
+}
+function updateRawAgentConfig(index,field,value){if(!roleAllows('rates'))return;rawImportConfig.agents[index][field]=field==='accounts'?String(value).split(',').map(item=>item.trim()).filter(Boolean):value}
+function updateRawCabinetRange(index,field,value){if(!roleAllows('rates'))return;rawImportConfig.cabinetRanges[index][field]=field==='ownerId'?value:Math.max(1,Number(value)||1)}
+function addRawAgentConfig(){if(!roleAllows('rates'))return;const id=`agent-${Date.now()}`;rawImportConfig.agents.push({id,name:'وكيل جديد',accounts:[],defaultTier:'auto'});renderRawImportSettings()}
+function removeRawAgentConfig(index){if(!roleAllows('rates')||!confirm('حذف هذا الوكيل من إعدادات القراءة؟'))return;const id=rawImportConfig.agents[index]?.id;rawImportConfig.agents.splice(index,1);rawImportConfig.cabinetRanges=rawImportConfig.cabinetRanges.filter(range=>range.ownerId!==id);renderRawImportSettings()}
+function addRawCabinetRange(){if(!roleAllows('rates'))return;rawImportConfig.cabinetRanges.push({id:`range-${Date.now()}`,from:1,to:1,ownerId:rawImportConfig.agents[0]?.id||''});renderRawImportSettings()}
+function removeRawCabinetRange(index){if(!roleAllows('rates'))return;rawImportConfig.cabinetRanges.splice(index,1);renderRawImportSettings()}
+async function saveRawImportConfig(){if(!(await ensurePermission('rates')))return;try{validateRawImportConfig(rawImportConfig);localStorage.setItem(RAW_IMPORT_CONFIG_STORAGE,JSON.stringify(rawImportConfig));toast('تم حفظ إعدادات قراءة الملف الخام')}catch(error){alert(error.message)}}
+async function resetRawImportConfig(){if(!(await ensurePermission('rates'))||!confirm('استعادة إعدادات قراءة الملف الخام الافتراضية؟'))return;localStorage.removeItem(RAW_IMPORT_CONFIG_STORAGE);await loadRawImportConfig(true);renderRawImportSettings();toast('تمت استعادة الإعدادات الافتراضية')}
 function filtered(zone){
  const q=(document.getElementById('searchInput').value||'').trim().toLowerCase(),zf=document.getElementById('zoneFilter').value,sf=document.getElementById('statusFilter').value;
  if(zf!=='all'&&zf!==zone)return[];return state.data[zone].map((r,i)=>({r,i})).filter(x=>(!q||x.r.name.toLowerCase().includes(q))&&(sf==='all'||status(x.r)===sf))
@@ -1048,11 +1108,17 @@ async function exportBackup(){
  try{const backup=await createBackupDocument(),blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json;charset=utf-8'}),a=document.createElement('a'),stamp=backup.exportedAt.replace(/[:.]/g,'-');a.href=URL.createObjectURL(blob);a.download=`babil_commission_backup_${stamp}.json`;a.click();URL.revokeObjectURL(a.href);toast('تم إنشاء النسخة الاحتياطية الآمنة')}
  catch(error){console.error(error);toast('تعذر إنشاء النسخة الاحتياطية')}
 }
+function hasRawColumns(rows){const keys=new Set(Object.keys(rows?.[0]||{}).map(key=>key.trim().toLowerCase()));return['id','parent','profile_name','lastname'].every(key=>keys.has(key))}
+function rawRowsFromWorkbook(workbook){for(const sheetName of workbook.SheetNames){const rows=XLSX.utils.sheet_to_json(workbook.Sheets[sheetName],{defval:''});if(rows.length&&hasRawColumns(rows))return{rows,sheetName}}throw new Error('لم أجد ورقة تحتوي الأعمدة id وparent وprofile_name وlastname')}
+function showRawImportReport(stats,sheetName){const report=document.getElementById('rawImportReport');report.innerHTML=`<b>تمت قراءة الملف الخام من ورقة ${esc(sheetName)}</b> — ${fmt(stats.sourceRows)} صف • ${fmt(stats.eligibleIds)} تفعيل مؤهل • ${fmt(stats.duplicateIds)} ID مكرر تم تجاهله • ${fmt(stats.ignoredProfiles)} باقة غير معتمدة • ${fmt(stats.exceptions.length)} حالة تحتاج مراجعة`;report.classList.add('show')}
 async function importFile(e){
-  if(!(await ensurePermission('edit'))){
-    e.target.value='';
-    return;
-  }const file=e.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=ev=>{try{let rows=[];if(file.name.toLowerCase().endsWith('.csv'))rows=parseCSV(ev.target.result);else{if(typeof XLSX==='undefined')throw Error('XLSX library not loaded');const wb=XLSX.read(ev.target.result,{type:'array'});rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})}if(!rows.length)throw Error('الملف فارغ');const mapped=rows.map(normalizeImport).filter(x=>x.name);if(!mapped.length)throw Error('لم أجد أسماء وكلاء في الملف');if(!confirm(`تم العثور على ${mapped.length} سجل. استبدال البيانات الحالية؟`))return;state.data={old:mapped.filter(x=>x.zone==='old'),new:mapped.filter(x=>x.zone==='new')};audit('استيراد بيانات','','','عدد السجلات','',mapped.length);save();renderAll();toast('تم استيراد البيانات بنجاح')}catch(err){alert('فشل الاستيراد: '+err.message)}e.target.value=''};if(file.name.toLowerCase().endsWith('.csv'))reader.readAsText(file,'UTF-8');else reader.readAsArrayBuffer(file)}
+  if(!(await ensurePermission('edit'))){e.target.value='';return}const file=e.target.files[0];if(!file)return;
+  try{if(typeof XLSX==='undefined')throw Error('XLSX library not loaded');const config=await loadRawImportConfig(),buffer=await file.arrayBuffer(),workbook=XLSX.read(buffer,{type:'array'}),source=rawRowsFromWorkbook(workbook),result=calculateRawImport(source.rows,config),totalRows=result.old.length+result.new.length;
+   if(!totalRows)throw new Error('لم ينتج عن الملف أي وكيل أو كابينة حسب الإعدادات الحالية');
+   const message=`تمت قراءة ${result.stats.sourceRows} صف وحساب ${result.stats.eligibleIds} تفعيل مؤهل.\nالنتيجة: ${result.old.length} وكيل OLD ZONE و${result.new.length} كابينة NEW ZONE.\n\nسيتم الاحتفاظ بالتير اليدوي والمدفوعات للسجلات الموجودة بنفس الاسم. هل تريد استبدال كميات الشهر الحالي؟`;
+   if(!confirm(message))return;applyRawImportResult(result);audit('استيراد ملف خام','','','عدد التفعيلات','',result.stats.eligibleIds,`الورقة: ${source.sheetName}`);save();renderAll();showRawImportReport(result.stats,source.sheetName);toast('تم حساب الملف الخام وتوزيع التفعيلات بنجاح')
+  }catch(error){console.error(error);alert('فشل استيراد الملف الخام: '+error.message)}finally{e.target.value=''}
+}
 function parseCSV(text){const lines=text.replace(/\r/g,'').split('\n').filter(Boolean),out=[],parse=s=>{let a=[],cur='',q=false;for(let i=0;i<s.length;i++){const ch=s[i];if(ch==='"'&&s[i+1]==='"'){cur+='"';i++;continue}if(ch==='"'){q=!q;continue}if(ch===','&&!q){a.push(cur);cur=''}else cur+=ch}a.push(cur);return a};const h=parse(lines[0]).map(x=>x.trim());for(let i=1;i<lines.length;i++){const a=parse(lines[i]),o={};h.forEach((k,j)=>o[k]=a[j]??'');out.push(o)}return out}
 function numFrom(o,keys){for(const k of keys){if(o[k]!==undefined&&o[k]!=='')return Number(String(o[k]).replace(/,/g,''))||0}return 0}
 function normalizeImport(o){const keys=Object.keys(o),get=names=>{const k=keys.find(x=>names.some(n=>x.trim().toLowerCase()===n.toLowerCase()));return k?o[k]:''},name=get(['Name','name','اسم الوكيل','اسم','FDT','fdt'])||o[keys[0]],zoneRaw=String(get(['Zone','zone','المنطقة'])||'').toLowerCase(),zone=zoneRaw.includes('new')||zoneRaw.includes('جديد')?'new':zoneRaw.includes('old')||zoneRaw.includes('قديم')?'old':String(name).toUpperCase().includes('FDT-')?'new':'old';return{name:String(name).trim(),p35:numFrom(o,['P35','p35','35']),p45:numFrom(o,['P45','p45','45']),p65:numFrom(o,['P65','p65','65']),paid:numFrom(o,['Paid','paid','المدفوع']),paymentDate:get(['PaymentDate','payment date','تاريخ الصرف'])||'',customTier:get(['Tier','tier','الفئة'])||'auto',zone}}

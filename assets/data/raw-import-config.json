@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "profiles": ["P-35000", "P-45000", "P-65000"],
+  "agents": [
+    {
+      "id": "saeed",
+      "name": "سعيد عمار",
+      "accounts": [
+        "r.saeed.ammar",
+        "r.saeed.ammar.sub1", "r.saeed.ammar.sub2", "r.saeed.ammar.sub3", "r.saeed.ammar.sub4", "r.saeed.ammar.sub5",
+        "r.saeed.ammar.sub6", "r.saeed.ammar.sub7", "r.saeed.ammar.sub8", "r.saeed.ammar.sub9", "r.saeed.ammar.sub10",
+        "r.saeed.ammar.sub11", "r.saeed.ammar.sub12", "r.saeed.ammar.sub13", "r.saeed.ammar.sub14", "r.saeed.ammar.sub15",
+        "r.saeed.ammar.sub16", "r.saeed.ammar.sub17", "r.saeed.ammar.sub18", "r.saeed.ammar.sub19", "r.saeed.ammar.sub20",
+        "r.saeed.ammar.sub21", "r.saeed.ammar.sub22", "r.saeed.ammar.sub23"
+      ]
+    },
+    {
+      "id": "ahmed",
+      "name": "أحمد عبدالعباس",
+      "accounts": [
+        "r.ahmed.abdalabbas", "r.ahmed.abdalabbas.sub1", "r.ahmed.abdalabbas.sub2", "r.ahmed.abdalabbas.sub3",
+        "r.ahmed.abdalabbas.sub4", "r.ahmed.abdalabbas.sub5", "r.ahmed.abdalabbas.sub6"
+      ]
+    },
+    { "id": "ali", "name": "علي طارق", "accounts": ["r.ali.tareq"] },
+    { "id": "ammar-kamil", "name": "عمار كامل", "accounts": ["r.ammar.kamil"] },
+    { "id": "ammar-khalil", "name": "عمار خليل", "accounts": ["r.ammar.khalil"] },
+    { "id": "bareq", "name": "بارق ليث", "accounts": ["r.bareq.laith"], "defaultTier": "t1" },
+    { "id": "basim", "name": "باسم محمد إبراهيم", "accounts": ["r.basim.mohammed.ibrahim"] },
+    { "id": "haider", "name": "حيدر طالب", "accounts": ["r.haider.talib"] },
+    { "id": "karar", "name": "كرار عباس", "accounts": ["r.karar.abbas"] },
+    { "id": "mustafa", "name": "مصطفى ضياء", "accounts": ["r.mustafa.dhiaa"] },
+    { "id": "ziyad", "name": "زياد مجيد", "accounts": ["r.ziyad.majid"] }
+  ],
+  "cabinetRanges": [
+    { "id": "saeed-94-102", "from": 94, "to": 102, "ownerId": "saeed" },
+    { "id": "ahmed-103-107", "from": 103, "to": 107, "ownerId": "ahmed" },
+    { "id": "saeed-108-117", "from": 108, "to": 117, "ownerId": "saeed" }
+  ]
+}

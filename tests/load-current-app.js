@@ -112,6 +112,8 @@ function loadCurrentApp(options = {}) {
   const exportsScript = `
     globalThis.__characterization = {
       calc,
+      calculateRawImport,
+      applyRawImportResult,
       backupStateSnapshot,
       applyCentralPaymentResult,
       buildCentralAuditLogs,
