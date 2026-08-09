@@ -25,7 +25,8 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 .unsaved{display:none;color:var(--yellow);font-size:10px;font-weight:800}.unsaved.show{display:inline-block}
 .mode-banner{display:none;background:rgba(78,127,212,.12);border:1px solid var(--blue);color:var(--text);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:11px}.mode-banner.show{display:block}.mode-banner b{color:#8eb2ef}
 .raw-config-note{font-size:11px;color:var(--muted);margin:-2px 0 12px}.raw-config-table{min-width:900px}.raw-config-table input,.raw-config-table select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px}.raw-config-table .accounts-input{min-width:430px;text-align:left;direction:ltr}.raw-config-actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px 0}.import-report{display:none;background:rgba(78,161,160,.1);border:1px solid var(--green);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:11px}.import-report.show{display:block}
-@media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls{width:100%}.btn{padding:8px 9px}}
+.app-layout{width:min(1680px,100%);margin:auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:18px;padding:16px}.sidebar{position:sticky;top:16px;height:calc(100vh - 32px);background:linear-gradient(180deg,#17212b,#111922);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:16px;overflow:auto}.side-brand{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line)}.brand-mark{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--gold),#9b6921);color:#111;font-weight:900}.side-brand h2{font-size:14px;margin:0}.side-brand small{color:var(--muted);font-size:9px}.central-status{display:flex;align-items:center;gap:8px;background:rgba(78,161,160,.1);border:1px solid rgba(78,161,160,.35);border-radius:10px;padding:9px 10px;font-size:11px}.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}.side-label{font-size:9px;color:var(--muted);font-weight:800;letter-spacing:1px;margin:0 4px 5px}.side-nav,.side-actions{display:grid;gap:6px}.side-btn{width:100%;display:flex;align-items:center;gap:9px;text-align:right;background:transparent;border:1px solid transparent;color:var(--muted);border-radius:9px;padding:9px 10px;cursor:pointer;font-size:11px;font-weight:700}.side-btn:hover,.side-btn.active{background:var(--panel2);border-color:var(--line);color:var(--text)}.side-btn.accent{color:var(--gold);border-color:rgba(212,162,78,.35);background:rgba(212,162,78,.08)}.side-btn.danger{color:var(--red)}.side-bottom{margin-top:auto;display:grid;gap:8px}.side-user{background:var(--panel2);border-radius:10px;padding:10px}.side-user .session-user{margin-bottom:4px}.main-content{min-width:0;padding:6px 0 44px}.wrap{max-width:none;margin:0;padding:0}.mast{background:rgba(24,32,42,.72);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;backdrop-filter:blur(8px)}.mast h1{font-size:22px}.month-controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.toolbar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}.section-anchor{scroll-margin-top:18px}.preparation-note{color:var(--yellow)}#appShell.workspace-loading #workspaceContent{opacity:.28;pointer-events:none}#appShell.workspace-unavailable #workspaceContent{display:none}.workspace-loading .side-actions [data-permission],.workspace-unavailable .side-actions [data-permission]{display:none!important}.central-error{display:none;background:rgba(212,99,78,.1);border:1px solid var(--red);border-radius:12px;padding:22px;text-align:center;margin-top:14px}.workspace-unavailable .central-error{display:block}.workspace-central .central-only{display:flex}.workspace-preparation .central-only,.workspace-loading .central-only,.workspace-unavailable .central-only{display:none}
+@media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}.app-layout{grid-template-columns:210px minmax(0,1fr)}}@media(max-width:820px){.app-layout{display:block;padding:10px}.sidebar{position:relative;top:0;height:auto;margin-bottom:12px}.side-nav{grid-template-columns:repeat(4,1fr)}.side-actions{grid-template-columns:repeat(2,1fr)}.side-bottom{margin-top:0;grid-template-columns:1fr auto}.side-btn{justify-content:center}.main-content{padding:0 0 30px}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls,.month-controls{width:100%}.btn{padding:8px 9px}.side-nav{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -45,43 +46,66 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 </div>
 
 <div id="appShell" style="display:none">
+<div class="app-layout">
+<aside class="sidebar" aria-label="القائمة الرئيسية">
+ <div class="side-brand"><div class="brand-mark">HR</div><div><h2>عمولات الوكلاء</h2><small>HRINS • RESELLER FINANCE</small></div></div>
+ <div id="centralStatus" class="central-status"><span class="status-dot"></span><span>جاري تحميل البيانات المركزية...</span></div>
+ <div>
+  <div class="side-label">التنقل</div>
+  <nav class="side-nav">
+   <button class="side-btn active" onclick="scrollToSection('dashboardSection')">▦ نظرة عامة</button>
+   <button class="side-btn" onclick="scrollToSection('agentsSection')">♟ الوكلاء والكابينات</button>
+   <button class="side-btn" onclick="openAuditLog()">▤ سجل التعديلات</button>
+   <button class="side-btn" onclick="exportAll()">⇩ تصدير التقرير</button>
+  </nav>
+ </div>
+ <div>
+  <div class="side-label">إجراءات</div>
+  <div class="side-actions">
+   <button id="refreshCentralSidebarButton" class="side-btn central-only" onclick="refreshCentralData()">↻ تحديث البيانات</button>
+   <button class="side-btn" data-permission="backup" onclick="exportBackup()">🛡 نسخة احتياطية</button>
+   <button id="centralPreviewButton" class="side-btn accent" data-role-permission="edit" onclick="toggleCentralPreview()">⚙ وضع تجهيز الشهر</button>
+   <button class="side-btn" data-permission="edit" onclick="document.getElementById('fileInput').click()">📥 رفع ملف التفعيلات</button>
+   <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden onchange="importFile(event)">
+   <button class="side-btn" data-permission="edit" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
+   <button class="side-btn" data-permission="edit" onclick="startNewMonth()">✨ شهر جديد</button>
+   <button class="side-btn" data-permission="users" onclick="openUserManagement()">👥 إدارة المستخدمين</button>
+  </div>
+ </div>
+ <div class="side-bottom">
+  <div class="side-user"><div class="session-user">👤 <b id="loggedUserName"></b></div><span id="loggedUserRole" class="role-pill"></span></div>
+  <button id="logoutButton" class="side-btn danger">تسجيل الخروج</button>
+ </div>
+</aside>
+<main class="main-content">
 <div class="wrap">
 <header class="mast">
  <div>
   <div class="eyebrow">HRINS • RESELLER FINANCE</div>
   <h1>لوحة عمولات الوكلاء</h1>
-  <div class="muted" style="font-size:11px">إدارة العمولات • الصرف • الأرشيف • الأداء الشهري</div>
+  <div class="muted" style="font-size:11px">متابعة العمولات والصرف والأداء الشهري من مصدر مركزي واحد</div>
  </div>
- <div class="controls">
-  <div class="session-user">👤 <b id="loggedUserName"></b><span id="loggedUserRole" class="role-pill"></span></div>
+ <div class="month-controls">
   <span class="muted" style="font-size:11px">الشهر:</span>
   <input id="monthInput" class="input" value="08/2026" placeholder="MM/YYYY" style="width:105px;text-align:center" title="اكتب الشهر بصيغة MM/YYYY">
   <button id="applyMonthButton" class="btn" onclick="applyMonthInput()">تطبيق</button>
   <select id="monthSelect" class="select" onchange="loadSelectedMonth()"></select>
-  <button class="btn gold" data-permission="edit" onclick="saveCurrentMonth()">💾 حفظ الشهر</button>
   <span id="unsavedIndicator" class="unsaved">● تعديلات غير محفوظة</span>
-  <button class="btn" data-permission="edit" onclick="startNewMonth()">✨ شهر جديد</button>
-  <button class="btn" onclick="openAuditLog()">🧾 سجل التعديلات</button>
-  <button class="btn gold" data-permission="users" onclick="openUserManagement()">👥 إدارة المستخدمين</button>
-  <button id="logoutButton" class="btn danger">تسجيل الخروج</button>
  </div>
 </header>
 
 <div id="centralPreviewBanner" class="mode-banner" role="status"></div>
+<div id="centralError" class="central-error"><h3>تعذر الوصول إلى البيانات المركزية</h3><p class="muted">تحقق من الاتصال ثم أعد المحاولة.</p><div class="actions" style="justify-content:center"><button class="btn green" onclick="enterCentralPreview()">↻ إعادة المحاولة</button><button class="btn" data-role-permission="edit" onclick="openPreparationMode()">⚙ فتح وضع تجهيز الشهر</button></div></div>
 
+<div id="workspaceContent">
 <div class="toolbar">
  <input id="searchInput" class="search" placeholder="🔍 ابحث باسم الوكيل أو FDT..." oninput="renderAll()">
  <select id="zoneFilter" class="select" onchange="renderAll()"><option value="all">كل المناطق</option><option value="old">OLD ZONE</option><option value="new">NEW ZONE</option></select>
  <select id="statusFilter" class="select" onchange="renderAll()"><option value="all">كل حالات الصرف</option><option value="pending">غير مدفوع</option><option value="partial">مدفوع جزئياً</option><option value="paid">مدفوع</option></select>
- <button id="centralPreviewButton" class="btn green" onclick="toggleCentralPreview()">☁️ فتح البيانات المركزية</button>
- <button class="btn" data-permission="edit" onclick="document.getElementById(&#39;fileInput&#39;).click()">📥 رفع ملف التفعيلات الخام</button>
- <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden="" onchange="importFile(event)">
- <button class="btn" onclick="exportAll()">📤 تصدير الكل</button>
- <button class="btn" data-permission="backup" onclick="exportBackup()">🛡️ نسخة احتياطية JSON</button>
 </div>
 <div id="rawImportReport" class="import-report" role="status"></div>
 
-<section class="cards">
+<section id="dashboardSection" class="cards section-anchor">
  <div class="card goldline"><div class="label">إجمالي العمولات</div><div class="value" id="grandTotal">0</div><div class="sub">د.ع</div></div>
  <div class="card blueline"><div class="label">OLD ZONE</div><div class="value" id="oldTotal">0</div><div class="sub" id="oldCount">0 وكيل</div></div>
  <div class="card greenline"><div class="label">NEW ZONE</div><div class="value" id="newTotal">0</div><div class="sub" id="newCount">0 وكيل</div></div>
@@ -112,15 +136,18 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
  <div class="raw-config-actions"><button class="btn" onclick="addRawCabinetRange()">+ إضافة نطاق</button><div class="actions"><button class="btn danger" onclick="resetRawImportConfig()">استعادة الافتراضي</button><button class="btn gold" onclick="saveRawImportConfig()">حفظ إعدادات القراءة</button></div></div>
 </details>
 
-<div class="tabs">
+<div id="agentsSection" class="tabs section-anchor">
  <button class="tab active" data-zone="old" onclick="switchTab(&#39;old&#39;)">🔵 OLD ZONE</button>
  <button class="tab" data-zone="new" onclick="switchTab(&#39;new&#39;)">🟢 NEW ZONE</button>
 </div>
 <div id="panel-old" class="panel active"></div>
 <div id="panel-new" class="panel"></div>
 <footer class="muted" style="font-size:10px;text-align:center;margin-top:18px">
- بيانات التشغيل المحلية تبقى محفوظة في هذا المتصفح. المعاينة المركزية اختيارية وللقراءة فقط ولا تستبدل النسخة المحلية.
+ البيانات المعروضة مرتبطة بالنظام المركزي، ويظهر آخر تحديث من شريط الحالة.
 </footer>
+</div>
+</div>
+</main>
 </div>
 
 <div id="auditModal" class="modal" onclick="if(event.target===this)closeAuditLog()"><div class="modalbox" style="width:min(1200px,100%)">
@@ -167,7 +194,8 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 const SUPABASE_URL='https://qolrsefpbvfuugwyqggu.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_XcVKdpASq1D23Fc1QzCmcA_kX-mkO7b';
 let authUser=null,authProfile=null;
-const centralPreview={active:false,localState:null,localUnsavedChanges:false,months:[]};
+const centralPreview={active:false,localState:null,localUnsavedChanges:false,months:[],lastUpdatedAt:null};
+let workspaceMode='loading';
 /* عميل Supabase خفيف داخل الملف: لا يعتمد على مكتبة CDN خارجية. */
 const SB_SESSION_KEY='hrins_supabase_session';
 const sbListeners=[];
@@ -235,6 +263,7 @@ function hasPermission(p){if(p==='payment')return centralPreview.active&&roleAll
 function showLogin(){document.getElementById('loginScreen').style.display='flex';document.getElementById('appShell').style.display='none'}
 function showApp(){
  document.getElementById('loginScreen').style.display='none';document.getElementById('appShell').style.display='block';
+ setWorkspaceMode('loading');
  document.getElementById('loggedUserName').textContent=authProfile?.full_name||authUser?.email||'مستخدم';
  document.getElementById('loggedUserRole').textContent=ROLE_LABELS[authProfile?.role]||authProfile?.role||'';
  applyPermissions();
@@ -247,8 +276,21 @@ function applyPermissions(){
    el.disabled=!allowed;
    el.style.display=allowed?'':'none';
  });
- document.getElementById('ratesDetails').style.display=roleAllows('rates')?'':'none';
+ document.querySelectorAll('[data-role-permission]').forEach(el=>{
+   const allowed=roleAllows(el.dataset.rolePermission);
+   el.disabled=!allowed;
+   el.style.display=allowed?'':'none';
+ });
+ document.getElementById('ratesDetails').style.display=hasPermission('rates')?'':'none';
 }
+function setWorkspaceMode(mode){
+ workspaceMode=mode;
+ const shell=document.getElementById('appShell');
+ if(!shell)return;
+ shell.classList.remove('workspace-loading','workspace-central','workspace-preparation','workspace-unavailable');
+ shell.classList.add(`workspace-${mode}`);
+}
+function scrollToSection(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'})}
 function authError(msg){const e=document.getElementById('loginError');e.textContent=msg;e.style.display='block'}
 function clearAuthError(){const e=document.getElementById('loginError');e.textContent='';e.style.display='none'}
 async function loadProfile(user){
@@ -339,6 +381,7 @@ async function login(){
    load();
    renderMonths();
    renderAll();
+   await enterCentralPreview(true);
  }catch(e){
    console.error(e);
 
@@ -380,6 +423,7 @@ async function initAuth(){
      load();
      renderMonths();
      renderAll();
+     await enterCentralPreview(true);
    }catch(e){
      console.error(e);
      authUser=null;
@@ -562,7 +606,7 @@ async function fetchCentralPages(path,pageSize=500){
    all.push(...batch);
    if(batch.length<pageSize)return all;
  }
- throw new Error('تجاوزت البيانات المركزية حد المعاينة الآمن');
+ throw new Error('تجاوزت البيانات المركزية حد التحميل الآمن');
 }
 async function fetchCentralPeriods(){
  const monthQuery='/rest/v1/commission_months?select=id,month_key,tiers,created_at,updated_at&order=month_key.asc';
@@ -610,32 +654,36 @@ function applyCentralSnapshot(snapshot,preferredMonth){
  hasUnsavedChanges=false;
 }
 function updateCentralPreviewUI(){
- const button=document.getElementById('centralPreviewButton'),banner=document.getElementById('centralPreviewBanner');
- if(!button||!banner)return;
- button.textContent=centralPreview.active?'↩️ الرجوع إلى النسخة المحلية':'☁️ فتح البيانات المركزية';
- button.classList.toggle('gold',centralPreview.active);
+ const button=document.getElementById('centralPreviewButton'),banner=document.getElementById('centralPreviewBanner'),status=document.getElementById('centralStatus');
+ if(!button||!banner||!status)return;
+ const updated=centralPreview.lastUpdatedAt?new Intl.DateTimeFormat('ar-IQ',{hour:'2-digit',minute:'2-digit'}).format(centralPreview.lastUpdatedAt):'';
+ button.textContent=centralPreview.active?'⚙ وضع تجهيز الشهر':'☁ العودة إلى البيانات المركزية';
  document.getElementById('monthInput').disabled=centralPreview.active;
  document.getElementById('applyMonthButton').disabled=centralPreview.active;
- banner.classList.toggle('show',centralPreview.active);
- banner.innerHTML=centralPreview.active
-   ?`<b>البيانات المركزية المشتركة</b> — الصرف متاح للمدير والمحاسب ويُحفظ للجميع مع سجل تدقيق. بقية التعديل والحذف معطل. <button id="refreshCentralButton" class="smallbtn" onclick="refreshCentralData()">↻ تحديث</button> الأشهر: ${centralPreview.months.map(esc).join('، ')}.`
+ banner.classList.toggle('show',workspaceMode==='preparation');
+ banner.innerHTML=workspaceMode==='preparation'
+   ?'<b class="preparation-note">وضع تجهيز الشهر</b> — ارفع ملف التفعيلات، راجع التير والأسعار، ثم احفظ الشهر. هذه المساحة متاحة للإدارة فقط.'
    :'';
+ if(workspaceMode==='central')status.innerHTML=`<span class="status-dot"></span><span>البيانات المركزية${updated?` • تحديث ${updated}`:''}</span>`;
+ else if(workspaceMode==='preparation')status.innerHTML='<span class="status-dot" style="background:var(--yellow);box-shadow:0 0 10px var(--yellow)"></span><span>تجهيز الشهر — إدارة</span>';
+ else if(workspaceMode==='unavailable')status.innerHTML='<span class="status-dot" style="background:var(--red);box-shadow:0 0 10px var(--red)"></span><span>المركز غير متاح</span>';
+ else status.innerHTML='<span class="status-dot"></span><span>جاري تحميل البيانات المركزية...</span>';
 }
-async function enterCentralPreview(){
+async function enterCentralPreview(silent=false){
  if(!authUser){showLogin();return}
  const button=document.getElementById('centralPreviewButton');
- button.disabled=true;button.textContent='جاري تحميل البيانات المركزية...';
+ setWorkspaceMode('loading');updateCentralPreviewUI();
+ if(button){button.disabled=true;button.textContent='جاري تحميل البيانات المركزية...'}
  try{
    if(!(await verifyCurrentUser()))return;
    const snapshot=await fetchCentralSnapshot();
-   centralPreview.localState=clone(state);
-   centralPreview.localUnsavedChanges=hasUnsavedChanges;
+   if(!centralPreview.localState){centralPreview.localState=clone(state);centralPreview.localUnsavedChanges=hasUnsavedChanges}
    applyCentralSnapshot(snapshot);
-   centralPreview.active=true;hasUnsavedChanges=false;
+   centralPreview.active=true;centralPreview.lastUpdatedAt=new Date();hasUnsavedChanges=false;setWorkspaceMode('central');
    applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
-   toast('تم تحميل البيانات المركزية المشتركة دون تغيير النسخة المحلية');
- }catch(error){console.error('Central data error:',error);toast(`تعذر تحميل البيانات المركزية: ${error.message||''}`)}
- finally{button.disabled=false;updateCentralPreviewUI()}
+   if(!silent)toast('تم تحديث البيانات المركزية');
+ }catch(error){console.error('Central data error:',error);centralPreview.active=false;setWorkspaceMode('unavailable');updateCentralPreviewUI();if(!silent)toast(`تعذر تحميل البيانات المركزية: ${error.message||''}`)}
+ finally{if(button)button.disabled=false;updateCentralPreviewUI()}
 }
 async function refreshCentralData(silent=false){
  if(!centralPreview.active)return;
@@ -643,6 +691,7 @@ async function refreshCentralData(silent=false){
  try{
    const selected=state.month,snapshot=await fetchCentralSnapshot();
    applyCentralSnapshot(snapshot,selected);
+   centralPreview.lastUpdatedAt=new Date();setWorkspaceMode('central');
    applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
    if(!silent)toast('تم تحديث البيانات المركزية وسجل التدقيق');
  }catch(error){console.error('Central refresh error:',error);if(!silent)toast(`تعذر تحديث البيانات المركزية: ${error.message||''}`);throw error}
@@ -653,8 +702,15 @@ function exitCentralPreview(silent=false){
  state=clone(centralPreview.localState);
  hasUnsavedChanges=centralPreview.localUnsavedChanges;
  centralPreview.active=false;centralPreview.localState=null;centralPreview.localUnsavedChanges=false;centralPreview.months=[];
+ setWorkspaceMode('preparation');
  applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
- if(!silent)toast('تم الرجوع إلى النسخة المحلية كما كانت');
+ if(!silent)toast('تم فتح وضع تجهيز الشهر للإدارة');
+}
+function openPreparationMode(){
+ if(!roleAllows('edit'))return;
+ if(centralPreview.active){exitCentralPreview();return}
+ setWorkspaceMode('preparation');applyPermissions();updateCentralPreviewUI();updateUnsavedIndicator();renderMonths();renderAll();
+ toast('تم فتح وضع تجهيز الشهر للإدارة');
 }
 async function toggleCentralPreview(){if(centralPreview.active)exitCentralPreview();else await enterCentralPreview()}
 function fmt(n){return Math.round(Number(n)||0).toLocaleString('en-US')}
@@ -793,7 +849,7 @@ function confirmDiscardUnsaved(){
  load();hasUnsavedChanges=false;updateUnsavedIndicator();return true;
 }
 function save(force=false){
- if(centralPreview.active){toast('لا يمكن الحفظ أثناء المعاينة المركزية');return}
+ if(centralPreview.active){toast('انتقل إلى وضع تجهيز الشهر لإجراء التعديلات');return}
  if(!force){markUnsaved();return}
  localStorage.setItem(STORAGE,JSON.stringify({month:state.month,data:state.data,tiers:state.tiers,archive:state.archive,auditLog:state.auditLog}));
  localStorage.setItem(LEGACY_DATA,JSON.stringify(state.data));
@@ -834,7 +890,7 @@ function renderAuditLog(){
 function exportAuditLog(){const rows=(state.auditLog||[]).map(x=>({DateTime:auditDate(x.at),User:x.user,Month:x.month,Zone:x.zone,Agent:x.agent,Action:x.action,Field:fieldLabel(x.field),Before:x.oldValue,After:x.newValue}));if(!rows.length){toast('لا يوجد سجل لتصديره');return}downloadCSV(rows,`audit_log_${state.month.replace('/','-')}.csv`)}
 function clearAuditLog(){if(!canDelete()){toast('ليس لديك صلاحية مسح السجل');return}if(!(state.auditLog||[]).length){toast('السجل فارغ');return}if(!confirm('مسح سجل التعديلات بالكامل؟'))return;state.auditLog=[];save();renderAuditLog();toast('تم مسح السجل')}
 async function applyMonthInput(){
- if(centralPreview.active){toast('اختر شهراً مركزياً من القائمة أثناء المعاينة');return}
+ if(centralPreview.active){toast('اختر الشهر المطلوب من قائمة البيانات المركزية');return}
  const raw=(document.getElementById('monthInput').value||'').trim(),m=raw.match(/^(0?[1-9]|1[0-2])[\/\-](\d{4})$/);
  if(!m){alert('اكتب الشهر بصيغة MM/YYYY مثل 08/2026');return}
  if(!(await ensurePermission('edit')))return;

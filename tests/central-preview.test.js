@@ -62,13 +62,17 @@ test('central preview rejects invalid financial rows before rendering', () => {
   assert.throws(() => buildCentralPeriods(months, rows), /تعذر تحديد شريحة/);
 });
 
-test('central mode allows only audited payments and preserves a local return path', () => {
+test('central workspace is default, allows only audited payments, and preserves admin preparation state', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
   assert.match(html, /id="centralPreviewButton"/);
-  assert.match(html, /البيانات المركزية المشتركة/);
+  assert.match(html, /البيانات المركزية/);
+  assert.match(html, /class="sidebar"/);
+  assert.match(html, /وضع تجهيز الشهر/);
+  assert.match(html, /await enterCentralPreview\(true\)/);
+  assert.doesNotMatch(html, /النسخة المحلية/);
   assert.match(html, /if\(p==='payment'\)return centralPreview\.active&&roleAllows\(p\)/);
-  assert.match(html, /if\(centralPreview\.active\)\{toast\('لا يمكن الحفظ أثناء المعاينة المركزية'\);return\}/);
+  assert.match(html, /if\(centralPreview\.active\)\{toast\('انتقل إلى وضع تجهيز الشهر لإجراء التعديلات'\);return\}/);
   assert.match(html, /centralPreview\.localState=clone\(state\)/);
   assert.match(html, /state=clone\(centralPreview\.localState\)/);
   assert.match(html, /function fetchCentralPages\(path,pageSize=500\)/);
