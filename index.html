@@ -624,7 +624,7 @@ function buildCentralPeriods(months,rows){
  });
  rows.forEach(row=>{
    const month=monthById.get(String(row?.month_id||'')),zone=String(row?.zone||'');
-   if(!month)throw new Error('يوجد صف مركزي مرتبط بشهر غير معروف');
+if (!month) {   console.warn(     'Skipping row for hidden or unavailable month:',     row.id,     row.month_id   );   return; }
    if(zone!=='old'&&zone!=='new')throw new Error(`يوجد نطاق غير صالح في الشهر ${month}`);
    const name=String(row?.name||'').trim();
    if(!name)throw new Error(`يوجد اسم وكيل مفقود في الشهر ${month}`);
