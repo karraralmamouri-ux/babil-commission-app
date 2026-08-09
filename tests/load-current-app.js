@@ -3,6 +3,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 const { TextEncoder } = require('node:util');
+const XLSX = require(path.join(__dirname, '..', 'assets', 'vendor', 'xlsx.full.min.js'));
 
 function createElement() {
   return {
@@ -107,6 +108,7 @@ function loadCurrentApp(options = {}) {
     window: {
       addEventListener() {},
     },
+    XLSX,
   });
 
   const exportsScript = `
@@ -116,6 +118,7 @@ function loadCurrentApp(options = {}) {
       syncTierGroupBasis,
       applyRawImportResult,
       backupStateSnapshot,
+      buildExcelReportWorkbook,
       applyCentralPaymentResult,
       buildCentralAuditLogs,
       buildCentralPeriods,
@@ -131,6 +134,7 @@ function loadCurrentApp(options = {}) {
       normalizeImport,
       parseCSV,
       recordCentralPayment,
+      rowsForCentralPublish,
       refreshSbSession,
       ROLE_PERMISSIONS,
       sessionExpiresSoon,
