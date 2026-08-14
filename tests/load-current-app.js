@@ -131,6 +131,7 @@ function loadCurrentApp(options = {}) {
       getPreviousRow,
       monthKey,
       monthOrder,
+      newZoneOwnerSummaries,
       nextMonthKey,
       normalizeImport,
       parseCSV,

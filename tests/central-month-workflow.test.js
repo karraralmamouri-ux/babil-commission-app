@@ -72,11 +72,31 @@ test('workspace exposes safe loading, empty, filtering, and mobile navigation st
 
 test('Excel report contains auditable formulas, comparison, and settings sheets', () => {
   const app = loadCurrentApp();
-  app.state.data = { old: [{ name: 'Agent', p35: 2, p45: 1, p65: 0, customTier: 't1', paid: 1000 }], new: [] };
+  app.state.data = { old: [{ name: 'Agent', p35: 2, p45: 1, p65: 0, customTier: 't1', paid: 1000 }], new: [{ name: 'FDT-94', owner: 'Saeed', p35: 3, p45: 0, p65: 0, customTier: 't1', paid: 0 }] };
   const workbook = app.buildExcelReportWorkbook();
 
-  assert.deepEqual(JSON.parse(JSON.stringify(workbook.SheetNames)), ['Summary', 'Commissions', 'Comparison', 'Settings']);
+  assert.deepEqual(JSON.parse(JSON.stringify(workbook.SheetNames)), ['Summary', 'Commissions', 'New Zone Agents', 'Comparison', 'Settings']);
   assert.match(workbook.Sheets.Commissions.I2.f, /VLOOKUP/);
   assert.equal(workbook.Sheets.Commissions.K2.f, 'MAX(0,I2-J2)');
-  assert.equal(workbook.Sheets.Summary.B5.f, 'SUM(Commissions!I2:I2)');
+  assert.equal(workbook.Sheets.Summary.B5.f, 'SUM(Commissions!I2:I3)');
+  assert.match(workbook.Sheets['New Zone Agents'].H2.f, /SUMIFS\(Commissions!/);
+});
+
+test('new-zone agent summary totals final cabinet calculations without changing cabinet tiers', () => {
+  const app = loadCurrentApp();
+  app.state.data = {
+    old: [],
+    new: [
+      { name: 'FDT-94', owner: 'Saeed Ammar', p35: 100, p45: 0, p65: 0, customTier: 'auto', paid: 1000 },
+      { name: 'FDT-95', owner: 'Saeed Ammar', p35: 0, p45: 250, p65: 0, customTier: 'auto', paid: 2000 },
+      { name: 'FDT-103', owner: 'Ahmed', p35: 0, p45: 0, p65: 10, customTier: 'auto', paid: 0 },
+    ],
+  };
+
+  const summaries = app.newZoneOwnerSummaries();
+  const saeed = summaries.find((item) => item.owner === 'Saeed Ammar');
+  assert.deepEqual(JSON.parse(JSON.stringify(saeed.cabinets)), ['FDT-94', 'FDT-95']);
+  assert.equal(saeed.qty, 350);
+  assert.equal(saeed.total, app.calc(app.state.data.new[0]).total + app.calc(app.state.data.new[1]).total);
+  assert.equal(saeed.paid, 3000);
 });
