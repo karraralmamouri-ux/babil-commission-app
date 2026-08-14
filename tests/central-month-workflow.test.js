@@ -84,7 +84,7 @@ test('Excel report contains auditable formulas, comparison, and settings sheets'
   assert.equal(workbook.Sheets['Agent Hierarchy'].B2.v, 'Agent');
 });
 
-test('agent hierarchy keeps the principal above old-zone sub-agents and new-zone cabinets', () => {
+test('agent hierarchy keeps the principal above FDTs and each FDT above its parents', () => {
   const app = loadCurrentApp();
   app.state.data = {
     old: [
@@ -99,7 +99,10 @@ test('agent hierarchy keeps the principal above old-zone sub-agents and new-zone
   assert.equal(hierarchy[0].owner, 'Saeed Ammar');
   assert.deepEqual(JSON.parse(JSON.stringify(hierarchy[0].parents.map((parent) => parent.name))), ['r.saeed.ammar', 'r.saeed.ammar.sub1']);
   assert.deepEqual(JSON.parse(JSON.stringify(hierarchy[0].parents[1].details.map((detail) => detail.label))), ['FDT-94', 'FDT-100']);
+  assert.deepEqual(JSON.parse(JSON.stringify(hierarchy[0].fdts.map((fdt) => fdt.label))), ['FDT-94', 'FDT-99', 'FDT-100']);
+  assert.equal(hierarchy[0].fdts[0].parents[0].name, 'r.saeed.ammar.sub1');
   assert.equal(hierarchy[0].qty, 9);
+  assert.equal(hierarchy[0].total, hierarchy[0].fdts.reduce((sum, fdt) => sum + fdt.total, 0));
   assert.equal(hierarchy[0].total, hierarchy[0].parents.reduce((sum, parent) => sum + parent.total, 0));
 });
 
