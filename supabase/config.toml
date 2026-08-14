@@ -5,5 +5,5 @@ verify_jwt = false
 entrypoint = "./functions/admin-create-user/index.ts"
 
 [functions.admin-users]
-verify_jwt = true
+verify_jwt = false
 entrypoint = "./functions/admin-users/index.ts"

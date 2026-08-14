@@ -26,7 +26,6 @@ Deno.serve(async (req) => {
   }
 
   const url = Deno.env.get("SUPABASE_URL")!;
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const bearer = req.headers.get("Authorization") || "";
 
@@ -34,18 +33,17 @@ Deno.serve(async (req) => {
     return reply({ error: "Unauthorized" }, 401);
   }
 
-  const callerClient = createClient(url, anonKey, {
-    global: { headers: { Authorization: bearer } },
+  const token = bearer.slice("Bearer ".length).trim();
+  const admin = createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 
   const { data: userData, error: userError } =
-    await callerClient.auth.getUser();
+    await admin.auth.getUser(token);
 
   if (userError || !userData.user) {
     return reply({ error: "Unauthorized" }, 401);
   }
-
-  const admin = createClient(url, serviceKey);
 
   const { data: callerProfile, error: profileError } = await admin
     .from("profiles")
@@ -104,7 +102,29 @@ Deno.serve(async (req) => {
         is_active: true,
       });
 
-      if (upsertError) throw upsertError;
+      if (upsertError) {
+        await admin.auth.admin.deleteUser(created.user.id);
+        throw upsertError;
+      }
+
+      const { error: auditError } = await admin.from("audit_logs").insert({
+        actor_id: userData.user.id,
+        action: "user.created",
+        entity_type: "profile",
+        entity_id: created.user.id,
+        after_data: { role, is_active: true },
+        request_id: crypto.randomUUID(),
+      });
+
+      if (auditError) {
+        const { error: cleanupError } = await admin.auth.admin.deleteUser(
+          created.user.id,
+        );
+        if (cleanupError) {
+          console.error("User creation rollback failed", cleanupError);
+        }
+        throw auditError;
+      }
 
       return reply(
         {
@@ -127,6 +147,15 @@ Deno.serve(async (req) => {
         return reply({ error: "User id is required" }, 400);
       }
 
+      const { data: targetProfile, error: targetError } = await admin
+        .from("profiles")
+        .select("id, full_name, email, role, is_active")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (targetError) throw targetError;
+      if (!targetProfile) return reply({ error: "User not found" }, 404);
+
       const profilePatch: Record<string, unknown> = {};
 
       if (body.role !== undefined) {
@@ -143,6 +172,23 @@ Deno.serve(async (req) => {
         profilePatch.is_active = Boolean(body.is_active);
       }
 
+      const hasProfileChange = Object.keys(profilePatch).length > 0;
+      const hasPasswordChange = body.password !== undefined;
+
+      if (hasProfileChange && hasPasswordChange) {
+        return reply(
+          { error: "Profile and password changes must be separate requests" },
+          400,
+        );
+      }
+
+      if (hasPasswordChange && String(body.password).length < 8) {
+        return reply(
+          { error: "Password must be at least 8 characters" },
+          400,
+        );
+      }
+
       if (
         id === userData.user.id &&
         (profilePatch.is_active === false ||
@@ -155,30 +201,82 @@ Deno.serve(async (req) => {
         );
       }
 
-      if (Object.keys(profilePatch).length) {
-        const { error } = await admin
+      if (hasProfileChange) {
+        const { data: updatedProfile, error } = await admin
           .from("profiles")
           .update(profilePatch)
-          .eq("id", id);
+          .eq("id", id)
+          .select("id, full_name, email, role, is_active")
+          .single();
 
         if (error) throw error;
+
+        const { error: auditError } = await admin.from("audit_logs").insert({
+          actor_id: userData.user.id,
+          action: "user.permissions.updated",
+          entity_type: "profile",
+          entity_id: id,
+          before_data: {
+            role: targetProfile.role,
+            is_active: targetProfile.is_active,
+          },
+          after_data: {
+            role: updatedProfile.role,
+            is_active: updatedProfile.is_active,
+          },
+          request_id: crypto.randomUUID(),
+        });
+
+        if (auditError) {
+          const { error: rollbackError } = await admin
+            .from("profiles")
+            .update({
+              role: targetProfile.role,
+              is_active: targetProfile.is_active,
+            })
+            .eq("id", id);
+
+          if (rollbackError) {
+            console.error("User update rollback failed", rollbackError);
+          }
+          throw auditError;
+        }
       }
 
-      if (body.password !== undefined) {
+      if (hasPasswordChange) {
         const password = String(body.password);
 
-        if (password.length < 8) {
-          return reply(
-            { error: "Password must be at least 8 characters" },
-            400,
-          );
-        }
+        const { error: requestAuditError } = await admin
+          .from("audit_logs")
+          .insert({
+            actor_id: userData.user.id,
+            action: "user.password.update.requested",
+            entity_type: "profile",
+            entity_id: id,
+            before_data: { password_changed: false },
+            after_data: { password_change_requested: true },
+            request_id: crypto.randomUUID(),
+          });
+
+        if (requestAuditError) throw requestAuditError;
 
         const { error } = await admin.auth.admin.updateUserById(id, {
           password,
         });
 
         if (error) throw error;
+
+        const { error: auditError } = await admin.from("audit_logs").insert({
+          actor_id: userData.user.id,
+          action: "user.password.updated",
+          entity_type: "profile",
+          entity_id: id,
+          before_data: { password_changed: false },
+          after_data: { password_changed: true },
+          request_id: crypto.randomUUID(),
+        });
+
+        if (auditError) console.error("Password completion audit failed", auditError);
       }
 
       return reply({ ok: true });

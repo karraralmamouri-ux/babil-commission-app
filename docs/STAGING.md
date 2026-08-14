@@ -17,7 +17,7 @@
 - migration `20260804203000_add_nonnegative_financial_constraints.sql`.
 - migration `20260804230000_add_atomic_financial_rpcs.sql`.
 - migration `20260809190000_add_central_month_workflow.sql`.
-- Edge Function `admin-users` مع التحقق من JWT.
+- Edge Function `admin-users` تتحقق من bearer token والحساب النشط ودور `admin` داخل الدالة؛ فحص JWT القديم في بوابة المنصة معطل لتجنب رفض رموز الجلسة الحديثة قبل وصولها إلى هذا التحقق.
 - لم تُنشر `admin-create-user` القديمة لأنها غير مستخدمة وJWT معطل في نسختها التاريخية.
 
 أُعيد ضبط Staging وبناؤه بالكامل من migrations، ثم ظهر الإصداران متطابقين محلياً وبعيداً في سجل Supabase.
@@ -77,6 +77,7 @@
 - منع `monitor` و`viewer` من الكتابة.
 - رفض قاعدة البيانات للكميات والمدفوعات السالبة.
 - نجاح `admin-users` للمدير ورفض المحاسب بحالة HTTP 403.
+- بعد تغيير `admin-users` يجب أيضاً التحقق من 401 دون token، و403 للأدوار غير الإدارية وللأدمن المعطل، ونجاح list للأدمن، ثم إنشاء حساب fixture وتغيير دوره وحالته وكلمة مروره مع فحص `audit_logs` وحذف fixture بعد الاختبار.
 - حذف fixture المالي المؤقت في نهاية الاختبار حتى عند الفشل.
 - رفض الكتابة المالية المباشرة لكل جلسات المتصفح.
 - نجاح `record_commission_payment` للمدير/المحاسب ورفض المتابع والمشاهد، مع حساب المستحق خادمياً ومنع تجاوزه.

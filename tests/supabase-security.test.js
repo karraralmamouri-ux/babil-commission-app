@@ -14,19 +14,26 @@ test('deployed Edge Function sources are tracked without embedded keys', () => {
   const legacyCreateUser = read('supabase/functions/admin-create-user/index.ts');
   const combined = `${adminUsers}\n${legacyCreateUser}`;
 
-  assert.match(adminUsers, /auth\.getUser\(\)/);
+  assert.match(adminUsers, /auth\.getUser\(token\)/);
   assert.match(adminUsers, /callerProfile\.role !== "admin"/);
   assert.match(adminUsers, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(adminUsers, /action: "user\.created"/);
+  assert.match(adminUsers, /action: "user\.permissions\.updated"/);
+  assert.match(adminUsers, /action: "user\.password\.update\.requested"/);
+  assert.match(adminUsers, /action: "user\.password\.updated"/);
+  assert.doesNotMatch(adminUsers, /after_data:\s*\{\s*full_name,\s*email/);
+  assert.match(adminUsers, /Profile and password changes must be separate requests/);
+  assert.match(adminUsers, /User update rollback failed/);
   assert.doesNotMatch(combined, /sbp_[a-zA-Z0-9_-]{20,}/);
   assert.doesNotMatch(combined, /sb_secret_[a-zA-Z0-9_-]{20,}/);
   assert.doesNotMatch(combined, /eyJ[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}/);
 });
 
-test('function configuration preserves the reviewed remote JWT settings', () => {
+test('admin-users verifies bearer tokens inside the function', () => {
   const config = read('supabase/config.toml');
 
   assert.match(config, /\[functions\.admin-create-user\][\s\S]*?verify_jwt = false/);
-  assert.match(config, /\[functions\.admin-users\][\s\S]*?verify_jwt = true/);
+  assert.match(config, /\[functions\.admin-users\][\s\S]*?verify_jwt = false/);
 });
 
 test('authorization migration removes profile self-mutation paths', () => {
