@@ -16,3 +16,12 @@ test('admin has complete account-management permissions in the interface', () =>
 test('Supabase errors preserve the Edge Function error message', () => {
   assert.match(html, /body\?\.error_description\|\|body\?\.error\|\|/);
 });
+
+test('account management requires explicit role saves and confirmed passwords', () => {
+  assert.match(html, /saveManagedUserRole\('\$\{esc\(u\.id\)\}'/);
+  assert.doesNotMatch(html, /onchange="updateManagedUser\('/);
+  assert.match(html, /id="passwordModal"[\s\S]*id="managedPasswordConfirm"/);
+  assert.match(html, /password!==confirmation/);
+  assert.match(html, /usersRoleFilter/);
+  assert.match(html, /usersStatusFilter/);
+});

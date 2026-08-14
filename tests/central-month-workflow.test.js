@@ -58,6 +58,18 @@ test('admin operations, manual month selection, language and Excel report are ex
   assert.doesNotMatch(html, /\{name:'حيدر طالب',p35:/);
 });
 
+test('workspace exposes safe loading, empty, filtering, and mobile navigation states', () => {
+  assert.match(html, /id="loadingState"/);
+  assert.match(html, /id="emptyState"/);
+  assert.match(html, /function renderWorkspaceState\(\)/);
+  assert.match(html, /function scheduleFilterRender\(\)/);
+  assert.match(html, /id="filterSummary"/);
+  assert.match(html, /function toggleMobileMenu\(force\)/);
+  assert.match(html, /@media\(max-width:820px\)/);
+  assert.match(html, /id="readinessInsights"/);
+  assert.match(html, /id="operationalAlerts"/);
+});
+
 test('Excel report contains auditable formulas, comparison, and settings sheets', () => {
   const app = loadCurrentApp();
   app.state.data = { old: [{ name: 'Agent', p35: 2, p45: 1, p65: 0, customTier: 't1', paid: 1000 }], new: [] };
