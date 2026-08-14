@@ -117,6 +117,7 @@ function loadCurrentApp(options = {}) {
       calculateRawImport,
       syncTierGroupBasis,
       applyRawImportResult,
+      agentHierarchySummaries,
       backupStateSnapshot,
       buildExcelReportWorkbook,
       applyCentralPaymentResult,
