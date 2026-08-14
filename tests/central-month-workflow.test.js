@@ -7,6 +7,7 @@ const { loadCurrentApp } = require('./load-current-app');
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const migration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260809190000_add_central_month_workflow.sql'), 'utf8');
+const breakdownMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '20260815113000_add_commission_source_breakdown.sql'), 'utf8');
 
 test('central month workflow stores group identity and shared import settings', () => {
   assert.match(migration, /add column tier_group_id text/);
@@ -29,8 +30,8 @@ test('prepared rows freeze the server-verifiable applied tier and group basis', 
   const app = loadCurrentApp();
   app.state.data = {
     old: [
-      { name: 'Main', p35: 100, p45: 0, p65: 0, customTier: 'auto', tierGroupId: 'g1', tierGroupName: 'Main', tierBasisQty: 201, sourceAccount: 'r.main', paid: 0 },
-      { name: 'Main sub1', p35: 101, p45: 0, p65: 0, customTier: 'auto', tierGroupId: 'g1', tierGroupName: 'Main', tierBasisQty: 201, sourceAccount: 'r.main.sub1', paid: 0 },
+      { name: 'Main', p35: 100, p45: 0, p65: 0, customTier: 'auto', tierGroupId: 'g1', tierGroupName: 'Main', tierBasisQty: 201, sourceAccount: 'r.main', sourceBreakdown: [{ parent: 'r.main', fdt: 20, p35: 100, p45: 0, p65: 0 }], paid: 0 },
+      { name: 'Main sub1', p35: 101, p45: 0, p65: 0, customTier: 'auto', tierGroupId: 'g1', tierGroupName: 'Main', tierBasisQty: 201, sourceAccount: 'r.main.sub1', sourceBreakdown: [{ parent: 'r.main.sub1', fdt: 21, p35: 101, p45: 0, p65: 0 }], paid: 0 },
     ],
     new: [],
   };
@@ -87,18 +88,35 @@ test('agent hierarchy keeps the principal above old-zone sub-agents and new-zone
   const app = loadCurrentApp();
   app.state.data = {
     old: [
-      { name: 'Saeed Ammar', owner: 'Saeed Ammar', sourceAccount: 'r.saeed.ammar', p35: 2, p45: 0, p65: 0, customTier: 't1', paid: 0 },
-      { name: 'Saeed Ammar sub1', owner: 'Saeed Ammar', sourceAccount: 'r.saeed.ammar.sub1', p35: 3, p45: 0, p65: 0, customTier: 't1', paid: 0 },
+      { name: 'Saeed Ammar', owner: 'Saeed Ammar', sourceAccount: 'r.saeed.ammar', sourceBreakdown: [{ parent: 'r.saeed.ammar', fdt: 99, p35: 2, p45: 0, p65: 0 }], p35: 2, p45: 0, p65: 0, customTier: 't1', paid: 0 },
+      { name: 'Saeed Ammar sub1', owner: 'Saeed Ammar', sourceAccount: 'r.saeed.ammar.sub1', sourceBreakdown: [{ parent: 'r.saeed.ammar.sub1', fdt: 100, p35: 3, p45: 0, p65: 0 }], p35: 3, p45: 0, p65: 0, customTier: 't1', paid: 0 },
     ],
-    new: [{ name: 'FDT-94', owner: 'Saeed Ammar', p35: 4, p45: 0, p65: 0, customTier: 't1', paid: 0 }],
+    new: [{ name: 'FDT-94', owner: 'Saeed Ammar', sourceBreakdown: [{ parent: 'r.saeed.ammar.sub1', fdt: 94, p35: 4, p45: 0, p65: 0 }], p35: 4, p45: 0, p65: 0, customTier: 't1', paid: 0 }],
   };
 
   const hierarchy = app.agentHierarchySummaries();
   assert.equal(hierarchy.length, 1);
   assert.equal(hierarchy[0].owner, 'Saeed Ammar');
-  assert.deepEqual(JSON.parse(JSON.stringify(hierarchy[0].children.map((child) => child.type))), ['main', 'sub', 'cabinet']);
+  assert.deepEqual(JSON.parse(JSON.stringify(hierarchy[0].parents.map((parent) => parent.name))), ['r.saeed.ammar', 'r.saeed.ammar.sub1']);
+  assert.deepEqual(JSON.parse(JSON.stringify(hierarchy[0].parents[1].details.map((detail) => detail.label))), ['FDT-94', 'FDT-100']);
   assert.equal(hierarchy[0].qty, 9);
-  assert.equal(hierarchy[0].total, hierarchy[0].children.reduce((sum, child) => sum + child.calculated.total, 0));
+  assert.equal(hierarchy[0].total, hierarchy[0].parents.reduce((sum, parent) => sum + parent.total, 0));
+});
+
+test('source parent and FDT allocation is stored centrally and reconciled before publishing', () => {
+  assert.match(breakdownMigration, /add column if not exists source_breakdown jsonb/);
+  assert.match(breakdownMigration, /jsonb_typeof\(source_breakdown\) = 'array'/);
+  assert.match(breakdownMigration, /Source breakdown does not reconcile/);
+  assert.match(breakdownMigration, /source_breakdown = excluded\.source_breakdown/);
+  assert.match(breakdownMigration, /source_breakdown is required for a non-empty row/);
+  assert.match(breakdownMigration, /before insert or update of p35, p45, p65, source_breakdown/);
+  assert.match(html, /الكمية مرتبطة بتفاصيل الملف الخام؛ أعد رفع الملف لتعديلها/);
+});
+
+test('publishing refuses positive quantities without parent and FDT allocation', () => {
+  const app = loadCurrentApp();
+  app.state.data = { old: [{ name: 'Manual', p35: 1, p45: 0, p65: 0, customTier: 't1', paid: 0 }], new: [] };
+  assert.throws(() => app.rowsForCentralPublish(), /تفاصيل parent وFDT مفقودة/);
 });
 
 test('new-zone agent summary totals final cabinet calculations without changing cabinet tiers', () => {
