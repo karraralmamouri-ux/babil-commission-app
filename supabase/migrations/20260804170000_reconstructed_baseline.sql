@@ -50,6 +50,7 @@ create table public.commission_rows (
   p45 integer not null default 0,
   p65 integer not null default 0,
   custom_tier text not null default 'auto',
+  source_breakdown jsonb,
   paid numeric not null default 0,
   payment_date date,
   created_by uuid,
@@ -61,7 +62,8 @@ create table public.commission_rows (
   constraint commission_rows_month_id_fkey foreign key (month_id) references public.commission_months(id) on delete cascade,
   constraint commission_rows_created_by_fkey foreign key (created_by) references auth.users(id),
   constraint commission_rows_updated_by_fkey foreign key (updated_by) references auth.users(id),
-  constraint commission_rows_zone_check check (zone = any (array['old'::text, 'new'::text]))
+  constraint commission_rows_zone_check check (zone = any (array['old'::text, 'new'::text])),
+  constraint commission_rows_source_breakdown_array_check check (source_breakdown is null or jsonb_typeof(source_breakdown) = 'array')
 );
 
 create table public.commission_agents (

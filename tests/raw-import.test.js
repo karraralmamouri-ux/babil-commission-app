@@ -29,6 +29,9 @@ test('raw import keeps main and sub accounts separate while sharing the pooled o
   ]);
   assert.equal(result.stats.duplicateIds, 1);
   assert.equal(result.stats.ignoredProfiles, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.old[0].sourceBreakdown)), [
+    { parent: 'r.main', fdt: 20, p35: 1, p45: 0, p65: 0 },
+  ]);
 });
 
 test('each old-zone account is priced with the tier selected from its whole principal group', () => {
@@ -67,6 +70,24 @@ test('new-zone cabinet ownership overrides parent and calculates each FDT separa
     ['FDT-94', 1, 0],
     ['FDT-95', 0, 1],
   ]);
+  assert.equal(result.new[0].sourceBreakdown[0].parent, 'r.unknown');
+  assert.equal(result.new[0].sourceBreakdown[0].fdt, 94);
+});
+
+test('a new-zone FDT preserves each parent share while retaining one cabinet total', () => {
+  const app = loadCurrentApp();
+  const result = app.calculateRawImport([
+    { id: 20, parent: 'r.main', profile_name: 'P-35000', lastname: 'FDT:94 FAT:1 PORT:1' },
+    { id: 21, parent: 'r.main.sub1', profile_name: 'P-45000', lastname: 'FDT:94 FAT:1 PORT:2' },
+  ], config());
+
+  assert.equal(result.new.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.new[0].sourceBreakdown)), [
+    { parent: 'r.main', fdt: 94, p35: 1, p45: 0, p65: 0 },
+    { parent: 'r.main.sub1', fdt: 94, p35: 0, p45: 1, p65: 0 },
+  ]);
+  assert.equal(result.new[0].p35, 1);
+  assert.equal(result.new[0].p45, 1);
 });
 
 test('applying raw results preserves existing manual tier and payment fields', () => {
