@@ -75,11 +75,30 @@ test('Excel report contains auditable formulas, comparison, and settings sheets'
   app.state.data = { old: [{ name: 'Agent', p35: 2, p45: 1, p65: 0, customTier: 't1', paid: 1000 }], new: [{ name: 'FDT-94', owner: 'Saeed', p35: 3, p45: 0, p65: 0, customTier: 't1', paid: 0 }] };
   const workbook = app.buildExcelReportWorkbook();
 
-  assert.deepEqual(JSON.parse(JSON.stringify(workbook.SheetNames)), ['Summary', 'Commissions', 'New Zone Agents', 'Comparison', 'Settings']);
+  assert.deepEqual(JSON.parse(JSON.stringify(workbook.SheetNames)), ['Summary', 'Commissions', 'Agent Hierarchy', 'New Zone Agents', 'Comparison', 'Settings']);
   assert.match(workbook.Sheets.Commissions.I2.f, /VLOOKUP/);
   assert.equal(workbook.Sheets.Commissions.K2.f, 'MAX(0,I2-J2)');
   assert.equal(workbook.Sheets.Summary.B5.f, 'SUM(Commissions!I2:I3)');
   assert.match(workbook.Sheets['New Zone Agents'].H2.f, /SUMIFS\(Commissions!/);
+  assert.equal(workbook.Sheets['Agent Hierarchy'].B2.v, 'Agent');
+});
+
+test('agent hierarchy keeps the principal above old-zone sub-agents and new-zone cabinets', () => {
+  const app = loadCurrentApp();
+  app.state.data = {
+    old: [
+      { name: 'Saeed Ammar', owner: 'Saeed Ammar', sourceAccount: 'r.saeed.ammar', p35: 2, p45: 0, p65: 0, customTier: 't1', paid: 0 },
+      { name: 'Saeed Ammar sub1', owner: 'Saeed Ammar', sourceAccount: 'r.saeed.ammar.sub1', p35: 3, p45: 0, p65: 0, customTier: 't1', paid: 0 },
+    ],
+    new: [{ name: 'FDT-94', owner: 'Saeed Ammar', p35: 4, p45: 0, p65: 0, customTier: 't1', paid: 0 }],
+  };
+
+  const hierarchy = app.agentHierarchySummaries();
+  assert.equal(hierarchy.length, 1);
+  assert.equal(hierarchy[0].owner, 'Saeed Ammar');
+  assert.deepEqual(JSON.parse(JSON.stringify(hierarchy[0].children.map((child) => child.type))), ['main', 'sub', 'cabinet']);
+  assert.equal(hierarchy[0].qty, 9);
+  assert.equal(hierarchy[0].total, hierarchy[0].children.reduce((sum, child) => sum + child.calculated.total, 0));
 });
 
 test('new-zone agent summary totals final cabinet calculations without changing cabinet tiers', () => {
