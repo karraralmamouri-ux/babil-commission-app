@@ -4,7 +4,7 @@ import path from 'node:path';
 const EXPECTED_REF = 'fbgffpxpskjzgheheikd'; // babil-commission-production, separated 2026-08-11
 const FORBIDDEN_REFS = {
   qolrsefpbvfuugwyqggu: 'Employee Performance Dashboard (V1/Pulse) — shared project Commission was separated FROM, do NOT deploy Commission tooling here',
-  unohqhxubraelqgjhxgh: 'babil-commission-staging — paused, not the production target',
+  unohqhxubraelqgjhxgh: 'babil-commission-staging — the test target, never the production one',
 };
 
 const refFile = path.join(process.cwd(), 'supabase', '.temp', 'project-ref');
@@ -19,7 +19,7 @@ const linkedRef = fs.readFileSync(refFile, 'utf8').trim();
 if (linkedRef in FORBIDDEN_REFS) {
   console.error(
     `REFUSING: this repo is linked to ${linkedRef} (${FORBIDDEN_REFS[linkedRef]}).\n` +
-    `Commission tooling must never run against the Employee project or paused staging. Re-link with:\n` +
+    `Production tooling must never run against staging or the Employee project. Re-link with:\n` +
     `  npx supabase link --project-ref ${EXPECTED_REF}`
   );
   process.exit(1);

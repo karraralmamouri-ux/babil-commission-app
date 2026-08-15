@@ -5,12 +5,18 @@
   "description": "Characterization tests for the Babil Commission App baseline.",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "test:staging": "node scripts/verify-supabase-staging.mjs",
-    "test:staging-admin": "node scripts/verify-admin-users-staging.mjs",
-    "test:staging-breakdown": "node scripts/verify-source-breakdown-staging.mjs",
+    "test:staging": "npm run guard:staging-ref && node scripts/verify-supabase-staging.mjs",
+    "test:staging-admin": "npm run guard:staging-ref && node scripts/verify-admin-users-staging.mjs",
+    "test:staging-breakdown": "npm run guard:staging-ref && node scripts/verify-source-breakdown-staging.mjs",
+    "localdb:up": "bash tests/sql/local-db-up.sh",
+    "localdb:rebuild": "bash tests/sql/rebuild-local.sh",
+    "localdb:test": "bash tests/sql/run-local-tests.sh",
+    "localdb:down": "docker rm -f babil-local-pg",
     "inspect:backup": "node scripts/inspect-local-backup.mjs",
     "reconcile:backup": "node scripts/reconcile-local-backup.mjs",
-    "guard:project-ref": "node scripts/assert-project-ref.mjs"
+    "guard:project-ref": "node scripts/assert-project-ref.mjs",
+    "guard:staging-ref": "node scripts/assert-staging-project-ref.mjs",
+    "migrate:staging": "npm run guard:staging-ref && npx supabase db push"
   },
   "engines": {
     "node": ">=20"

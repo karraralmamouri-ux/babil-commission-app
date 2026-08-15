@@ -76,12 +76,17 @@ test('Excel report contains auditable formulas, comparison, and settings sheets'
   app.state.data = { old: [{ name: 'Agent', p35: 2, p45: 1, p65: 0, customTier: 't1', paid: 1000 }], new: [{ name: 'FDT-94', owner: 'Saeed', p35: 3, p45: 0, p65: 0, customTier: 't1', paid: 0 }] };
   const workbook = app.buildExcelReportWorkbook();
 
-  assert.deepEqual(JSON.parse(JSON.stringify(workbook.SheetNames)), ['Summary', 'Commissions', 'Agent Hierarchy', 'New Zone Agents', 'Comparison', 'Settings']);
+  assert.deepEqual(JSON.parse(JSON.stringify(workbook.SheetNames)), ['Summary', 'Commissions', 'NEW FDT Summary', 'NEW FDT Agents', 'NEW FDT Sources', 'New Zone Agents', 'Comparison', 'Settings']);
   assert.match(workbook.Sheets.Commissions.I2.f, /VLOOKUP/);
   assert.equal(workbook.Sheets.Commissions.K2.f, 'MAX(0,I2-J2)');
   assert.equal(workbook.Sheets.Summary.B5.f, 'SUM(Commissions!I2:I3)');
   assert.match(workbook.Sheets['New Zone Agents'].H2.f, /SUMIFS\(Commissions!/);
-  assert.equal(workbook.Sheets['Agent Hierarchy'].B2.v, 'Agent');
+  // The new-zone report is cabinet-first: one row per FDT, then agents, then source accounts.
+  assert.equal(workbook.Sheets['NEW FDT Summary'].A2.v, 'FDT-94');
+  // This fixture has no source breakdown, so no agent split may be invented.
+  assert.equal(workbook.Sheets['NEW FDT Summary'].B2.v, 0);
+  assert.equal(workbook.Sheets['NEW FDT Agents'].A2, undefined);
+  assert.equal(workbook.Sheets['NEW FDT Sources'].A2, undefined);
 });
 
 test('agent hierarchy keeps the principal above FDTs and each FDT above its parents', () => {

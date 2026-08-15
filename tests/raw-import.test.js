@@ -30,7 +30,7 @@ test('raw import keeps main and sub accounts separate while sharing the pooled o
   assert.equal(result.stats.duplicateIds, 1);
   assert.equal(result.stats.ignoredProfiles, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(result.old[0].sourceBreakdown)), [
-    { parent: 'r.main', fdt: 20, p35: 1, p45: 0, p65: 0 },
+    { parent: 'r.main', fdt: 20, agentId: 'main', agentName: 'Main agent', p35: 1, p45: 0, p65: 0 },
   ]);
 });
 
@@ -83,8 +83,8 @@ test('a new-zone FDT preserves each parent share while retaining one cabinet tot
 
   assert.equal(result.new.length, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(result.new[0].sourceBreakdown)), [
-    { parent: 'r.main', fdt: 94, p35: 1, p45: 0, p65: 0 },
-    { parent: 'r.main.sub1', fdt: 94, p35: 0, p45: 1, p65: 0 },
+    { parent: 'r.main', fdt: 94, agentId: 'main', agentName: 'Main agent', p35: 1, p45: 0, p65: 0 },
+    { parent: 'r.main.sub1', fdt: 94, agentId: 'main', agentName: 'Main agent', p35: 0, p45: 1, p65: 0 },
   ]);
   assert.equal(result.new[0].p35, 1);
   assert.equal(result.new[0].p45, 1);

@@ -6,6 +6,7 @@
 <title>لوحة عمولات الوكلاء — HRINS</title>
 <meta name="theme-color" content="#12161c">
 <script src="./assets/vendor/xlsx.full.min.js"></script>
+<script src="./assets/js/installation-fees.js"></script>
 <style>
 :root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
@@ -75,6 +76,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
    <button class="side-btn active" data-nav-target="dashboardSection" onclick="scrollToSection('dashboardSection',this)">▦ ملخص العمولات</button>
    <button class="side-btn" data-nav-target="agentsSection" onclick="scrollToSection('agentsSection',this)">♟ تفاصيل الوكلاء والكابينات</button>
    <button class="side-btn" onclick="openAuditLog()">▤ سجل العمليات</button>
+   <button class="side-btn" data-nav-target="installationSection" onclick="scrollToSection('installationSection',this)">🔧 أجور التنصيب</button>
   </nav>
  </div>
  <div class="side-section">
@@ -197,6 +199,38 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 <section id="operationalSection" class="grid2 section-anchor">
  <div class="box"><h3>✦ جاهزية الشهر</h3><div id="readinessInsights" class="insight-list"></div></div>
  <div class="box"><h3>⚑ تنبيهات تشغيلية</h3><div id="operationalAlerts" class="insight-list"></div></div>
+</section>
+<section id="installationSection" class="section-anchor" style="margin-top:16px">
+ <div class="box">
+  <h3>🔧 أجور التنصيب</h3>
+  <div class="raw-config-note">نطاق مستقل عن عمولات الوكلاء. الدفعات هنا P1 إلى P4 وDONE، ولا علاقة لها بـP35/P45/P65 أو شرائح التير. لا يُصرف لأي مشترك قبل اعتماد فاتورته.</div>
+  <div id="installationCards" class="cards" style="margin:12px 0"></div>
+  <div class="toolbar" style="margin-bottom:10px">
+   <div class="controls" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+    <input id="installationSearch" class="input" placeholder="بحث بالمشترك أو الاسم أو الوكيل" style="min-width:220px" oninput="renderInstallation()">
+    <select id="installationPeriodFilter" class="input" onchange="renderInstallation()"><option value="all">كل الفترات</option></select>
+    <select id="installationResellerFilter" class="input" onchange="renderInstallation()"><option value="all">كل الوكلاء</option></select>
+    <select id="installationZoneFilter" class="input" onchange="renderInstallation()"><option value="all">كل المناطق</option><option value="old">OLD</option><option value="new">NEW</option></select>
+    <select id="installationFdtFilter" class="input" onchange="renderInstallation()"><option value="all">كل الكابينات</option></select>
+    <select id="installationStageFilter" class="input" onchange="renderInstallation()"><option value="all">كل الدفعات</option><option value="P1">P1</option><option value="P2">P2</option><option value="P3">P3</option><option value="P4">P4</option><option value="DONE">DONE</option></select>
+    <select id="installationInvoiceFilter" class="input" onchange="renderInstallation()"><option value="all">كل حالات الفاتورة</option><option value="pending">بانتظار التدقيق</option><option value="approved">معتمدة</option><option value="missing">فاتورة مفقودة</option><option value="rejected">مرفوضة</option></select>
+    <select id="installationPaymentFilter" class="input" onchange="renderInstallation()"><option value="all">كل حالات الصرف</option><option value="awaiting_invoice">بانتظار الفاتورة</option><option value="eligible">مؤهل للصرف</option><option value="paid">مصروف</option><option value="not_eligible">غير مؤهل</option></select>
+    <button class="btn" onclick="clearInstallationFilters()">مسح التصفية</button>
+    <span id="installationFilterSummary" class="muted" style="font-size:10px"></span>
+   </div>
+  </div>
+  <div id="installationPanel" class="panel sticky-table"></div>
+  <div class="zoneActions">
+   <div class="actions">
+    <button class="btn" data-permission="edit" onclick="document.getElementById('installationFileInput').click()">📥 استيراد ملف أجور التنصيب</button>
+    <button class="btn gold" data-permission="payment" onclick="openInstallationPaymentReview()">💳 مراجعة صرف وكيل</button>
+    <button class="btn" onclick="exportInstallationCsv()">📤 تصدير CSV</button>
+    <button class="btn" onclick="exportInstallationExcel()">▦ تصدير Excel</button>
+    <button class="btn" onclick="refreshInstallation()">↻ تحديث</button>
+   </div>
+  </div>
+  <input type="file" id="installationFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importInstallationFile(event)">
+ </div>
 </section>
 </div>
 </main>
@@ -656,7 +690,9 @@ function calculateRawImport(rows,config){
  config.agents.forEach((agent,agentOrder)=>(agent.accounts||[]).forEach((account,accountOrder)=>accounts.set(rawText(account).toLowerCase(),{agent,account:rawText(account),agentOrder,accountOrder,label:oldAccountLabel(agent,account,accountOrder)})));
  const seenIds=new Set(),oldBuckets=new Map(),newBuckets=new Map(),exceptions=[];let duplicateIds=0,ignoredProfiles=0,ignoredAccounts=0;
  const emptyCounts=()=>({p35:0,p45:0,p65:0});
- const recordBreakdown=(bucket,parent,fdt,field)=>{const key=`${rawText(parent).toLowerCase()}\u001f${fdt??''}`,entry=bucket.breakdown.get(key)||{parent:rawText(parent)||'غير محدد',fdt:fdt??null,p35:0,p45:0,p65:0};entry[field]++;bucket.breakdown.set(key,entry)};
+ /* يُحلّ حساب parent إلى الوكيل الحقيقي المرتبط به في الإعدادات؛ الحساب غير المعرّف يبقى بلا وكيل ويظهر كحالة تحتاج ربطًا. */
+ const resolveBreakdownAgent=parent=>{const account=accounts.get(rawText(parent).toLowerCase());return account?{agentId:account.agent.id,agentName:account.agent.name}:{agentId:'',agentName:''}};
+ const recordBreakdown=(bucket,parent,fdt,field)=>{const source=rawText(parent),key=`${source.toLowerCase()}\u001f${fdt??''}`,entry=bucket.breakdown.get(key)||{parent:source||'غير محدد',fdt:fdt??null,...resolveBreakdownAgent(source),p35:0,p45:0,p65:0};entry[field]++;bucket.breakdown.set(key,entry)};
  rows.forEach((row,index)=>{const sheetRow=index+2,id=rawText(rawField(row,'id')),profile=normalizeRawProfile(rawField(row,'profile_name')),parent=rawText(rawField(row,'parent'));
   if(!profiles.has(profile)){ignoredProfiles++;return}if(!id){exceptions.push({row:sheetRow,reason:'معرّف id فارغ',parent});return}if(seenIds.has(id)){duplicateIds++;return}seenIds.add(id);
   const fdt=rawFdt(rawField(row,'lastname')),range=fdt===undefined?null:config.cabinetRanges.find(item=>fdt>=Number(item.from)&&fdt<=Number(item.to));let bucket;
@@ -676,7 +712,7 @@ function centralNumber(value,label,{integer=false}={}){
  if(!Number.isFinite(number)||number<0||(integer&&!Number.isInteger(number)))throw new Error(`قيمة مركزية غير صالحة: ${label}`);
  return number;
 }
-function normalizeSourceBreakdown(value,row,label,{allowLegacyEmpty=false}={}){if(value==null||value==='')return[];if(!Array.isArray(value))throw new Error(`تفاصيل المصدر غير صالحة: ${label}`);if(!value.length){if(!allowLegacyEmpty&&['p35','p45','p65'].some(field=>Number(row[field]||0)>0))throw new Error(`تفاصيل parent وFDT مفقودة للسجل: ${label}. أعد رفع الملف الخام.`);return[]}const normalized=value.map((item,index)=>({parent:String(item?.parent||'').trim(),fdt:item?.fdt==null?null:centralNumber(item.fdt,`${label}[${index}].fdt`,{integer:true}),p35:centralNumber(item?.p35||0,`${label}[${index}].p35`,{integer:true}),p45:centralNumber(item?.p45||0,`${label}[${index}].p45`,{integer:true}),p65:centralNumber(item?.p65||0,`${label}[${index}].p65`,{integer:true})}));if(normalized.some(item=>!item.parent))throw new Error(`يوجد parent مفقود في تفاصيل المصدر: ${label}`);for(const field of ['p35','p45','p65'])if(normalized.reduce((sum,item)=>sum+item[field],0)!==Number(row[field]||0))throw new Error(`مجموع ${field.toUpperCase()} لا يطابق السجل: ${label}`);return normalized}
+function normalizeSourceBreakdown(value,row,label,{allowLegacyEmpty=false}={}){if(value==null||value==='')return[];if(!Array.isArray(value))throw new Error(`تفاصيل المصدر غير صالحة: ${label}`);if(!value.length){if(!allowLegacyEmpty&&['p35','p45','p65'].some(field=>Number(row[field]||0)>0))throw new Error(`تفاصيل parent وFDT مفقودة للسجل: ${label}. أعد رفع الملف الخام.`);return[]}const normalized=value.map((item,index)=>({parent:String(item?.parent||'').trim(),fdt:item?.fdt==null?null:centralNumber(item.fdt,`${label}[${index}].fdt`,{integer:true}),agentId:String(item?.agentId||'').trim(),agentName:String(item?.agentName||'').trim(),p35:centralNumber(item?.p35||0,`${label}[${index}].p35`,{integer:true}),p45:centralNumber(item?.p45||0,`${label}[${index}].p45`,{integer:true}),p65:centralNumber(item?.p65||0,`${label}[${index}].p65`,{integer:true})}));if(normalized.some(item=>!item.parent))throw new Error(`يوجد parent مفقود في تفاصيل المصدر: ${label}`);for(const field of ['p35','p45','p65'])if(normalized.reduce((sum,item)=>sum+item[field],0)!==Number(row[field]||0))throw new Error(`مجموع ${field.toUpperCase()} لا يطابق السجل: ${label}`);return normalized}
 function normalizeCentralTiers(tiers,month){
  if(!Array.isArray(tiers)||!tiers.length)throw new Error(`لا توجد شرائح أسعار صالحة للشهر ${month}`);
  const normalized=tiers.map((tier,index)=>({
@@ -1138,6 +1174,57 @@ function newZoneOwnerSummaries(rows=state.data.new){
 }
 function ownerSummaryStatus(summary){return summary.paid<=0?'pending':summary.paid>=summary.total?'paid':'partial'}
 function sourceBreakdownForRow(row,zone,calculated){if(Array.isArray(row.sourceBreakdown)&&row.sourceBreakdown.length)return row.sourceBreakdown;return[{parent:row.sourceAccount||row.name||'غير محدد',fdt:zone==='new'?rawFdt(row.name):null,p35:calculated.p35,p45:calculated.p45,p65:calculated.p65}]}
+/* المصدر الموحد لتفاصيل الزون الجديد: الكابينة FDT أولاً، وتحتها الوكلاء الذين ساهموا بتفعيلاتها.
+   التير يبقى تير الكابينة؛ حصة الوكيل = كمياته داخل هذه الكابينة × أسعار تير الكابينة. */
+function newZoneFdtBreakdown(rows=state.data.new){
+ const accountAgents=new Map(),cabinets=[];
+ (rows||[]).forEach(row=>(Array.isArray(row.sourceBreakdown)?row.sourceBreakdown:[]).forEach(source=>{
+  const account=String(source?.parent||'').trim().toLowerCase();if(!account)return;
+  const agentId=String(source?.agentId||'').trim();if(!agentId)return;
+  const seen=accountAgents.get(account)||new Set();seen.add(agentId);accountAgents.set(account,seen);
+ }));
+ const conflicts=[...accountAgents.entries()].filter(([,ids])=>ids.size>1).map(([account,ids])=>({account,agentIds:[...ids]}));
+ (rows||[]).forEach((row,index)=>{
+  const calculated=calc(row),tier=calculated.t,fdt=rawFdt(row.name),detailed=Array.isArray(row.sourceBreakdown)&&row.sourceBreakdown.length>0;
+  const cabinet={name:row.name,fdt:fdt===undefined?null:fdt,index,owner:String(row.owner||'').trim(),tierKey:tier?.key||'',tierLabel:tier?.label||'—',p35:calculated.p35,p45:calculated.p45,p65:calculated.p65,qty:calculated.qty,total:calculated.total,paid:calculated.paid,remaining:calculated.remaining,detailed,agents:[],reconciled:true,issues:[]};
+  if(!detailed){cabinet.reconciled=calculated.qty===0;if(calculated.qty>0)cabinet.issues.push('تفاصيل الوكلاء غير متوفرة لهذه الفترة لأنها محفوظة قبل إضافة تفاصيل المصدر. أعد استيراد الملف الخام للحصول على التفاصيل.');cabinets.push(cabinet);return}
+  const byAgent=new Map();
+  row.sourceBreakdown.forEach(source=>{
+   const account=String(source?.parent||'').trim()||'غير محدد',agentId=String(source?.agentId||'').trim(),agentName=String(source?.agentName||'').trim();
+   const key=agentId||`account:${account.toLowerCase()}`,counts={p35:Number(source?.p35)||0,p45:Number(source?.p45)||0,p65:Number(source?.p65)||0};
+   const agent=byAgent.get(key)||{agentId,agentName:agentName||account,resolved:!!agentId,accounts:[],p35:0,p45:0,p65:0,qty:0,total:0,_accounts:new Map()};
+   const source_=agent._accounts.get(account.toLowerCase())||{account,p35:0,p45:0,p65:0,qty:0,total:0};
+   for(const field of ['p35','p45','p65']){agent[field]+=counts[field];source_[field]+=counts[field]}
+   source_.qty=source_.p35+source_.p45+source_.p65;
+   source_.total=tier?source_.p35*tier.p35+source_.p45*tier.p45+source_.p65*tier.p65:0;
+   agent._accounts.set(account.toLowerCase(),source_);
+   agent.qty=agent.p35+agent.p45+agent.p65;
+   agent.total=tier?agent.p35*tier.p35+agent.p45*tier.p45+agent.p65*tier.p65:0;
+   byAgent.set(key,agent);
+  });
+  cabinet.agents=[...byAgent.values()].map(agent=>{agent.accounts=[...agent._accounts.values()].sort((a,b)=>a.account.localeCompare(b.account,'en',{numeric:true}));delete agent._accounts;return agent}).sort((a,b)=>b.total-a.total||a.agentName.localeCompare(b.agentName,'ar'));
+  const sum=field=>cabinet.agents.reduce((total,agent)=>total+agent[field],0);
+  for(const field of ['p35','p45','p65'])if(sum(field)!==cabinet[field]){cabinet.reconciled=false;cabinet.issues.push(`مجموع ${field.toUpperCase()} للوكلاء (${sum(field)}) لا يساوي كمية الكابينة (${cabinet[field]}).`)}
+  if(sum('total')!==cabinet.total){cabinet.reconciled=false;cabinet.issues.push(`مجموع حصص الوكلاء (${sum('total')}) لا يساوي عمولة الكابينة (${cabinet.total}).`)}
+  const unresolved=cabinet.agents.filter(agent=>!agent.resolved);
+  if(unresolved.length)cabinet.issues.push(`${unresolved.length} حساب غير مربوط بوكيل معروف في الإعدادات.`);
+  cabinets.push(cabinet);
+ });
+ cabinets.sort((a,b)=>(a.fdt??Infinity)-(b.fdt??Infinity)||a.name.localeCompare(b.name,'en',{numeric:true}));
+ return {cabinets,conflicts,reconciled:cabinets.every(cabinet=>cabinet.reconciled)&&!conflicts.length};
+}
+/* عرض ثانوي مشتق من نفس المصدر: الوكيل ← الكابينات. لا يعيد الحساب ولا يجمع كابينات داخل تفاصيل كابينة. */
+function newZoneAgentTotals(breakdown=newZoneFdtBreakdown()){
+ const agents=new Map();
+ breakdown.cabinets.forEach(cabinet=>cabinet.agents.forEach(agent=>{
+  const key=agent.agentId||`account:${agent.agentName.toLowerCase()}`;
+  const entry=agents.get(key)||{agentId:agent.agentId,agentName:agent.agentName,resolved:agent.resolved,cabinets:[],p35:0,p45:0,p65:0,qty:0,total:0};
+  entry.cabinets.push({name:cabinet.name,fdt:cabinet.fdt,tierLabel:cabinet.tierLabel,p35:agent.p35,p45:agent.p45,p65:agent.p65,qty:agent.qty,total:agent.total});
+  for(const field of ['p35','p45','p65','qty','total'])entry[field]+=agent[field];
+  agents.set(key,entry);
+ }));
+ return [...agents.values()].sort((a,b)=>b.total-a.total||a.agentName.localeCompare(b.agentName,'ar'));
+}
 function agentHierarchySummaries(zones=['old','new']){
  const groups=new Map();
  zones.forEach(zone=>(state.data[zone]||[]).forEach((row,index)=>{
@@ -1153,9 +1240,57 @@ function agentHierarchySummaries(zones=['old','new']){
  }));
  return [...groups.values()].map(group=>{group.parents=[...group._parents.values()].map(parent=>{parent.details=[...parent._details.values()].sort((a,b)=>(a.fdt??Infinity)-(b.fdt??Infinity)||a.zone.localeCompare(b.zone));delete parent._details;return parent}).sort((a,b)=>(a.type==='main'?0:1)-(b.type==='main'?0:1)||a.name.localeCompare(b.name,'en',{numeric:true}));group.fdts=[...group._fdts.values()].map(fdt=>{fdt.parents=[...fdt._parents.values()].sort((a,b)=>(a.type==='main'?0:1)-(b.type==='main'?0:1)||a.name.localeCompare(b.name,'en',{numeric:true}));delete fdt._parents;return fdt}).sort((a,b)=>(a.fdt??Infinity)-(b.fdt??Infinity)||a.zone.localeCompare(b.zone));delete group._parents;delete group._fdts;return group}).sort((a,b)=>b.total-a.total||a.owner.localeCompare(b.owner,'ar'));
 }
-function filteredAgentHierarchy(){const q=(document.getElementById('searchInput').value||'').trim().toLowerCase(),zf=document.getElementById('zoneFilter').value,sf=document.getElementById('statusFilter').value,zones=zf==='old'?['old']:zf==='new'?['new']:['old','new'];return agentHierarchySummaries(zones).filter(group=>(!q||`${group.owner} ${group.fdts.map(fdt=>`${fdt.label} ${fdt.parents.map(parent=>parent.name).join(' ')}`).join(' ')}`.toLowerCase().includes(q))&&(sf==='all'||ownerSummaryStatus(group)===sf))}
 function hierarchyTypeLabel(type){return type==='main'?'الحساب الرئيسي':'وكيل فرعي'}
-function renderAgentHierarchy(){const panel=document.getElementById('panel-hierarchy');if(!panel)return;const groups=filteredAgentHierarchy(),stText={pending:'غير مدفوع',partial:'جزئي',paid:'مدفوع'},stClass={pending:'bpending',partial:'bpartial',paid:'bpaid'};panel.innerHTML=`<div class="raw-config-note">داخل كل وكيل رئيسي تظهر كابينات FDT أولاً، وتحت كل كابينة حسابات parent التي ساهمت بتفعيلاتها وعمولتها. التير يبقى محسوباً حسب قواعد الزون الأصلية.</div>`+(groups.map(group=>{const st=ownerSummaryStatus(group),fdtCards=group.fdts.map(fdt=>{const parentRows=fdt.parents.map(parent=>`<tr><td><span class="badge ${parent.type==='main'?'bpaid':'bpartial'}">${hierarchyTypeLabel(parent.type)}</span></td><td><b style="direction:ltr;display:inline-block">${esc(parent.name)}</b></td><td>${fmt(parent.p35)}</td><td>${fmt(parent.p45)}</td><td>${fmt(parent.p65)}</td><td>${fmt(parent.qty)}</td><td>${esc(parent.tier)}</td><td class="money">${fmt(parent.total)} د.ع</td></tr>`).join('');return`<details style="border-top:1px solid var(--line)" open><summary style="padding:13px 16px;cursor:pointer;display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap"><span><b style="font-size:13px">${esc(fdt.label)}</b> <span class="badge bpending">${fdt.zone.toUpperCase()}</span></span><span><small class="muted">${fmt(fdt.parents.length)} parent • ${fmt(fdt.qty)} تفعيل</small> &nbsp; <b class="money">${fmt(fdt.total)} د.ع</b></span></summary><div style="overflow:auto"><table style="min-width:900px"><thead><tr><th>النوع</th><th>Parent</th><th>P35</th><th>P45</th><th>P65</th><th>التفعيلات</th><th>التير</th><th>العمولة</th></tr></thead><tbody>${parentRows}</tbody></table></div></details>`}).join('');return`<details class="box" style="margin-bottom:12px;padding:0;overflow:hidden" open><summary style="padding:16px;cursor:pointer;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span><b style="font-size:15px">${esc(group.owner)}</b><small class="muted" style="display:block;margin-top:4px">${fmt(group.fdts.length)} FDT • ${fmt(group.parents.length)} parent</small></span><span style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><small>التفعيلات <b>${fmt(group.qty)}</b></small><small>المستحق <b class="money">${fmt(group.total)} د.ع</b></small><small>المدفوع <b>${fmt(group.paid)} د.ع</b></small><small>المتبقي <b class="money">${fmt(group.remaining)} د.ع</b></small><span class="badge ${stClass[st]}">${stText[st]}</span></span></summary>${fdtCards}</details>`}).join('')||'<div class="box muted">لا توجد نتائج مطابقة.</div>')+`<div class="zoneActions"><button class="btn" onclick="exportAgentHierarchy()">📤 تصدير التوزيع التفصيلي</button><span class="muted" style="font-size:10px">${fmt(groups.length)} وكيل رئيسي</span></div>`}
+function newZoneCabinetMatches(cabinet,query){if(!query)return true;const haystack=[cabinet.name,...cabinet.agents.flatMap(agent=>[agent.agentName,agent.agentId,...agent.accounts.map(source=>source.account)])].join(' ').toLowerCase();return haystack.includes(query)}
+function filteredNewZoneBreakdown(){const query=(document.getElementById('searchInput').value||'').trim().toLowerCase(),breakdown=newZoneFdtBreakdown();return{...breakdown,cabinets:breakdown.cabinets.filter(cabinet=>newZoneCabinetMatches(cabinet,query))}}
+/* تنبيهان منفصلان لا واحد: عدم التطابق يعني أن الأرقام نفسها غير موثوقة،
+   أما نقص الربط فيعني أن الأرقام صحيحة والنسبة إلى الوكيل ناقصة. خلطهما
+   يخبر المحاسب أن أرقاماً سليمة غير موثوقة. */
+function newZoneReconciliationHtml(breakdown){
+ const broken=breakdown.cabinets.filter(cabinet=>!cabinet.reconciled);
+ const unmapped=breakdown.cabinets.filter(cabinet=>cabinet.reconciled&&cabinet.issues.length);
+ let html='';
+ if(broken.length||breakdown.conflicts.length){
+  const conflictItems=breakdown.conflicts.map(conflict=>`<li>الحساب <b style="direction:ltr;display:inline-block">${esc(conflict.account)}</b> مربوط بأكثر من وكيل (${esc(conflict.agentIds.join('، '))}). لا يمكن نسب تفعيلاته بصورة قاطعة.</li>`).join('');
+  const brokenItems=broken.map(cabinet=>`<li><b>${esc(cabinet.name)}</b>: ${esc(cabinet.issues.join(' '))}</li>`).join('');
+  html+=`<div class="insight danger" style="display:block;margin-bottom:12px"><span class="insight-dot"></span><span><b>تعذر التحقق من تطابق تفاصيل الكابينات</b><ul style="margin:8px 0 0;padding-inline-start:18px;font-size:11px;line-height:1.8">${conflictItems}${brokenItems}</ul><small class="muted" style="display:block;margin-top:6px">أرقام هذه الكابينات لا تعتبر مطابقة حتى تعالج هذه الحالات.</small></span></div>`;
+ }
+ if(unmapped.length){
+  const items=unmapped.map(cabinet=>`<li><b>${esc(cabinet.name)}</b>: ${esc(cabinet.issues.join(' '))}</li>`).join('');
+  html+=`<div class="insight warn" style="display:block;margin-bottom:12px"><span class="insight-dot"></span><span><b>ربط الوكلاء غير مكتمل</b><ul style="margin:8px 0 0;padding-inline-start:18px;font-size:11px;line-height:1.8">${items}</ul><small class="muted" style="display:block;margin-top:6px">مجاميع هذه الكابينات وعمولتها صحيحة ومطابقة؛ الناقص هو نسبة بعض الحسابات إلى وكيل معروف. أضف الحساب في إعدادات الربط ثم أعد رفع الملف.</small></span></div>`;
+ }
+ return html;
+}
+function newZoneAgentBlock(agent){
+ const badge=agent.resolved?'':' <span class="badge bpending">حساب غير مربوط بوكيل</span>';
+ const sourceRows=agent.accounts.map(source=>`<tr><td><span style="direction:ltr;display:inline-block">${esc(source.account)}</span></td><td>${fmt(source.p35)}</td><td>${fmt(source.p45)}</td><td>${fmt(source.p65)}</td><td>${fmt(source.qty)}</td><td class="money">${fmt(source.total)} د.ع</td></tr>`).join('');
+ return `<details style="border-top:1px solid var(--line)"><summary style="padding:11px 16px;cursor:pointer;display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap"><span><b style="font-size:12px">${esc(agent.agentName)}</b>${badge}<small class="muted" style="display:block;margin-top:3px">${fmt(agent.accounts.length)} حساب مصدر</small></span><span style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:11px"><small>P35 <b>${fmt(agent.p35)}</b></small><small>P45 <b>${fmt(agent.p45)}</b></small><small>P65 <b>${fmt(agent.p65)}</b></small><small>التفعيلات <b>${fmt(agent.qty)}</b></small><b class="money">${fmt(agent.total)} د.ع</b></span></summary><div style="overflow:auto;padding:0 16px 12px"><table style="min-width:620px"><thead><tr><th>حساب المصدر</th><th>P35</th><th>P45</th><th>P65</th><th>التفعيلات</th><th>حصة العمولة</th></tr></thead><tbody>${sourceRows}</tbody></table></div></details>`;
+}
+function newZoneCabinetCard(cabinet){
+ const warn=cabinet.reconciled?'':' <span class="badge bpending">يحتاج مراجعة</span>';
+ const body=cabinet.detailed
+   ?cabinet.agents.map(newZoneAgentBlock).join('')
+   :`<div class="box muted" style="margin:12px 16px;font-size:11px">${esc(cabinet.issues[0]||'لا توجد تفاصيل وكلاء لهذه الكابينة.')}</div>`;
+ return `<details class="box" style="margin-bottom:12px;padding:0;overflow:hidden"><summary style="padding:16px;cursor:pointer;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span><b style="font-size:15px">${esc(cabinet.name)}</b>${warn}<small class="muted" style="display:block;margin-top:4px">${fmt(cabinet.agents.length)} وكيل مشارك • التير ${esc(cabinet.tierLabel)}</small></span><span style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><small>P35 <b>${fmt(cabinet.p35)}</b></small><small>P45 <b>${fmt(cabinet.p45)}</b></small><small>P65 <b>${fmt(cabinet.p65)}</b></small><small>التفعيلات <b>${fmt(cabinet.qty)}</b></small><small>عمولة الكابينة <b class="money">${fmt(cabinet.total)} د.ع</b></small></span></summary>${body}</details>`;
+}
+function renderAgentHierarchy(){
+ const panel=document.getElementById('panel-hierarchy');if(!panel)return;
+ const zoneFilter=document.getElementById('zoneFilter').value,showNew=zoneFilter!=='old',showOld=zoneFilter!=='new';
+ const breakdown=filteredNewZoneBreakdown();
+ const newSection=showNew
+   ?`<div class="raw-config-note">الأساس في الزون الجديد هو الكابينة FDT. افتح الكابينة لترى الوكلاء الذين جاءت تفعيلاتهم منها وحصة كل وكيل، ثم افتح الوكيل لترى حسابات المصدر. التير تير الكابينة، وحصص الوكلاء تساوي عمولتها بالضبط.</div>`
+     +newZoneReconciliationHtml(breakdown)
+     +(breakdown.cabinets.map(newZoneCabinetCard).join('')||'<div class="box muted">لا توجد كابينات مطابقة.</div>')
+   :'';
+ const oldGroups=showOld?agentHierarchySummaries(['old']):[];
+ const oldSection=showOld
+   ?`<div class="raw-config-note" style="margin-top:16px">الزون القديم يبقى مجمعاً حسب الوكيل الرئيسي وحساباته، كما هو.</div>`
+     +(oldGroups.map(group=>{const st=ownerSummaryStatus(group),parentRows=group.parents.map(parent=>`<tr><td><span class="badge ${parent.type==='main'?'bpaid':'bpartial'}">${hierarchyTypeLabel(parent.type)}</span></td><td><b style="direction:ltr;display:inline-block">${esc(parent.name)}</b></td><td>${fmt(parent.p35)}</td><td>${fmt(parent.p45)}</td><td>${fmt(parent.p65)}</td><td>${fmt(parent.qty)}</td><td class="money">${fmt(parent.total)} د.ع</td></tr>`).join('');return`<details class="box" style="margin-bottom:12px;padding:0;overflow:hidden"><summary style="padding:16px;cursor:pointer;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span><b style="font-size:15px">${esc(group.owner)}</b><small class="muted" style="display:block;margin-top:4px">${fmt(group.parents.length)} حساب</small></span><span style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><small>التفعيلات <b>${fmt(group.qty)}</b></small><small>المستحق <b class="money">${fmt(group.total)} د.ع</b></small><small>المدفوع <b>${fmt(group.paid)} د.ع</b></small><small>المتبقي <b class="money">${fmt(group.remaining)} د.ع</b></small><span class="badge ${stClassFor(st)}">${stTextFor(st)}</span></span></summary><div style="overflow:auto"><table style="min-width:760px"><thead><tr><th>النوع</th><th>الحساب</th><th>P35</th><th>P45</th><th>P65</th><th>التفعيلات</th><th>العمولة</th></tr></thead><tbody>${parentRows}</tbody></table></div></details>`}).join('')||'<div class="box muted">لا توجد حسابات في الزون القديم.</div>')
+   :'';
+ panel.innerHTML=newSection+oldSection+`<div class="zoneActions"><div class="actions"><button class="btn" onclick="exportNewZoneFdtAgents()">📤 تصدير تفاصيل الكابينات</button><button class="btn" onclick="exportNewZoneAgentTotals()">📤 تصدير إجمالي كل وكيل</button></div><span class="muted" style="font-size:10px">${fmt(breakdown.cabinets.length)} كابينة</span></div>`;
+}
+function stTextFor(st){return{pending:'غير مدفوع',partial:'جزئي',paid:'مدفوع'}[st]}
+function stClassFor(st){return{pending:'bpending',partial:'bpartial',paid:'bpaid'}[st]}
 function totals(){let x={old:{total:0,paid:0,rem:0,count:0},new:{total:0,paid:0,rem:0,count:0}},all=[];['old','new'].forEach(z=>state.data[z].forEach((r,i)=>{const c=calc(r);x[z].total+=c.total;x[z].paid+=c.paid;x[z].rem+=c.remaining;x[z].count++;all.push({r,i,z,c})}));x.grand={total:x.old.total+x.new.total,paid:x.old.paid+x.new.paid,rem:x.old.rem+x.new.rem,count:all.length};return{x,all}}
 function renderDashboard(){
  const {x,all}=totals();document.getElementById('grandTotal').textContent=fmt(x.grand.total);document.getElementById('oldTotal').textContent=fmt(x.old.total);document.getElementById('newTotal').textContent=fmt(x.new.total);document.getElementById('paidTotal').textContent=fmt(x.grand.paid);document.getElementById('remainingTotal').textContent=fmt(x.grand.rem);document.getElementById('agentCount').textContent=x.grand.count;
@@ -1407,7 +1542,9 @@ function downloadCSV(rows,name){const keys=Object.keys(rows[0]||{Zone:'',Name:''
 function exportZone(z){downloadCSV(rowsFor(z),`${state.month.replace('/','-')}_${z}_commission.csv`)}
 function exportAll(){downloadCSV([...rowsFor('old'),...rowsFor('new')],`${state.month.replace('/','-')}_all_commissions.csv`)}
 function exportNewZoneOwnerSummary(){const rows=newZoneOwnerSummaries().map(summary=>({Agent:summary.owner,Cabinets:summary.cabinets.length,CabinetNames:summary.cabinets.join(' | '),P35:summary.p35,P45:summary.p45,P65:summary.p65,Quantity:summary.qty,Due:summary.total,Paid:summary.paid,Remaining:summary.remaining,Status:{pending:'Pending',partial:'Partial',paid:'Paid'}[ownerSummaryStatus(summary)]}));if(!rows.length){toast('لا توجد عمولات وكلاء في الزون الجديد');return}downloadCSV(rows,`${state.month.replace('/','-')}_new_zone_agents.csv`)}
-function exportAgentHierarchy(){const rows=agentHierarchySummaries().flatMap(group=>[{Level:'Principal',MainAgent:group.owner,FDT:'',Parent:'',Zone:'ALL',P35:group.p35,P45:group.p45,P65:group.p65,Quantity:group.qty,Tier:'',Due:group.total,Paid:group.paid,Remaining:group.remaining},...group.fdts.flatMap(fdt=>[{Level:'FDT',MainAgent:group.owner,FDT:fdt.label,Parent:'',Zone:fdt.zone.toUpperCase(),P35:fdt.p35,P45:fdt.p45,P65:fdt.p65,Quantity:fdt.qty,Tier:'',Due:fdt.total},...fdt.parents.map(parent=>({Level:'Parent',MainAgent:group.owner,FDT:fdt.label,Parent:parent.name,Zone:fdt.zone.toUpperCase(),P35:parent.p35,P45:parent.p45,P65:parent.p65,Quantity:parent.qty,Tier:parent.tier,Due:parent.total}))])]);if(!rows.length){toast('لا توجد بيانات للتوزيع التفصيلي');return}downloadCSV(rows,`${state.month.replace('/','-')}_agent_hierarchy.csv`)}
+function newZoneFdtAgentExportRows(breakdown=newZoneFdtBreakdown()){return breakdown.cabinets.flatMap(cabinet=>cabinet.agents.flatMap(agent=>agent.accounts.map(source=>({FDT:cabinet.name,AgentName:agent.agentName,AgentID:agent.agentId||'',SourceAccount:source.account,P35:source.p35,P45:source.p45,P65:source.p65,Quantity:source.qty,Tier:cabinet.tierLabel,CommissionShare:source.total,AgentQuantity:agent.qty,AgentCommissionShare:agent.total,CabinetQuantity:cabinet.qty,CabinetCommission:cabinet.total,Reconciled:cabinet.reconciled?'YES':'NO'}))))}
+function exportNewZoneFdtAgents(){const breakdown=newZoneFdtBreakdown(),rows=newZoneFdtAgentExportRows(breakdown);if(!rows.length){toast('لا توجد تفاصيل كابينات في الزون الجديد');return}if(!breakdown.reconciled)toast('تنبيه: التصدير يحتوي كابينات لم تتطابق حصصها؛ راجع التنبيه قبل الاعتماد');downloadCSV(rows,`${state.month.replace('/','-')}_new_fdt_agents.csv`)}
+function exportNewZoneAgentTotals(){const rows=newZoneAgentTotals().map(agent=>({AgentName:agent.agentName,AgentID:agent.agentId||'',Cabinets:agent.cabinets.length,CabinetNames:agent.cabinets.map(item=>item.name).join(' | '),P35:agent.p35,P45:agent.p45,P65:agent.p65,Quantity:agent.qty,CommissionShare:agent.total}));if(!rows.length){toast('لا توجد عمولات وكلاء في الزون الجديد');return}downloadCSV(rows,`${state.month.replace('/','-')}_new_agent_totals.csv`)}
 function buildExcelReportWorkbook(){
  if(typeof XLSX==='undefined')throw new Error('مكتبة Excel غير متاحة');
  const workbook=XLSX.utils.book_new(),english=currentLanguage==='en',labels=english?{title:'Babil Agent Commission Report',month:'Month',generated:'Generated at',zone:'Zone',name:'Agent / Cabinet',quantity:'Quantity',tier:'Tier',groupQty:'Tier group quantity',due:'Due',paid:'Paid',remaining:'Remaining',status:'Status',paymentDate:'Payment date',parent:'Parent account',owner:'Owner',total:'Total commissions',activations:'Total activations',records:'Records',comparison:'Monthly comparison'}:{title:'تقرير عمولات وكلاء بابل',month:'الشهر',generated:'وقت إنشاء التقرير',zone:'المنطقة',name:'الوكيل / الكابينة',quantity:'الكمية',tier:'التير',groupQty:'كمية مجموعة التير',due:'المستحق',paid:'المدفوع',remaining:'المتبقي',status:'الحالة',paymentDate:'تاريخ الصرف',parent:'حساب parent',owner:'المالك',total:'إجمالي العمولات',activations:'إجمالي التفعيلات',records:'عدد السجلات',comparison:'مقارنة الأشهر'};
@@ -1416,10 +1553,19 @@ function buildExcelReportWorkbook(){
  const commissions=XLSX.utils.aoa_to_sheet(commissionRows),lastRow=Math.max(2,commissionRows.length);commissions['!cols']=[{wch:10},{wch:28},{wch:9},{wch:9},{wch:9},{wch:11},{wch:9},{wch:18},{wch:16},{wch:16},{wch:16},{wch:14},{wch:14},{wch:28},{wch:22}];commissions['!autofilter']={ref:`A1:O${lastRow}`};commissions['!freeze']={xSplit:0,ySplit:1};for(let row=2;row<=lastRow;row++)['I','J','K'].forEach(column=>{if(commissions[`${column}${row}`])commissions[`${column}${row}`].z='#,##0'});
  const settings=XLSX.utils.aoa_to_sheet([['Tier','P35','P45','P65','Min Qty','Max Qty'],...settingsRows]);settings['!cols']=[{wch:12},{wch:14},{wch:14},{wch:14},{wch:12},{wch:12}];
  const ownerRows=[[english?'Agent':'الوكيل',english?'Cabinets':'عدد الكابينات',english?'Cabinet details':'تفاصيل الكابينات','P35','P45','P65',labels.quantity,labels.due,labels.paid,labels.remaining,labels.status]];newZoneOwnerSummaries().forEach((owner,index)=>{const excelRow=index+2;ownerRows.push([owner.owner,{f:`COUNTIFS(Commissions!$A$2:$A$${lastRow},"NEW",Commissions!$O$2:$O$${lastRow},A${excelRow})`},owner.cabinets.join(' • '),{f:`SUMIFS(Commissions!$C$2:$C$${lastRow},Commissions!$A$2:$A$${lastRow},"NEW",Commissions!$O$2:$O$${lastRow},A${excelRow})`},{f:`SUMIFS(Commissions!$D$2:$D$${lastRow},Commissions!$A$2:$A$${lastRow},"NEW",Commissions!$O$2:$O$${lastRow},A${excelRow})`},{f:`SUMIFS(Commissions!$E$2:$E$${lastRow},Commissions!$A$2:$A$${lastRow},"NEW",Commissions!$O$2:$O$${lastRow},A${excelRow})`},{f:`SUMIFS(Commissions!$F$2:$F$${lastRow},Commissions!$A$2:$A$${lastRow},"NEW",Commissions!$O$2:$O$${lastRow},A${excelRow})`},{f:`SUMIFS(Commissions!$I$2:$I$${lastRow},Commissions!$A$2:$A$${lastRow},"NEW",Commissions!$O$2:$O$${lastRow},A${excelRow})`},{f:`SUMIFS(Commissions!$J$2:$J$${lastRow},Commissions!$A$2:$A$${lastRow},"NEW",Commissions!$O$2:$O$${lastRow},A${excelRow})`},{f:`MAX(0,H${excelRow}-I${excelRow})`},{f:`IF(I${excelRow}<=0,"Pending",IF(I${excelRow}>=H${excelRow},"Paid","Partial"))`}])});const newZoneAgents=XLSX.utils.aoa_to_sheet(ownerRows);newZoneAgents['!cols']=[{wch:24},{wch:12},{wch:42},{wch:9},{wch:9},{wch:9},{wch:12},{wch:18},{wch:18},{wch:18},{wch:14}];newZoneAgents['!autofilter']={ref:`A1:K${Math.max(2,ownerRows.length)}`};newZoneAgents['!freeze']={xSplit:0,ySplit:1};
- const hierarchyRows=[[english?'Level':'المستوى',english?'Main agent':'الوكيل الرئيسي','FDT','Parent',labels.zone,'P35','P45','P65',labels.quantity,labels.tier,labels.due,labels.paid,labels.remaining]];agentHierarchySummaries().forEach(group=>{hierarchyRows.push([english?'Principal':'رئيسي',group.owner,'','','ALL',group.p35,group.p45,group.p65,group.qty,'',group.total,group.paid,group.remaining]);group.fdts.forEach(fdt=>{hierarchyRows.push(['FDT',group.owner,fdt.label,'',fdt.zone.toUpperCase(),fdt.p35,fdt.p45,fdt.p65,fdt.qty,'',fdt.total,'','']);fdt.parents.forEach(parent=>hierarchyRows.push(['Parent',group.owner,fdt.label,parent.name,fdt.zone.toUpperCase(),parent.p35,parent.p45,parent.p65,parent.qty,parent.tier,parent.total,'','']))})});const agentHierarchy=XLSX.utils.aoa_to_sheet(hierarchyRows);agentHierarchy['!cols']=[{wch:12},{wch:24},{wch:14},{wch:30},{wch:10},{wch:9},{wch:9},{wch:9},{wch:12},{wch:10},{wch:18},{wch:18},{wch:18}];agentHierarchy['!autofilter']={ref:`A1:M${Math.max(2,hierarchyRows.length)}`};agentHierarchy['!freeze']={xSplit:0,ySplit:1};
+ const newBreakdown=newZoneFdtBreakdown();
+ const fdtSummaryRows=[[english?'FDT':'الكابينة',english?'Agents':'عدد الوكلاء','P35','P45','P65',labels.quantity,labels.tier,labels.due,labels.paid,labels.remaining,english?'Reconciled':'مطابقة']];
+ newBreakdown.cabinets.forEach(cabinet=>fdtSummaryRows.push([cabinet.name,cabinet.agents.length,cabinet.p35,cabinet.p45,cabinet.p65,cabinet.qty,cabinet.tierLabel,cabinet.total,cabinet.paid,cabinet.remaining,cabinet.reconciled?(english?'Yes':'نعم'):(english?'NO — review':'لا — يحتاج مراجعة')]));
+ const fdtSummary=XLSX.utils.aoa_to_sheet(fdtSummaryRows);fdtSummary['!cols']=[{wch:16},{wch:12},{wch:9},{wch:9},{wch:9},{wch:12},{wch:10},{wch:18},{wch:18},{wch:18},{wch:20}];fdtSummary['!autofilter']={ref:`A1:K${Math.max(2,fdtSummaryRows.length)}`};fdtSummary['!freeze']={xSplit:0,ySplit:1};
+ const fdtAgentRows=[[english?'FDT':'الكابينة',english?'Agent name':'اسم الوكيل',english?'Agent ID':'معرّف الوكيل',english?'Source accounts':'عدد الحسابات','P35','P45','P65',labels.quantity,labels.tier,english?'Commission share':'حصة العمولة']];
+ newBreakdown.cabinets.forEach(cabinet=>cabinet.agents.forEach(agent=>fdtAgentRows.push([cabinet.name,agent.agentName,agent.agentId||'',agent.accounts.length,agent.p35,agent.p45,agent.p65,agent.qty,cabinet.tierLabel,agent.total])));
+ const fdtAgents=XLSX.utils.aoa_to_sheet(fdtAgentRows);fdtAgents['!cols']=[{wch:16},{wch:26},{wch:14},{wch:14},{wch:9},{wch:9},{wch:9},{wch:12},{wch:10},{wch:20}];fdtAgents['!autofilter']={ref:`A1:J${Math.max(2,fdtAgentRows.length)}`};fdtAgents['!freeze']={xSplit:0,ySplit:1};
+ const fdtSourceRows=[[english?'FDT':'الكابينة',english?'Agent name':'اسم الوكيل',english?'Agent ID':'معرّف الوكيل',labels.parent,'P35','P45','P65',labels.quantity,english?'Commission share':'حصة العمولة']];
+ newBreakdown.cabinets.forEach(cabinet=>cabinet.agents.forEach(agent=>agent.accounts.forEach(source=>fdtSourceRows.push([cabinet.name,agent.agentName,agent.agentId||'',source.account,source.p35,source.p45,source.p65,source.qty,source.total]))));
+ const fdtSources=XLSX.utils.aoa_to_sheet(fdtSourceRows);fdtSources['!cols']=[{wch:16},{wch:26},{wch:14},{wch:30},{wch:9},{wch:9},{wch:9},{wch:12},{wch:20}];fdtSources['!autofilter']={ref:`A1:I${Math.max(2,fdtSourceRows.length)}`};fdtSources['!freeze']={xSplit:0,ySplit:1};
  const summary=XLSX.utils.aoa_to_sheet([[labels.title],[labels.month,state.month],[labels.generated,new Date().toLocaleString(english?'en-GB':'ar-IQ')],[],[labels.total,{f:`SUM(Commissions!I2:I${lastRow})`}],[labels.paid,{f:`SUM(Commissions!J2:J${lastRow})`}],[labels.remaining,{f:`SUM(Commissions!K2:K${lastRow})`}],[labels.activations,{f:`SUM(Commissions!F2:F${lastRow})`}],[labels.records,flat.length]]);summary['!cols']=[{wch:28},{wch:22}];['B5','B6','B7'].forEach(cell=>{if(summary[cell])summary[cell].z='#,##0'});
  const months=[...new Set([...Object.keys(state.archive),state.month])].filter(month=>Number.isFinite(monthOrder(month))).sort(compareMonthKeys),comparisonRows=[[labels.month,labels.total,labels.activations,english?'Change':'التغيير']];months.forEach((month,index)=>{const rows=calculatedPeriodRows(periodSnapshot(month)),excelRow=index+2;comparisonRows.push([month,rows.reduce((sum,item)=>sum+item.calculated.total,0),rows.reduce((sum,item)=>sum+item.calculated.qty,0),index?{f:`B${excelRow}-B${excelRow-1}`}:0])});const comparison=XLSX.utils.aoa_to_sheet(comparisonRows);comparison['!cols']=[{wch:14},{wch:20},{wch:18},{wch:20}];
- XLSX.utils.book_append_sheet(workbook,summary,'Summary');XLSX.utils.book_append_sheet(workbook,commissions,'Commissions');XLSX.utils.book_append_sheet(workbook,agentHierarchy,'Agent Hierarchy');XLSX.utils.book_append_sheet(workbook,newZoneAgents,'New Zone Agents');XLSX.utils.book_append_sheet(workbook,comparison,'Comparison');XLSX.utils.book_append_sheet(workbook,settings,'Settings');workbook.Props={Title:labels.title,Subject:state.month,Author:authProfile?.full_name||authUser?.email||'HRINS',CreatedDate:new Date()};return workbook
+ XLSX.utils.book_append_sheet(workbook,summary,'Summary');XLSX.utils.book_append_sheet(workbook,commissions,'Commissions');XLSX.utils.book_append_sheet(workbook,fdtSummary,'NEW FDT Summary');XLSX.utils.book_append_sheet(workbook,fdtAgents,'NEW FDT Agents');XLSX.utils.book_append_sheet(workbook,fdtSources,'NEW FDT Sources');XLSX.utils.book_append_sheet(workbook,newZoneAgents,'New Zone Agents');XLSX.utils.book_append_sheet(workbook,comparison,'Comparison');XLSX.utils.book_append_sheet(workbook,settings,'Settings');workbook.Props={Title:labels.title,Subject:state.month,Author:authProfile?.full_name||authUser?.email||'HRINS',CreatedDate:new Date()};return workbook
 }
 function exportExcelReport(){try{const workbook=buildExcelReportWorkbook();XLSX.writeFile(workbook,`babil_commissions_${state.month.replace('/','-')}.xlsx`,{compression:true});toast(currentLanguage==='en'?'Excel report created':'تم إنشاء تقرير Excel المتكامل')}catch(error){console.error(error);toast(error.message||'تعذر إنشاء تقرير Excel')}}
 function validatePeriodArchiveSnapshot(snapshot,month){
@@ -1470,7 +1616,326 @@ function normalizeImport(o){const keys=Object.keys(o),get=names=>{const k=keys.f
 
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){document.querySelectorAll('.modal.open').forEach(modal=>modal.classList.remove('open'));managedPasswordTarget=null;toggleMobileMenu(false)}if(event.key==='Enter'&&document.getElementById('passwordModal')?.classList.contains('open')&&event.target?.id==='managedPasswordConfirm')saveManagedUserPassword()});
 window.addEventListener('beforeunload',e=>{if(hasUnsavedChanges){e.preventDefault();e.returnValue='لديك تعديلات غير محفوظة.'}});
+/* ===================== أجور التنصيب ===================== */
+/* نطاق مستقل: لا يشارك نطاق العمولات أي قاعدة حساب. الحماية الفعلية في RLS
+   والـRPCs؛ ما هنا تجربة استخدام فقط ولا يُعتمد عليه كضابط أمان. */
+const installationState={rows:[],loading:false,error:'',lastPreview:null};
+const INSTALLATION_STAGE_LABELS={P1:'الدفعة 1',P2:'الدفعة 2',P3:'الدفعة 3',P4:'الدفعة 4',DONE:'مكتمل'};
+const INSTALLATION_INVOICE_LABELS={pending:'بانتظار التدقيق',approved:'معتمدة',missing:'مفقودة',rejected:'مرفوضة'};
+const INSTALLATION_PAYMENT_LABELS={not_eligible:'غير مؤهل',awaiting_invoice:'بانتظار الفاتورة',eligible:'مؤهل للصرف',paid:'مصروف'};
+function installationFees(){if(typeof InstallationFees==='undefined')throw new Error('وحدة أجور التنصيب غير محمّلة');return InstallationFees}
+function installationPeriodKey(date=new Date()){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`}
+async function fetchInstallationEntitlements(){
+ const select='id,period,subscriber_id,subscriber_name,reseller,zone,fdt,remaining,stage,amount,invoice_status,invoice_audited_at,invoice_note,payment_status,paid_amount,paid_at,updated_at';
+ return fetchCentralPages(`/rest/v1/installation_entitlements?select=${select}&order=period.desc,reseller.asc,subscriber_id.asc`);
+}
+async function refreshInstallation(silent=false){
+ if(!authUser)return;
+ installationState.loading=true;installationState.error='';renderInstallation();
+ try{
+   installationState.rows=await fetchInstallationEntitlements();
+   installationState.error='';
+   if(!silent)toast('تم تحديث أجور التنصيب');
+ }catch(error){
+   console.error('Installation fees error:',error);
+   installationState.rows=[];
+   /* الجداول قد لا تكون منشورة بعد؛ لا تُعرض كخطأ مزعج. */
+   installationState.error=error?.status===404||error?.status===400
+     ?'جداول أجور التنصيب غير منشورة على هذه البيئة بعد.'
+     :`تعذر تحميل أجور التنصيب: ${error?.message||''}`;
+ }finally{installationState.loading=false;renderInstallation()}
+}
+/* غياب العنصر أو قيمته الفارغة يعني «الكل»، لا تصفية تُخفي كل السجلات. */
+function installationFilterValue(id){const element=document.getElementById(id);const value=element&&element.value;return value?value:'all'}
+function filteredInstallationRows(){
+ const query=(document.getElementById('installationSearch')?.value||'').trim().toLowerCase();
+ const period=installationFilterValue('installationPeriodFilter'),reseller=installationFilterValue('installationResellerFilter');
+ const zone=installationFilterValue('installationZoneFilter'),fdt=installationFilterValue('installationFdtFilter');
+ const stage=installationFilterValue('installationStageFilter'),invoice=installationFilterValue('installationInvoiceFilter');
+ const payment=installationFilterValue('installationPaymentFilter');
+ return installationState.rows.filter(row=>{
+  const haystack=`${row.subscriber_id||''} ${row.subscriber_name||''} ${row.reseller||''}`.toLowerCase();
+  return (!query||haystack.includes(query))
+    &&(period==='all'||row.period===period)
+    &&(reseller==='all'||row.reseller===reseller)
+    &&(zone==='all'||(row.zone||'')===zone)
+    &&(fdt==='all'||String(row.fdt||'')===fdt)
+    &&(stage==='all'||row.stage===stage)
+    &&(invoice==='all'||row.invoice_status===invoice)
+    &&(payment==='all'||row.payment_status===payment);
+ });
+}
+function refreshInstallationFilterOptions(){
+ const fill=(id,values)=>{const select=document.getElementById(id);if(!select)return;const current=select.value;const first=select.querySelector('option');
+  select.innerHTML=(first?first.outerHTML:'<option value="all">الكل</option>')+values.map(value=>`<option value="${esc(value)}">${esc(value)}</option>`).join('');
+  select.value=values.includes(current)||current==='all'?current:'all'};
+ const unique=key=>[...new Set(installationState.rows.map(row=>String(row[key]||'')).filter(Boolean))].sort();
+ fill('installationPeriodFilter',unique('period').reverse());
+ fill('installationResellerFilter',unique('reseller'));
+ fill('installationFdtFilter',unique('fdt'));
+}
+function installationCard(label,value,sub,cls){return `<div class="card ${cls||''}"><div class="label">${esc(label)}</div><div class="value">${fmt(value)}</div><div class="sub">${esc(sub||'')}</div></div>`}
+function renderInstallationDashboard(rows){
+ const container=document.getElementById('installationCards');if(!container)return;
+ const summary=installationFees().summarizeEntitlements(rows);
+ container.innerHTML=[
+  installationCard('إجمالي المشتركين',summary.total,'سجل','blueline'),
+  installationCard('مكتمل DONE',summary.done,'لا مبلغ مستحق'),
+  installationCard('P1',summary.stages.P1,'3,000 د.ع للمشترك'),
+  installationCard('P2',summary.stages.P2,'3,000 د.ع للمشترك'),
+  installationCard('P3',summary.stages.P3,'3,000 د.ع للمشترك'),
+  installationCard('P4',summary.stages.P4,'4,000 د.ع للمشترك'),
+  installationCard('المبلغ قبل تدقيق الفواتير',summary.amountBeforeAudit,'د.ع','goldline'),
+  installationCard('بانتظار تدقيق الفاتورة',summary.invoices.pending,'سجل'),
+  installationCard('فواتير معتمدة',summary.invoices.approved,'سجل','greenline'),
+  installationCard('فواتير مفقودة',summary.invoices.missing,'سجل'),
+  installationCard('فواتير مرفوضة',summary.invoices.rejected,'سجل'),
+  installationCard('مؤهل للصرف',summary.payments.eligible,'سجل','greenline'),
+  installationCard('مصروف',summary.paidAmount,'د.ع'),
+  installationCard('المتبقي للصرف',summary.remainingToPay,'د.ع','goldline')
+ ].join('');
+}
+function installationRowActions(row){
+ const canAudit=roleAllows('payment')&&row.payment_status!=='paid';
+ const canPay=roleAllows('payment')&&row.payment_status==='eligible';
+ if(!canAudit&&!canPay)return '<span class="muted" style="font-size:10px">—</span>';
+ const audit=canAudit?`<button class="smallbtn" onclick="openInstallationInvoiceAudit('${esc(row.id)}')">🧾 تدقيق</button>`:'';
+ const pay=canPay?` <button class="smallbtn" onclick="payInstallationEntitlement('${esc(row.id)}')">💳 صرف</button>`:'';
+ return audit+pay;
+}
+function renderInstallationTable(rows){
+ const panel=document.getElementById('installationPanel');if(!panel)return;
+ if(installationState.loading){panel.innerHTML='<div class="box muted">جاري تحميل أجور التنصيب...</div>';return}
+ if(installationState.error){panel.innerHTML=`<div class="insight danger" style="display:block"><b>${esc(installationState.error)}</b></div>`;return}
+ if(!rows.length){panel.innerHTML='<div class="box muted">لا توجد سجلات مطابقة. ارفع ملف أجور التنصيب للفترة المطلوبة.</div>';return}
+ const body=rows.slice(0,500).map(row=>{
+  const invoiceClass=row.invoice_status==='approved'?'bpaid':row.invoice_status==='pending'?'bpartial':'bpending';
+  const paymentClass=row.payment_status==='paid'?'bpaid':row.payment_status==='eligible'?'bpartial':'bpending';
+  return `<tr>
+   <td><b>${esc(row.subscriber_id)}</b><small class="muted" style="display:block">${esc(row.subscriber_name||'')}</small></td>
+   <td>${esc(row.reseller)}</td>
+   <td>${esc(String(row.zone||'').toUpperCase())}</td>
+   <td>${esc(row.fdt||'—')}</td>
+   <td>${fmt(row.remaining)}</td>
+   <td><span class="badge ${row.stage==='DONE'?'bpaid':'bpartial'}">${esc(INSTALLATION_STAGE_LABELS[row.stage]||row.stage)}</span></td>
+   <td class="money">${fmt(row.amount)}</td>
+   <td><span class="badge ${invoiceClass}">${esc(INSTALLATION_INVOICE_LABELS[row.invoice_status]||row.invoice_status)}</span>${row.invoice_note?`<small class="muted" style="display:block">${esc(row.invoice_note)}</small>`:''}</td>
+   <td><span class="badge ${paymentClass}">${esc(INSTALLATION_PAYMENT_LABELS[row.payment_status]||row.payment_status)}</span></td>
+   <td>${fmt(row.paid_amount)}</td>
+   <td>${esc(String(row.paid_at||'').slice(0,10)||'—')}</td>
+   <td>${esc(row.period)}</td>
+   <td>${installationRowActions(row)}</td>
+  </tr>`}).join('');
+ panel.innerHTML=`<table><thead><tr><th>المشترك</th><th>الوكيل</th><th>المنطقة</th><th>FDT</th><th>المتبقي</th><th>الدفعة</th><th>المستحق</th><th>الفاتورة</th><th>حالة الصرف</th><th>المدفوع</th><th>تاريخ الصرف</th><th>الفترة</th><th>إجراء</th></tr></thead><tbody>${body}</tbody></table>`
+  +(rows.length>500?`<div class="muted" style="font-size:10px;padding:8px">يظهر أول 500 من ${fmt(rows.length)} سجل. استخدم التصفية لتضييق النتائج.</div>`:'');
+}
+function renderInstallation(){
+ if(!document.getElementById('installationPanel'))return;
+ refreshInstallationFilterOptions();
+ const rows=filteredInstallationRows();
+ renderInstallationDashboard(rows);
+ renderInstallationTable(rows);
+ const summary=document.getElementById('installationFilterSummary');
+ if(summary)summary.textContent=`${fmt(rows.length)} من ${fmt(installationState.rows.length)} سجل`;
+}
+function installationRowById(id){return installationState.rows.find(row=>String(row.id)===String(id))}
+function openInstallationInvoiceAudit(id){
+ const row=installationRowById(id);if(!row)return;
+ if(!roleAllows('payment')){toast('لا تملك صلاحية تدقيق الفواتير');return}
+ openModal(`🧾 تدقيق فاتورة — ${row.subscriber_id}`,
+  `<div class="detailgrid" style="margin-bottom:10px">
+    <div><small class="muted">الوكيل</small><div>${esc(row.reseller)}</div></div>
+    <div><small class="muted">الدفعة</small><div>${esc(INSTALLATION_STAGE_LABELS[row.stage]||row.stage)}</div></div>
+    <div><small class="muted">المستحق</small><div class="money">${fmt(row.amount)} د.ع</div></div>
+    <div><small class="muted">الحالة الحالية</small><div>${esc(INSTALLATION_INVOICE_LABELS[row.invoice_status]||row.invoice_status)}</div></div>
+   </div>
+   <label>ملاحظة أو سبب<input id="installationInvoiceNote" class="input" value="${esc(row.invoice_note||'')}" placeholder="اختياري للاعتماد، مطلوب عند الرفض"></label>
+   <div class="actions" style="margin-top:14px;flex-wrap:wrap">
+    <button class="btn green" onclick="submitInstallationInvoiceAudit('${esc(row.id)}','approved')">✓ اعتماد الفاتورة</button>
+    <button class="btn" onclick="submitInstallationInvoiceAudit('${esc(row.id)}','missing')">؟ فاتورة مفقودة</button>
+    <button class="btn danger" onclick="submitInstallationInvoiceAudit('${esc(row.id)}','rejected')">✕ رفض الفاتورة</button>
+    <button class="btn" onclick="closeModal()">إلغاء</button>
+   </div>
+   <div class="muted" style="font-size:10px;margin-top:8px">الاعتماد لا يعني الصرف. الصرف عملية منفصلة ولا تتم إلا بعد اعتماد الفاتورة.</div>`);
+}
+async function submitInstallationInvoiceAudit(id,status){
+ const note=document.getElementById('installationInvoiceNote')?.value||'';
+ if(status==='rejected'&&!note.trim()){toast('اذكر سبب الرفض');return}
+ try{
+   await sbRequest('/rest/v1/rpc/audit_installation_invoice',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({p_entitlement_id:id,p_status:status,p_note:note||null,p_request_id:createRequestId()})});
+   closeModal();await refreshInstallation(true);toast('تم تسجيل نتيجة تدقيق الفاتورة');
+ }catch(error){console.error(error);toast(`تعذر حفظ التدقيق: ${error?.message||''}`)}
+}
+async function payInstallationEntitlement(id){
+ const row=installationRowById(id);if(!row)return;
+ if(!roleAllows('payment')){toast('لا تملك صلاحية الصرف');return}
+ if(row.invoice_status!=='approved'){toast('لا يمكن الصرف قبل اعتماد الفاتورة');return}
+ if(!confirm(`صرف ${fmt(row.amount)} د.ع للمشترك ${row.subscriber_id} (${INSTALLATION_STAGE_LABELS[row.stage]||row.stage})؟`))return;
+ try{
+   /* المبلغ لا يُرسل من المتصفح؛ الخادم يشتقه من الدفعة المعتمدة. */
+   await sbRequest('/rest/v1/rpc/record_installation_payment',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({p_entitlement_id:id,p_expected_updated_at:row.updated_at||null,p_request_id:createRequestId()})});
+   await refreshInstallation(true);toast('تم تسجيل الصرف مركزياً');
+ }catch(error){console.error(error);toast(`تعذر تسجيل الصرف: ${error?.message||''}`)}
+}
+/* مراجعة صرف وكيل: تعرض المؤهل والمحجوب وسببه قبل أي تأكيد. */
+function installationPaymentReview(rows,reseller){
+ const scope=rows.filter(row=>row.reseller===reseller&&row.stage!=='DONE'&&row.payment_status!=='paid');
+ const eligible=scope.filter(row=>row.payment_status==='eligible');
+ const blocked=scope.filter(row=>row.payment_status!=='eligible');
+ const stages={P1:0,P2:0,P3:0,P4:0};
+ eligible.forEach(row=>{if(stages[row.stage]!==undefined)stages[row.stage]+=1});
+ const reasons=new Map();
+ blocked.forEach(row=>{const reason=INSTALLATION_INVOICE_LABELS[row.invoice_status]||row.invoice_status;reasons.set(reason,(reasons.get(reason)||0)+1)});
+ return{reseller,eligible,blocked,stages,amount:eligible.reduce((sum,row)=>sum+(Number(row.amount)||0),0),
+   reasons:[...reasons.entries()].map(([reason,count])=>({reason,count}))};
+}
+function openInstallationPaymentReview(){
+ if(!roleAllows('payment')){toast('لا تملك صلاحية الصرف');return}
+ const rows=filteredInstallationRows();
+ const reseller=installationFilterValue('installationResellerFilter');
+ if(reseller==='all'){toast('اختر وكيلاً من التصفية أولاً لمراجعة صرفه');return}
+ const review=installationPaymentReview(rows,reseller);
+ const blockedRows=review.reasons.map(item=>`<tr><td>${esc(item.reason)}</td><td>${fmt(item.count)}</td></tr>`).join('')
+   ||'<tr><td colspan="2" class="muted">لا توجد سجلات محجوبة</td></tr>';
+ openModal(`💳 مراجعة صرف — ${reseller}`,
+  `<div class="detailgrid" style="margin-bottom:12px">
+    <div><small class="muted">الوكيل</small><div>${esc(review.reseller)}</div></div>
+    <div><small class="muted">عدد المشتركين المؤهلين</small><div>${fmt(review.eligible.length)}</div></div>
+    <div><small class="muted">P1 / P2 / P3 / P4</small><div>${fmt(review.stages.P1)} / ${fmt(review.stages.P2)} / ${fmt(review.stages.P3)} / ${fmt(review.stages.P4)}</div></div>
+    <div><small class="muted">إجمالي المبلغ المؤهل</small><div class="money">${fmt(review.amount)} د.ع</div></div>
+    <div><small class="muted">سجلات محجوبة</small><div>${fmt(review.blocked.length)}</div></div>
+   </div>
+   <table><thead><tr><th>سبب الحجب</th><th>عدد السجلات</th></tr></thead><tbody>${blockedRows}</tbody></table>
+   <div class="muted" style="font-size:10px;margin-top:10px">المبالغ المحجوبة بسبب الفاتورة لا تدخل في الصرف. يتم الصرف سجلاً بسجل من الجدول، ويشتق الخادم المبلغ من الدفعة المعتمدة.</div>
+   <div class="actions" style="margin-top:12px"><button class="btn" onclick="closeModal()">إغلاق</button></div>`);
+}
+/* الاستيراد: معاينة إلزامية قبل أي كتابة، ولا تمر قيمة متبقٍ مجهولة بصمت. */
+async function importInstallationFile(event){
+ const input=event.target;
+ try{
+   if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}
+   const file=input.files&&input.files[0];if(!file)return;
+   if(typeof XLSX==='undefined')throw new Error('مكتبة Excel غير متاحة');
+   const workbook=XLSX.read(await file.arrayBuffer(),{type:'array'});
+   const sheet=workbook.Sheets[workbook.SheetNames[0]];
+   const raw=XLSX.utils.sheet_to_json(sheet,{defval:''});
+   const period=prompt('فترة أجور التنصيب بصيغة YYYY-MM',installationPeriodKey());
+   if(!period)return;
+   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(period.trim()))throw new Error('صيغة الفترة يجب أن تكون YYYY-MM');
+   const existingKeys=installationState.rows.map(row=>installationFees().entitlementKey({subscriberId:row.subscriber_id,stage:row.stage,period:row.period}));
+   const preview=installationFees().buildImportPreview(raw,{period:period.trim(),existingKeys});
+   preview.fileName=file.name;installationState.lastPreview=preview;
+   showInstallationImportPreview(preview,file.name);
+ }catch(error){console.error(error);alert(`تعذر قراءة ملف أجور التنصيب: ${error.message||''}`)}
+ finally{input.value=''}
+}
+function showInstallationImportPreview(preview,fileName){
+ const line=(label,value,tone)=>`<div class="minirow"><span>${esc(label)}</span><b class="${tone||''}">${fmt(value)}</b></div>`;
+ openModal(`📥 معاينة استيراد أجور التنصيب`,
+  `<div class="muted" style="font-size:10px;margin-bottom:8px">${esc(fileName)} — الفترة ${esc(preview.period)}</div>
+   <div class="grid2">
+    <div class="box">
+     <h4 style="font-size:12px">الصفوف</h4>
+     ${line('إجمالي الصفوف',preview.totalRows)}
+     ${line('صفوف صالحة',preview.valid)}
+     ${line('صفوف غير صالحة',preview.invalid,'status-disabled')}
+     ${line('مكرر داخل الملف',preview.duplicatesInFile)}
+     ${line('مسجل مسبقاً',preview.duplicatesAlreadyStored)}
+     ${line('قيمة متبقٍ غير معروفة',preview.reasons.unknownRemaining,'status-disabled')}
+     ${line('معرّف مشترك مفقود',preview.reasons.missingSubscriber,'status-disabled')}
+     ${line('وكيل مفقود',preview.reasons.missingReseller,'status-disabled')}
+    </div>
+    <div class="box">
+     <h4 style="font-size:12px">الدفعات</h4>
+     ${line('P1',preview.stages.P1)}${line('P2',preview.stages.P2)}
+     ${line('P3',preview.stages.P3)}${line('P4',preview.stages.P4)}
+     ${line('DONE',preview.stages.DONE)}
+     ${line('استحقاقات جديدة',preview.newEntitlements.length,'status-active')}
+     ${line('المبلغ المحسوب للجديد',preview.newAmount,'money')}
+    </div>
+   </div>
+   <div class="muted" style="font-size:10px;margin-top:10px">الصفوف غير الصالحة والمكررة لا تُستورد ولا تُحتسب في المبلغ. المشترك المسجل مسبقاً لنفس الدفعة والفترة لا يُنشئ استحقاقاً ثانياً.</div>
+   <div id="installationImportStatus" style="margin-top:10px"></div>
+   <div class="actions" style="margin-top:12px">${preview.importable&&roleAllows('edit')?`<button id="installationConfirmButton" class="btn gold" onclick="confirmInstallationImport()">✓ اعتماد الاستيراد مركزياً</button>`:''}<button class="btn" onclick="closeModal()">إغلاق</button></div>
+   ${preview.importable?'':`<div class="insight warn" style="display:block;margin-top:10px"><span class="insight-dot"></span><span><b>لا يوجد استحقاق جديد لاعتماده</b><small>كل الصفوف الصالحة مسجلة مسبقاً لهذه الفترة، أو لا يوجد صف صالح.</small></span></div>`}`);
+}
+/* اعتماد الاستيراد: تُرسل الصفوف الخام كما قُرئت، والخادم يتحقق ويشتق الدفعة
+   والمبلغ ويمنع التكرار ويعيد الأعداد المعتمدة. الواجهة لا تُدخل صفوفاً بحرية. */
+async function confirmInstallationImport(){
+ const preview=installationState.lastPreview;
+ if(!preview){toast('لا توجد معاينة لاعتمادها');return}
+ if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}
+ const button=document.getElementById('installationConfirmButton');
+ const statusBox=document.getElementById('installationImportStatus');
+ if(button){button.disabled=true;button.textContent='جاري الاعتماد المركزي...'}
+ if(statusBox)statusBox.innerHTML='<div class="insight warn" style="display:block"><span class="insight-dot"></span><span><b>جاري كتابة الاستحقاقات مركزياً</b><small>لا تغلق النافذة حتى تظهر النتيجة.</small></span></div>';
+ try{
+   const rows=preview.mappedRows.map(row=>({subscriber_id:row.subscriberId,subscriber_name:row.subscriberName,reseller:row.reseller,zone:row.zone||null,fdt:row.fdt||null,remaining:row.remaining}));
+   const result=await sbRequest('/rest/v1/rpc/import_installation_entitlements',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({p_period:preview.period,p_file_name:preview.fileName||'',p_file_checksum:null,p_rows:rows,p_request_id:createRequestId()})});
+   const batch=(result&&result.batch)||{};
+   installationState.lastPreview=null;
+   /* المصدر الرسمي بعد الاعتماد هو قاعدة البيانات، لا ناتج قراءة الملف. */
+   await refreshInstallation(true);
+   if(statusBox)statusBox.innerHTML='<div class="insight good" style="display:block"><span class="insight-dot"></span><span><b>تم الاعتماد المركزي</b><small>مقبول '+fmt(batch.accepted||0)+' • مكرر '+fmt(batch.duplicates||0)+' • مرفوض '+fmt(batch.rejected||0)+' • من '+fmt(batch.source_rows||0)+' صف</small></span></div>';
+   if(button)button.style.display='none';
+   toast('تم استيراد '+fmt(batch.accepted||0)+' استحقاقاً');
+ }catch(error){
+   console.error(error);
+   if(statusBox)statusBox.innerHTML='<div class="insight danger" style="display:block"><span class="insight-dot"></span><span><b>تعذر اعتماد الاستيراد</b><small>'+esc((error&&error.message)||'')+'</small></span></div>';
+ }finally{if(button&&button.style.display!=='none'){button.disabled=false;button.textContent='✓ اعتماد الاستيراد مركزياً'}}
+}
+function installationExportRows(){return installationFees().buildExportRows(filteredInstallationRows())}
+function exportInstallationCsv(){
+ const rows=installationExportRows();
+ if(!rows.length){toast('لا توجد سجلات للتصدير');return}
+ downloadCSV(rows,`installation_fees_${installationFilterValue('installationPeriodFilter')}.csv`);
+}
+function buildInstallationWorkbook(){
+ if(typeof XLSX==='undefined')throw new Error('مكتبة Excel غير متاحة');
+ const rows=installationExportRows(),workbook=XLSX.utils.book_new();
+ const header=['SubscriberID','SubscriberName','Reseller','Zone','FDT','Remaining','Stage','DueAmount','InvoiceStatus','InvoiceAuditDate','PaymentStatus','PaidAmount','PaymentDate','Period'];
+ const detail=XLSX.utils.aoa_to_sheet([header,...rows.map(row=>header.map(key=>row[key]))]);
+ detail['!cols']=header.map(()=>({wch:16}));detail['!autofilter']={ref:`A1:N${Math.max(2,rows.length+1)}`};detail['!freeze']={xSplit:0,ySplit:1};
+ const summary=installationFees().summarizeEntitlements(filteredInstallationRows());
+ const summarySheet=XLSX.utils.aoa_to_sheet([
+  ['تقرير أجور التنصيب'],['إجمالي المشتركين',summary.total],['DONE',summary.done],
+  ['P1',summary.stages.P1],['P2',summary.stages.P2],['P3',summary.stages.P3],['P4',summary.stages.P4],
+  ['المبلغ قبل تدقيق الفواتير',summary.amountBeforeAudit],['فواتير معتمدة',summary.invoices.approved],
+  ['فواتير مفقودة',summary.invoices.missing],['فواتير مرفوضة',summary.invoices.rejected],
+  ['مؤهل للصرف',summary.payments.eligible],['المصروف',summary.paidAmount],['المتبقي للصرف',summary.remainingToPay]]);
+ summarySheet['!cols']=[{wch:30},{wch:18}];
+ const byReseller=[['Reseller','Subscribers','DONE','Pending','Eligible amount','Paid']];
+ const groups=new Map();
+ filteredInstallationRows().forEach(row=>{const entry=groups.get(row.reseller)||{total:0,done:0,pending:0,eligible:0,paid:0};entry.total+=1;
+  if(row.stage==='DONE')entry.done+=1;else entry.pending+=1;
+  if(row.payment_status==='eligible')entry.eligible+=Number(row.amount)||0;
+  if(row.payment_status==='paid')entry.paid+=Number(row.paid_amount)||0;groups.set(row.reseller,entry)});
+ [...groups.entries()].forEach(([reseller,entry])=>byReseller.push([reseller,entry.total,entry.done,entry.pending,entry.eligible,entry.paid]));
+ const resellerSheet=XLSX.utils.aoa_to_sheet(byReseller);resellerSheet['!cols']=[{wch:26},{wch:14},{wch:10},{wch:10},{wch:18},{wch:16}];
+ XLSX.utils.book_append_sheet(workbook,summarySheet,'Installation Summary');
+ XLSX.utils.book_append_sheet(workbook,resellerSheet,'Installation Resellers');
+ XLSX.utils.book_append_sheet(workbook,detail,'Installation Detail');
+ return workbook;
+}
+function exportInstallationExcel(){
+ try{
+   const rows=installationExportRows();
+   if(!rows.length){toast('لا توجد سجلات للتصدير');return}
+   XLSX.writeFile(buildInstallationWorkbook(),`installation_fees_${installationFilterValue('installationPeriodFilter')}.xlsx`);
+   toast('تم تصدير تقرير أجور التنصيب');
+ }catch(error){console.error(error);toast(`تعذر التصدير: ${error.message||''}`)}
+}
+function clearInstallationFilters(){
+ ['installationSearch'].forEach(id=>{const element=document.getElementById(id);if(element)element.value=''});
+ ['installationPeriodFilter','installationResellerFilter','installationZoneFilter','installationFdtFilter','installationStageFilter','installationInvoiceFilter','installationPaymentFilter']
+  .forEach(id=>{const element=document.getElementById(id);if(element)element.value='all'});
+ renderInstallation();
+}
 initAuth();
+
 </script>
 </div>
 
