@@ -4,6 +4,8 @@ const vm = require('node:vm');
 const { webcrypto } = require('node:crypto');
 const { TextEncoder } = require('node:util');
 const XLSX = require(path.join(__dirname, '..', 'assets', 'vendor', 'xlsx.full.min.js'));
+// index.html loads this as a separate <script src>; the sandbox needs it too.
+const InstallationFees = require(path.join(__dirname, '..', 'assets', 'js', 'installation-fees.js'));
 
 function createElement() {
   return {
@@ -115,6 +117,7 @@ function loadCurrentApp(options = {}) {
       addEventListener() {},
     },
     XLSX,
+    InstallationFees,
   });
 
   const exportsScript = `
@@ -139,6 +142,12 @@ function loadCurrentApp(options = {}) {
       monthKey,
       monthOrder,
       renderAgentHierarchy,
+      renderInstallation,
+      installationState,
+      installationPaymentReview,
+      installationExportRows,
+      buildInstallationWorkbook,
+      filteredInstallationRows,
       newZoneAgentTotals,
       newZoneFdtAgentExportRows,
       newZoneFdtBreakdown,

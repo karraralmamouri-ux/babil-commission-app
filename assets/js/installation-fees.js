@@ -174,15 +174,163 @@
     return [...resellers.values()].sort((a, b) => b.amount - a.amount || a.reseller.localeCompare(b.reseller, 'ar'));
   }
 
+  /* أسماء الأعمدة تتغير بين الملفات، فالربط بالاسم لا بالموقع. */
+  const IMPORT_ALIASES = {
+    subscriberId: ['subscriber_id', 'subscriberid', 'subscriber id', 'subscriber', 'id', 'معرف المشترك', 'معرّف المشترك', 'رقم المشترك', 'المشترك'],
+    subscriberName: ['subscriber_name', 'subscribername', 'subscriber name', 'name', 'full_name', 'اسم المشترك', 'الاسم'],
+    reseller: ['reseller', 'agent', 'agent_name', 'الوكيل', 'اسم الوكيل', 'الموزع'],
+    zone: ['zone', 'المنطقة', 'النطاق'],
+    fdt: ['fdt', 'cabinet', 'الكابينة'],
+    remaining: ['remaining', 'remaining_amount', 'balance', 'المتبقي', 'الرصيد المتبقي', 'المبلغ المتبقي'],
+  };
+
+  function headerLookup(row) {
+    const byNormalized = new Map();
+    Object.keys(row || {}).forEach((key) => {
+      byNormalized.set(String(key).trim().toLowerCase(), row[key]);
+    });
+    return (field) => {
+      for (const alias of IMPORT_ALIASES[field]) {
+        if (byNormalized.has(alias)) return byNormalized.get(alias);
+      }
+      return '';
+    };
+  }
+
+  /* يحوّل صفاً خاماً من Excel/CSV إلى شكل النطاق دون الاعتماد على ترتيب الأعمدة. */
+  function mapImportRow(raw) {
+    const get = headerLookup(raw);
+    return {
+      subscriberId: text(get('subscriberId')),
+      subscriberName: text(get('subscriberName')),
+      reseller: text(get('reseller')),
+      zone: text(get('zone')).toLowerCase(),
+      fdt: text(get('fdt')),
+      remaining: get('remaining'),
+    };
+  }
+
+  /* معاينة الاستيراد: لا تكتب شيئاً، وتصنّف كل صف قبل أي حفظ.
+     `existingKeys` هي هويات الاستحقاقات المحفوظة سابقاً، فيُكشف التكرار
+     عبر الملفات لا داخل الملف الواحد فقط. */
+  function buildImportPreview(rawRows, options) {
+    const period = text(options && options.period);
+    const existing = new Set((options && options.existingKeys) || []);
+    const mapped = (rawRows || []).map(mapImportRow);
+    const batch = summarizeInstallationBatch(mapped, { period });
+
+    const alreadyStored = [];
+    const fresh = [];
+    batch.accepted.forEach((row) => {
+      const key = entitlementKey({ subscriberId: row.subscriberId, stage: row.stage, period });
+      if (existing.has(key)) alreadyStored.push(row);
+      else fresh.push(row);
+    });
+
+    const reasons = { unknownRemaining: 0, missingSubscriber: 0, missingReseller: 0 };
+    batch.invalid.forEach((row) => {
+      const problems = row.problems.join(' ');
+      if (problems.includes('متبقٍ') || problems.includes('غير رقمية')) reasons.unknownRemaining += 1;
+      if (problems.includes('معرّف المشترك مفقود')) reasons.missingSubscriber += 1;
+      if (problems.includes('الوكيل مفقود')) reasons.missingReseller += 1;
+    });
+
+    const freshAmount = fresh.reduce((sum, row) => sum + row.amount, 0);
+    return {
+      period,
+      totalRows: (rawRows || []).length,
+      valid: batch.accepted.length,
+      invalid: batch.invalid.length,
+      duplicatesInFile: batch.duplicates.length,
+      duplicatesAlreadyStored: alreadyStored.length,
+      reasons,
+      stages: batch.stages,
+      stageAmounts: batch.stageAmounts,
+      amount: batch.amount,
+      newEntitlements: fresh,
+      newAmount: freshAmount,
+      invalidRows: batch.invalid,
+      duplicateRows: batch.duplicates,
+      /* لا يُستورد شيء إذا لم يبقَ صف جديد صالح. */
+      importable: fresh.length > 0,
+    };
+  }
+
+  const INVOICE_STATUSES = ['pending', 'approved', 'missing', 'rejected'];
+  const PAYMENT_STATUSES = ['not_eligible', 'awaiting_invoice', 'eligible', 'paid'];
+
+  /* عدادات لوحة أجور التنصيب، محسوبة من الاستحقاقات المحفوظة. */
+  function summarizeEntitlements(rows) {
+    const list = rows || [];
+    const stages = emptyStageCounts();
+    const invoices = INVOICE_STATUSES.reduce((acc, key) => Object.assign(acc, { [key]: 0 }), {});
+    const payments = PAYMENT_STATUSES.reduce((acc, key) => Object.assign(acc, { [key]: 0 }), {});
+    let amountBeforeAudit = 0;
+    let eligibleAmount = 0;
+    let paidAmount = 0;
+
+    list.forEach((row) => {
+      const stage = text(row.stage);
+      const amount = Number(row.amount) || 0;
+      if (stages[stage] !== undefined) stages[stage] += 1;
+      if (invoices[row.invoice_status] !== undefined) invoices[row.invoice_status] += 1;
+      if (payments[row.payment_status] !== undefined) payments[row.payment_status] += 1;
+      if (stage !== 'DONE') amountBeforeAudit += amount;
+      if (row.payment_status === 'eligible') eligibleAmount += amount;
+      if (row.payment_status === 'paid') paidAmount += Number(row.paid_amount) || 0;
+    });
+
+    const pending = PENDING_STAGES.reduce((sum, stage) => sum + stages[stage], 0);
+    return {
+      total: list.length,
+      done: stages.DONE,
+      pending,
+      stages,
+      invoices,
+      payments,
+      amountBeforeAudit,
+      eligibleAmount,
+      paidAmount,
+      remainingToPay: eligibleAmount,
+    };
+  }
+
+  /* صفوف التصدير — نفس الحقول لـCSV وExcel حتى لا يختلف الملفان. */
+  function buildExportRows(rows) {
+    return (rows || []).map((row) => ({
+      SubscriberID: text(row.subscriber_id),
+      SubscriberName: text(row.subscriber_name),
+      Reseller: text(row.reseller),
+      Zone: text(row.zone).toUpperCase(),
+      FDT: text(row.fdt),
+      Remaining: Number(row.remaining) || 0,
+      Stage: text(row.stage),
+      DueAmount: Number(row.amount) || 0,
+      InvoiceStatus: text(row.invoice_status),
+      InvoiceAuditDate: text(row.invoice_audited_at).slice(0, 10),
+      PaymentStatus: text(row.payment_status),
+      PaidAmount: Number(row.paid_amount) || 0,
+      PaymentDate: text(row.paid_at).slice(0, 10),
+      Period: text(row.period),
+    }));
+  }
+
   return {
     ALL_STAGES,
+    IMPORT_ALIASES,
+    INVOICE_STATUSES,
+    PAYMENT_STATUSES,
     PENDING_STAGES,
     STAGE_BY_REMAINING,
+    buildExportRows,
+    buildImportPreview,
     entitlementKey,
+    mapImportRow,
     normalizeInstallationRow,
     parseRemaining,
     resolveInstallationStage,
     summarizeByReseller,
+    summarizeEntitlements,
     summarizeInstallationBatch,
   };
 });

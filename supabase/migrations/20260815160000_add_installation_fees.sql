@@ -141,6 +141,36 @@ create trigger trg_installation_entitlement_updated
 before update on public.installation_entitlements
 for each row execute function public.set_updated_at();
 
+-- Archive protection: once an instalment is paid, the figures that produced that
+-- payment are frozen. A later import or rate change can never restate history.
+create or replace function public.protect_settled_installation_entitlement()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if old.payment_status = 'paid' and (
+       new.period is distinct from old.period
+    or new.subscriber_id is distinct from old.subscriber_id
+    or new.stage is distinct from old.stage
+    or new.amount is distinct from old.amount
+    or new.remaining is distinct from old.remaining
+    or new.reseller is distinct from old.reseller
+    or new.paid_amount is distinct from old.paid_amount
+    or new.paid_at is distinct from old.paid_at
+    or new.paid_by is distinct from old.paid_by
+  ) then
+    raise exception 'A settled installation entitlement cannot be restated'
+      using errcode = '23514';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_installation_entitlement_archive
+before update on public.installation_entitlements
+for each row execute function public.protect_settled_installation_entitlement();
+
 alter table public.installation_batches enable row level security;
 alter table public.installation_entitlements enable row level security;
 alter table public.installation_payments enable row level security;

@@ -231,6 +231,27 @@ select pg_temp.expect(
   (select paid_amount = 4000 and payment_status = 'paid'
    from public.installation_entitlements where id = 'bbbbbbbb-0000-0000-0000-000000000002'));
 
+-- Archive — a settled instalment is frozen against later restatement.
+select pg_temp.expect_error(
+  'a paid instalment cannot have its amount restated',
+  $q$update public.installation_entitlements set amount = 9000, remaining = 13000
+      where id = 'bbbbbbbb-0000-0000-0000-000000000001'$q$,
+  '23514');
+select pg_temp.expect_error(
+  'a paid instalment cannot be moved to another period',
+  $q$update public.installation_entitlements set period = '2026-08'
+      where id = 'bbbbbbbb-0000-0000-0000-000000000001'$q$,
+  '23514');
+select pg_temp.expect_error(
+  'a paid instalment cannot have its payment erased',
+  $q$update public.installation_entitlements set paid_amount = 0, paid_at = null
+      where id = 'bbbbbbbb-0000-0000-0000-000000000001'$q$,
+  '23514');
+select pg_temp.expect(
+  'an unpaid instalment in the same period is still editable',
+  (select true from public.installation_entitlements
+    where id = 'bbbbbbbb-0000-0000-0000-000000000003'));
+
 -- RLS — a browser session reads but never writes.
 set local role authenticated;
 select pg_temp.act_as('44444444-4444-4444-4444-444444444444');

@@ -6,6 +6,7 @@
 <title>لوحة عمولات الوكلاء — HRINS</title>
 <meta name="theme-color" content="#12161c">
 <script src="./assets/vendor/xlsx.full.min.js"></script>
+<script src="./assets/js/installation-fees.js"></script>
 <style>
 :root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
@@ -75,6 +76,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
    <button class="side-btn active" data-nav-target="dashboardSection" onclick="scrollToSection('dashboardSection',this)">▦ ملخص العمولات</button>
    <button class="side-btn" data-nav-target="agentsSection" onclick="scrollToSection('agentsSection',this)">♟ تفاصيل الوكلاء والكابينات</button>
    <button class="side-btn" onclick="openAuditLog()">▤ سجل العمليات</button>
+   <button class="side-btn" data-nav-target="installationSection" onclick="scrollToSection('installationSection',this)">🔧 أجور التنصيب</button>
   </nav>
  </div>
  <div class="side-section">
@@ -197,6 +199,38 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 <section id="operationalSection" class="grid2 section-anchor">
  <div class="box"><h3>✦ جاهزية الشهر</h3><div id="readinessInsights" class="insight-list"></div></div>
  <div class="box"><h3>⚑ تنبيهات تشغيلية</h3><div id="operationalAlerts" class="insight-list"></div></div>
+</section>
+<section id="installationSection" class="section-anchor" style="margin-top:16px">
+ <div class="box">
+  <h3>🔧 أجور التنصيب</h3>
+  <div class="raw-config-note">نطاق مستقل عن عمولات الوكلاء. الدفعات هنا P1 إلى P4 وDONE، ولا علاقة لها بـP35/P45/P65 أو شرائح التير. لا يُصرف لأي مشترك قبل اعتماد فاتورته.</div>
+  <div id="installationCards" class="cards" style="margin:12px 0"></div>
+  <div class="toolbar" style="margin-bottom:10px">
+   <div class="controls" style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+    <input id="installationSearch" class="input" placeholder="بحث بالمشترك أو الاسم أو الوكيل" style="min-width:220px" oninput="renderInstallation()">
+    <select id="installationPeriodFilter" class="input" onchange="renderInstallation()"><option value="all">كل الفترات</option></select>
+    <select id="installationResellerFilter" class="input" onchange="renderInstallation()"><option value="all">كل الوكلاء</option></select>
+    <select id="installationZoneFilter" class="input" onchange="renderInstallation()"><option value="all">كل المناطق</option><option value="old">OLD</option><option value="new">NEW</option></select>
+    <select id="installationFdtFilter" class="input" onchange="renderInstallation()"><option value="all">كل الكابينات</option></select>
+    <select id="installationStageFilter" class="input" onchange="renderInstallation()"><option value="all">كل الدفعات</option><option value="P1">P1</option><option value="P2">P2</option><option value="P3">P3</option><option value="P4">P4</option><option value="DONE">DONE</option></select>
+    <select id="installationInvoiceFilter" class="input" onchange="renderInstallation()"><option value="all">كل حالات الفاتورة</option><option value="pending">بانتظار التدقيق</option><option value="approved">معتمدة</option><option value="missing">فاتورة مفقودة</option><option value="rejected">مرفوضة</option></select>
+    <select id="installationPaymentFilter" class="input" onchange="renderInstallation()"><option value="all">كل حالات الصرف</option><option value="awaiting_invoice">بانتظار الفاتورة</option><option value="eligible">مؤهل للصرف</option><option value="paid">مصروف</option><option value="not_eligible">غير مؤهل</option></select>
+    <button class="btn" onclick="clearInstallationFilters()">مسح التصفية</button>
+    <span id="installationFilterSummary" class="muted" style="font-size:10px"></span>
+   </div>
+  </div>
+  <div id="installationPanel" class="panel sticky-table"></div>
+  <div class="zoneActions">
+   <div class="actions">
+    <button class="btn" data-permission="edit" onclick="document.getElementById('installationFileInput').click()">📥 استيراد ملف أجور التنصيب</button>
+    <button class="btn gold" data-permission="payment" onclick="openInstallationPaymentReview()">💳 مراجعة صرف وكيل</button>
+    <button class="btn" onclick="exportInstallationCsv()">📤 تصدير CSV</button>
+    <button class="btn" onclick="exportInstallationExcel()">▦ تصدير Excel</button>
+    <button class="btn" onclick="refreshInstallation()">↻ تحديث</button>
+   </div>
+  </div>
+  <input type="file" id="installationFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importInstallationFile(event)">
+ </div>
 </section>
 </div>
 </main>
@@ -1571,7 +1605,299 @@ function normalizeImport(o){const keys=Object.keys(o),get=names=>{const k=keys.f
 
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){document.querySelectorAll('.modal.open').forEach(modal=>modal.classList.remove('open'));managedPasswordTarget=null;toggleMobileMenu(false)}if(event.key==='Enter'&&document.getElementById('passwordModal')?.classList.contains('open')&&event.target?.id==='managedPasswordConfirm')saveManagedUserPassword()});
 window.addEventListener('beforeunload',e=>{if(hasUnsavedChanges){e.preventDefault();e.returnValue='لديك تعديلات غير محفوظة.'}});
+/* ===================== أجور التنصيب ===================== */
+/* نطاق مستقل: لا يشارك نطاق العمولات أي قاعدة حساب. الحماية الفعلية في RLS
+   والـRPCs؛ ما هنا تجربة استخدام فقط ولا يُعتمد عليه كضابط أمان. */
+const installationState={rows:[],loading:false,error:'',lastPreview:null};
+const INSTALLATION_STAGE_LABELS={P1:'الدفعة 1',P2:'الدفعة 2',P3:'الدفعة 3',P4:'الدفعة 4',DONE:'مكتمل'};
+const INSTALLATION_INVOICE_LABELS={pending:'بانتظار التدقيق',approved:'معتمدة',missing:'مفقودة',rejected:'مرفوضة'};
+const INSTALLATION_PAYMENT_LABELS={not_eligible:'غير مؤهل',awaiting_invoice:'بانتظار الفاتورة',eligible:'مؤهل للصرف',paid:'مصروف'};
+function installationFees(){if(typeof InstallationFees==='undefined')throw new Error('وحدة أجور التنصيب غير محمّلة');return InstallationFees}
+function installationPeriodKey(date=new Date()){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`}
+async function fetchInstallationEntitlements(){
+ const select='id,period,subscriber_id,subscriber_name,reseller,zone,fdt,remaining,stage,amount,invoice_status,invoice_audited_at,invoice_note,payment_status,paid_amount,paid_at,updated_at';
+ return fetchCentralPages(`/rest/v1/installation_entitlements?select=${select}&order=period.desc,reseller.asc,subscriber_id.asc`);
+}
+async function refreshInstallation(silent=false){
+ if(!authUser)return;
+ installationState.loading=true;installationState.error='';renderInstallation();
+ try{
+   installationState.rows=await fetchInstallationEntitlements();
+   installationState.error='';
+   if(!silent)toast('تم تحديث أجور التنصيب');
+ }catch(error){
+   console.error('Installation fees error:',error);
+   installationState.rows=[];
+   /* الجداول قد لا تكون منشورة بعد؛ لا تُعرض كخطأ مزعج. */
+   installationState.error=error?.status===404||error?.status===400
+     ?'جداول أجور التنصيب غير منشورة على هذه البيئة بعد.'
+     :`تعذر تحميل أجور التنصيب: ${error?.message||''}`;
+ }finally{installationState.loading=false;renderInstallation()}
+}
+/* غياب العنصر أو قيمته الفارغة يعني «الكل»، لا تصفية تُخفي كل السجلات. */
+function installationFilterValue(id){const element=document.getElementById(id);const value=element&&element.value;return value?value:'all'}
+function filteredInstallationRows(){
+ const query=(document.getElementById('installationSearch')?.value||'').trim().toLowerCase();
+ const period=installationFilterValue('installationPeriodFilter'),reseller=installationFilterValue('installationResellerFilter');
+ const zone=installationFilterValue('installationZoneFilter'),fdt=installationFilterValue('installationFdtFilter');
+ const stage=installationFilterValue('installationStageFilter'),invoice=installationFilterValue('installationInvoiceFilter');
+ const payment=installationFilterValue('installationPaymentFilter');
+ return installationState.rows.filter(row=>{
+  const haystack=`${row.subscriber_id||''} ${row.subscriber_name||''} ${row.reseller||''}`.toLowerCase();
+  return (!query||haystack.includes(query))
+    &&(period==='all'||row.period===period)
+    &&(reseller==='all'||row.reseller===reseller)
+    &&(zone==='all'||(row.zone||'')===zone)
+    &&(fdt==='all'||String(row.fdt||'')===fdt)
+    &&(stage==='all'||row.stage===stage)
+    &&(invoice==='all'||row.invoice_status===invoice)
+    &&(payment==='all'||row.payment_status===payment);
+ });
+}
+function refreshInstallationFilterOptions(){
+ const fill=(id,values)=>{const select=document.getElementById(id);if(!select)return;const current=select.value;const first=select.querySelector('option');
+  select.innerHTML=(first?first.outerHTML:'<option value="all">الكل</option>')+values.map(value=>`<option value="${esc(value)}">${esc(value)}</option>`).join('');
+  select.value=values.includes(current)||current==='all'?current:'all'};
+ const unique=key=>[...new Set(installationState.rows.map(row=>String(row[key]||'')).filter(Boolean))].sort();
+ fill('installationPeriodFilter',unique('period').reverse());
+ fill('installationResellerFilter',unique('reseller'));
+ fill('installationFdtFilter',unique('fdt'));
+}
+function installationCard(label,value,sub,cls){return `<div class="card ${cls||''}"><div class="label">${esc(label)}</div><div class="value">${fmt(value)}</div><div class="sub">${esc(sub||'')}</div></div>`}
+function renderInstallationDashboard(rows){
+ const container=document.getElementById('installationCards');if(!container)return;
+ const summary=installationFees().summarizeEntitlements(rows);
+ container.innerHTML=[
+  installationCard('إجمالي المشتركين',summary.total,'سجل','blueline'),
+  installationCard('مكتمل DONE',summary.done,'لا مبلغ مستحق'),
+  installationCard('P1',summary.stages.P1,'3,000 د.ع للمشترك'),
+  installationCard('P2',summary.stages.P2,'3,000 د.ع للمشترك'),
+  installationCard('P3',summary.stages.P3,'3,000 د.ع للمشترك'),
+  installationCard('P4',summary.stages.P4,'4,000 د.ع للمشترك'),
+  installationCard('المبلغ قبل تدقيق الفواتير',summary.amountBeforeAudit,'د.ع','goldline'),
+  installationCard('بانتظار تدقيق الفاتورة',summary.invoices.pending,'سجل'),
+  installationCard('فواتير معتمدة',summary.invoices.approved,'سجل','greenline'),
+  installationCard('فواتير مفقودة',summary.invoices.missing,'سجل'),
+  installationCard('فواتير مرفوضة',summary.invoices.rejected,'سجل'),
+  installationCard('مؤهل للصرف',summary.payments.eligible,'سجل','greenline'),
+  installationCard('مصروف',summary.paidAmount,'د.ع'),
+  installationCard('المتبقي للصرف',summary.remainingToPay,'د.ع','goldline')
+ ].join('');
+}
+function installationRowActions(row){
+ const canAudit=roleAllows('payment')&&row.payment_status!=='paid';
+ const canPay=roleAllows('payment')&&row.payment_status==='eligible';
+ if(!canAudit&&!canPay)return '<span class="muted" style="font-size:10px">—</span>';
+ const audit=canAudit?`<button class="smallbtn" onclick="openInstallationInvoiceAudit('${esc(row.id)}')">🧾 تدقيق</button>`:'';
+ const pay=canPay?` <button class="smallbtn" onclick="payInstallationEntitlement('${esc(row.id)}')">💳 صرف</button>`:'';
+ return audit+pay;
+}
+function renderInstallationTable(rows){
+ const panel=document.getElementById('installationPanel');if(!panel)return;
+ if(installationState.loading){panel.innerHTML='<div class="box muted">جاري تحميل أجور التنصيب...</div>';return}
+ if(installationState.error){panel.innerHTML=`<div class="insight danger" style="display:block"><b>${esc(installationState.error)}</b></div>`;return}
+ if(!rows.length){panel.innerHTML='<div class="box muted">لا توجد سجلات مطابقة. ارفع ملف أجور التنصيب للفترة المطلوبة.</div>';return}
+ const body=rows.slice(0,500).map(row=>{
+  const invoiceClass=row.invoice_status==='approved'?'bpaid':row.invoice_status==='pending'?'bpartial':'bpending';
+  const paymentClass=row.payment_status==='paid'?'bpaid':row.payment_status==='eligible'?'bpartial':'bpending';
+  return `<tr>
+   <td><b>${esc(row.subscriber_id)}</b><small class="muted" style="display:block">${esc(row.subscriber_name||'')}</small></td>
+   <td>${esc(row.reseller)}</td>
+   <td>${esc(String(row.zone||'').toUpperCase())}</td>
+   <td>${esc(row.fdt||'—')}</td>
+   <td>${fmt(row.remaining)}</td>
+   <td><span class="badge ${row.stage==='DONE'?'bpaid':'bpartial'}">${esc(INSTALLATION_STAGE_LABELS[row.stage]||row.stage)}</span></td>
+   <td class="money">${fmt(row.amount)}</td>
+   <td><span class="badge ${invoiceClass}">${esc(INSTALLATION_INVOICE_LABELS[row.invoice_status]||row.invoice_status)}</span>${row.invoice_note?`<small class="muted" style="display:block">${esc(row.invoice_note)}</small>`:''}</td>
+   <td><span class="badge ${paymentClass}">${esc(INSTALLATION_PAYMENT_LABELS[row.payment_status]||row.payment_status)}</span></td>
+   <td>${fmt(row.paid_amount)}</td>
+   <td>${esc(String(row.paid_at||'').slice(0,10)||'—')}</td>
+   <td>${esc(row.period)}</td>
+   <td>${installationRowActions(row)}</td>
+  </tr>`}).join('');
+ panel.innerHTML=`<table><thead><tr><th>المشترك</th><th>الوكيل</th><th>المنطقة</th><th>FDT</th><th>المتبقي</th><th>الدفعة</th><th>المستحق</th><th>الفاتورة</th><th>حالة الصرف</th><th>المدفوع</th><th>تاريخ الصرف</th><th>الفترة</th><th>إجراء</th></tr></thead><tbody>${body}</tbody></table>`
+  +(rows.length>500?`<div class="muted" style="font-size:10px;padding:8px">يظهر أول 500 من ${fmt(rows.length)} سجل. استخدم التصفية لتضييق النتائج.</div>`:'');
+}
+function renderInstallation(){
+ if(!document.getElementById('installationPanel'))return;
+ refreshInstallationFilterOptions();
+ const rows=filteredInstallationRows();
+ renderInstallationDashboard(rows);
+ renderInstallationTable(rows);
+ const summary=document.getElementById('installationFilterSummary');
+ if(summary)summary.textContent=`${fmt(rows.length)} من ${fmt(installationState.rows.length)} سجل`;
+}
+function installationRowById(id){return installationState.rows.find(row=>String(row.id)===String(id))}
+function openInstallationInvoiceAudit(id){
+ const row=installationRowById(id);if(!row)return;
+ if(!roleAllows('payment')){toast('لا تملك صلاحية تدقيق الفواتير');return}
+ openModal(`🧾 تدقيق فاتورة — ${row.subscriber_id}`,
+  `<div class="detailgrid" style="margin-bottom:10px">
+    <div><small class="muted">الوكيل</small><div>${esc(row.reseller)}</div></div>
+    <div><small class="muted">الدفعة</small><div>${esc(INSTALLATION_STAGE_LABELS[row.stage]||row.stage)}</div></div>
+    <div><small class="muted">المستحق</small><div class="money">${fmt(row.amount)} د.ع</div></div>
+    <div><small class="muted">الحالة الحالية</small><div>${esc(INSTALLATION_INVOICE_LABELS[row.invoice_status]||row.invoice_status)}</div></div>
+   </div>
+   <label>ملاحظة أو سبب<input id="installationInvoiceNote" class="input" value="${esc(row.invoice_note||'')}" placeholder="اختياري للاعتماد، مطلوب عند الرفض"></label>
+   <div class="actions" style="margin-top:14px;flex-wrap:wrap">
+    <button class="btn green" onclick="submitInstallationInvoiceAudit('${esc(row.id)}','approved')">✓ اعتماد الفاتورة</button>
+    <button class="btn" onclick="submitInstallationInvoiceAudit('${esc(row.id)}','missing')">؟ فاتورة مفقودة</button>
+    <button class="btn danger" onclick="submitInstallationInvoiceAudit('${esc(row.id)}','rejected')">✕ رفض الفاتورة</button>
+    <button class="btn" onclick="closeModal()">إلغاء</button>
+   </div>
+   <div class="muted" style="font-size:10px;margin-top:8px">الاعتماد لا يعني الصرف. الصرف عملية منفصلة ولا تتم إلا بعد اعتماد الفاتورة.</div>`);
+}
+async function submitInstallationInvoiceAudit(id,status){
+ const note=document.getElementById('installationInvoiceNote')?.value||'';
+ if(status==='rejected'&&!note.trim()){toast('اذكر سبب الرفض');return}
+ try{
+   await sbRequest('/rest/v1/rpc/audit_installation_invoice',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({p_entitlement_id:id,p_status:status,p_note:note||null,p_request_id:createRequestId()})});
+   closeModal();await refreshInstallation(true);toast('تم تسجيل نتيجة تدقيق الفاتورة');
+ }catch(error){console.error(error);toast(`تعذر حفظ التدقيق: ${error?.message||''}`)}
+}
+async function payInstallationEntitlement(id){
+ const row=installationRowById(id);if(!row)return;
+ if(!roleAllows('payment')){toast('لا تملك صلاحية الصرف');return}
+ if(row.invoice_status!=='approved'){toast('لا يمكن الصرف قبل اعتماد الفاتورة');return}
+ if(!confirm(`صرف ${fmt(row.amount)} د.ع للمشترك ${row.subscriber_id} (${INSTALLATION_STAGE_LABELS[row.stage]||row.stage})؟`))return;
+ try{
+   /* المبلغ لا يُرسل من المتصفح؛ الخادم يشتقه من الدفعة المعتمدة. */
+   await sbRequest('/rest/v1/rpc/record_installation_payment',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({p_entitlement_id:id,p_expected_updated_at:row.updated_at||null,p_request_id:createRequestId()})});
+   await refreshInstallation(true);toast('تم تسجيل الصرف مركزياً');
+ }catch(error){console.error(error);toast(`تعذر تسجيل الصرف: ${error?.message||''}`)}
+}
+/* مراجعة صرف وكيل: تعرض المؤهل والمحجوب وسببه قبل أي تأكيد. */
+function installationPaymentReview(rows,reseller){
+ const scope=rows.filter(row=>row.reseller===reseller&&row.stage!=='DONE'&&row.payment_status!=='paid');
+ const eligible=scope.filter(row=>row.payment_status==='eligible');
+ const blocked=scope.filter(row=>row.payment_status!=='eligible');
+ const stages={P1:0,P2:0,P3:0,P4:0};
+ eligible.forEach(row=>{if(stages[row.stage]!==undefined)stages[row.stage]+=1});
+ const reasons=new Map();
+ blocked.forEach(row=>{const reason=INSTALLATION_INVOICE_LABELS[row.invoice_status]||row.invoice_status;reasons.set(reason,(reasons.get(reason)||0)+1)});
+ return{reseller,eligible,blocked,stages,amount:eligible.reduce((sum,row)=>sum+(Number(row.amount)||0),0),
+   reasons:[...reasons.entries()].map(([reason,count])=>({reason,count}))};
+}
+function openInstallationPaymentReview(){
+ if(!roleAllows('payment')){toast('لا تملك صلاحية الصرف');return}
+ const rows=filteredInstallationRows();
+ const reseller=installationFilterValue('installationResellerFilter');
+ if(reseller==='all'){toast('اختر وكيلاً من التصفية أولاً لمراجعة صرفه');return}
+ const review=installationPaymentReview(rows,reseller);
+ const blockedRows=review.reasons.map(item=>`<tr><td>${esc(item.reason)}</td><td>${fmt(item.count)}</td></tr>`).join('')
+   ||'<tr><td colspan="2" class="muted">لا توجد سجلات محجوبة</td></tr>';
+ openModal(`💳 مراجعة صرف — ${reseller}`,
+  `<div class="detailgrid" style="margin-bottom:12px">
+    <div><small class="muted">الوكيل</small><div>${esc(review.reseller)}</div></div>
+    <div><small class="muted">عدد المشتركين المؤهلين</small><div>${fmt(review.eligible.length)}</div></div>
+    <div><small class="muted">P1 / P2 / P3 / P4</small><div>${fmt(review.stages.P1)} / ${fmt(review.stages.P2)} / ${fmt(review.stages.P3)} / ${fmt(review.stages.P4)}</div></div>
+    <div><small class="muted">إجمالي المبلغ المؤهل</small><div class="money">${fmt(review.amount)} د.ع</div></div>
+    <div><small class="muted">سجلات محجوبة</small><div>${fmt(review.blocked.length)}</div></div>
+   </div>
+   <table><thead><tr><th>سبب الحجب</th><th>عدد السجلات</th></tr></thead><tbody>${blockedRows}</tbody></table>
+   <div class="muted" style="font-size:10px;margin-top:10px">المبالغ المحجوبة بسبب الفاتورة لا تدخل في الصرف. يتم الصرف سجلاً بسجل من الجدول، ويشتق الخادم المبلغ من الدفعة المعتمدة.</div>
+   <div class="actions" style="margin-top:12px"><button class="btn" onclick="closeModal()">إغلاق</button></div>`);
+}
+/* الاستيراد: معاينة إلزامية قبل أي كتابة، ولا تمر قيمة متبقٍ مجهولة بصمت. */
+async function importInstallationFile(event){
+ const input=event.target;
+ try{
+   if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}
+   const file=input.files&&input.files[0];if(!file)return;
+   if(typeof XLSX==='undefined')throw new Error('مكتبة Excel غير متاحة');
+   const workbook=XLSX.read(await file.arrayBuffer(),{type:'array'});
+   const sheet=workbook.Sheets[workbook.SheetNames[0]];
+   const raw=XLSX.utils.sheet_to_json(sheet,{defval:''});
+   const period=prompt('فترة أجور التنصيب بصيغة YYYY-MM',installationPeriodKey());
+   if(!period)return;
+   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(period.trim()))throw new Error('صيغة الفترة يجب أن تكون YYYY-MM');
+   const existingKeys=installationState.rows.map(row=>installationFees().entitlementKey({subscriberId:row.subscriber_id,stage:row.stage,period:row.period}));
+   const preview=installationFees().buildImportPreview(raw,{period:period.trim(),existingKeys});
+   installationState.lastPreview=preview;
+   showInstallationImportPreview(preview,file.name);
+ }catch(error){console.error(error);alert(`تعذر قراءة ملف أجور التنصيب: ${error.message||''}`)}
+ finally{input.value=''}
+}
+function showInstallationImportPreview(preview,fileName){
+ const line=(label,value,tone)=>`<div class="minirow"><span>${esc(label)}</span><b class="${tone||''}">${fmt(value)}</b></div>`;
+ openModal(`📥 معاينة استيراد أجور التنصيب`,
+  `<div class="muted" style="font-size:10px;margin-bottom:8px">${esc(fileName)} — الفترة ${esc(preview.period)}</div>
+   <div class="grid2">
+    <div class="box">
+     <h4 style="font-size:12px">الصفوف</h4>
+     ${line('إجمالي الصفوف',preview.totalRows)}
+     ${line('صفوف صالحة',preview.valid)}
+     ${line('صفوف غير صالحة',preview.invalid,'status-disabled')}
+     ${line('مكرر داخل الملف',preview.duplicatesInFile)}
+     ${line('مسجل مسبقاً',preview.duplicatesAlreadyStored)}
+     ${line('قيمة متبقٍ غير معروفة',preview.reasons.unknownRemaining,'status-disabled')}
+     ${line('معرّف مشترك مفقود',preview.reasons.missingSubscriber,'status-disabled')}
+     ${line('وكيل مفقود',preview.reasons.missingReseller,'status-disabled')}
+    </div>
+    <div class="box">
+     <h4 style="font-size:12px">الدفعات</h4>
+     ${line('P1',preview.stages.P1)}${line('P2',preview.stages.P2)}
+     ${line('P3',preview.stages.P3)}${line('P4',preview.stages.P4)}
+     ${line('DONE',preview.stages.DONE)}
+     ${line('استحقاقات جديدة',preview.newEntitlements.length,'status-active')}
+     ${line('المبلغ المحسوب للجديد',preview.newAmount,'money')}
+    </div>
+   </div>
+   <div class="muted" style="font-size:10px;margin-top:10px">الصفوف غير الصالحة والمكررة لا تُستورد ولا تُحتسب في المبلغ. المشترك المسجل مسبقاً لنفس الدفعة والفترة لا يُنشئ استحقاقاً ثانياً.</div>
+   <div class="actions" style="margin-top:12px"><button class="btn" onclick="closeModal()">إغلاق المعاينة</button></div>
+   <div class="insight warn" style="display:block;margin-top:10px"><b>الكتابة المركزية غير مفعّلة بعد</b><small>هذه معاينة للقراءة فقط. مسار حفظ الاستحقاقات مركزياً ينتظر نشر مهاجرة أجور التنصيب.</small></div>`);
+}
+function installationExportRows(){return installationFees().buildExportRows(filteredInstallationRows())}
+function exportInstallationCsv(){
+ const rows=installationExportRows();
+ if(!rows.length){toast('لا توجد سجلات للتصدير');return}
+ downloadCSV(rows,`installation_fees_${installationFilterValue('installationPeriodFilter')}.csv`);
+}
+function buildInstallationWorkbook(){
+ if(typeof XLSX==='undefined')throw new Error('مكتبة Excel غير متاحة');
+ const rows=installationExportRows(),workbook=XLSX.utils.book_new();
+ const header=['SubscriberID','SubscriberName','Reseller','Zone','FDT','Remaining','Stage','DueAmount','InvoiceStatus','InvoiceAuditDate','PaymentStatus','PaidAmount','PaymentDate','Period'];
+ const detail=XLSX.utils.aoa_to_sheet([header,...rows.map(row=>header.map(key=>row[key]))]);
+ detail['!cols']=header.map(()=>({wch:16}));detail['!autofilter']={ref:`A1:N${Math.max(2,rows.length+1)}`};detail['!freeze']={xSplit:0,ySplit:1};
+ const summary=installationFees().summarizeEntitlements(filteredInstallationRows());
+ const summarySheet=XLSX.utils.aoa_to_sheet([
+  ['تقرير أجور التنصيب'],['إجمالي المشتركين',summary.total],['DONE',summary.done],
+  ['P1',summary.stages.P1],['P2',summary.stages.P2],['P3',summary.stages.P3],['P4',summary.stages.P4],
+  ['المبلغ قبل تدقيق الفواتير',summary.amountBeforeAudit],['فواتير معتمدة',summary.invoices.approved],
+  ['فواتير مفقودة',summary.invoices.missing],['فواتير مرفوضة',summary.invoices.rejected],
+  ['مؤهل للصرف',summary.payments.eligible],['المصروف',summary.paidAmount],['المتبقي للصرف',summary.remainingToPay]]);
+ summarySheet['!cols']=[{wch:30},{wch:18}];
+ const byReseller=[['Reseller','Subscribers','DONE','Pending','Eligible amount','Paid']];
+ const groups=new Map();
+ filteredInstallationRows().forEach(row=>{const entry=groups.get(row.reseller)||{total:0,done:0,pending:0,eligible:0,paid:0};entry.total+=1;
+  if(row.stage==='DONE')entry.done+=1;else entry.pending+=1;
+  if(row.payment_status==='eligible')entry.eligible+=Number(row.amount)||0;
+  if(row.payment_status==='paid')entry.paid+=Number(row.paid_amount)||0;groups.set(row.reseller,entry)});
+ [...groups.entries()].forEach(([reseller,entry])=>byReseller.push([reseller,entry.total,entry.done,entry.pending,entry.eligible,entry.paid]));
+ const resellerSheet=XLSX.utils.aoa_to_sheet(byReseller);resellerSheet['!cols']=[{wch:26},{wch:14},{wch:10},{wch:10},{wch:18},{wch:16}];
+ XLSX.utils.book_append_sheet(workbook,summarySheet,'Installation Summary');
+ XLSX.utils.book_append_sheet(workbook,resellerSheet,'Installation Resellers');
+ XLSX.utils.book_append_sheet(workbook,detail,'Installation Detail');
+ return workbook;
+}
+function exportInstallationExcel(){
+ try{
+   const rows=installationExportRows();
+   if(!rows.length){toast('لا توجد سجلات للتصدير');return}
+   XLSX.writeFile(buildInstallationWorkbook(),`installation_fees_${installationFilterValue('installationPeriodFilter')}.xlsx`);
+   toast('تم تصدير تقرير أجور التنصيب');
+ }catch(error){console.error(error);toast(`تعذر التصدير: ${error.message||''}`)}
+}
+function clearInstallationFilters(){
+ ['installationSearch'].forEach(id=>{const element=document.getElementById(id);if(element)element.value=''});
+ ['installationPeriodFilter','installationResellerFilter','installationZoneFilter','installationFdtFilter','installationStageFilter','installationInvoiceFilter','installationPaymentFilter']
+  .forEach(id=>{const element=document.getElementById(id);if(element)element.value='all'});
+ renderInstallation();
+}
 initAuth();
+
 </script>
 </div>
 
