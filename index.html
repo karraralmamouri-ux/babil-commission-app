@@ -1243,12 +1243,23 @@ function agentHierarchySummaries(zones=['old','new']){
 function hierarchyTypeLabel(type){return type==='main'?'الحساب الرئيسي':'وكيل فرعي'}
 function newZoneCabinetMatches(cabinet,query){if(!query)return true;const haystack=[cabinet.name,...cabinet.agents.flatMap(agent=>[agent.agentName,agent.agentId,...agent.accounts.map(source=>source.account)])].join(' ').toLowerCase();return haystack.includes(query)}
 function filteredNewZoneBreakdown(){const query=(document.getElementById('searchInput').value||'').trim().toLowerCase(),breakdown=newZoneFdtBreakdown();return{...breakdown,cabinets:breakdown.cabinets.filter(cabinet=>newZoneCabinetMatches(cabinet,query))}}
+/* تنبيهان منفصلان لا واحد: عدم التطابق يعني أن الأرقام نفسها غير موثوقة،
+   أما نقص الربط فيعني أن الأرقام صحيحة والنسبة إلى الوكيل ناقصة. خلطهما
+   يخبر المحاسب أن أرقاماً سليمة غير موثوقة. */
 function newZoneReconciliationHtml(breakdown){
- const failing=breakdown.cabinets.filter(cabinet=>!cabinet.reconciled||cabinet.issues.length);
- if(!failing.length&&!breakdown.conflicts.length)return '';
- const conflictItems=breakdown.conflicts.map(conflict=>`<li>الحساب <b style="direction:ltr;display:inline-block">${esc(conflict.account)}</b> مربوط بأكثر من وكيل (${esc(conflict.agentIds.join('، '))}). لا يمكن نسب تفعيلاته بصورة قاطعة.</li>`).join('');
- const cabinetItems=failing.map(cabinet=>`<li><b>${esc(cabinet.name)}</b>: ${esc(cabinet.issues.join(' '))}</li>`).join('');
- return `<div class="insight danger" style="display:block;margin-bottom:12px"><b>تعذر التحقق من تطابق تفاصيل الكابينات</b><ul style="margin:8px 0 0;padding-inline-start:18px;font-size:11px;line-height:1.8">${conflictItems}${cabinetItems}</ul><small class="muted" style="display:block;margin-top:6px">الأرقام المعروضة أدناه لا تعتبر مطابقة حتى تعالج هذه الحالات.</small></div>`;
+ const broken=breakdown.cabinets.filter(cabinet=>!cabinet.reconciled);
+ const unmapped=breakdown.cabinets.filter(cabinet=>cabinet.reconciled&&cabinet.issues.length);
+ let html='';
+ if(broken.length||breakdown.conflicts.length){
+  const conflictItems=breakdown.conflicts.map(conflict=>`<li>الحساب <b style="direction:ltr;display:inline-block">${esc(conflict.account)}</b> مربوط بأكثر من وكيل (${esc(conflict.agentIds.join('، '))}). لا يمكن نسب تفعيلاته بصورة قاطعة.</li>`).join('');
+  const brokenItems=broken.map(cabinet=>`<li><b>${esc(cabinet.name)}</b>: ${esc(cabinet.issues.join(' '))}</li>`).join('');
+  html+=`<div class="insight danger" style="display:block;margin-bottom:12px"><span class="insight-dot"></span><span><b>تعذر التحقق من تطابق تفاصيل الكابينات</b><ul style="margin:8px 0 0;padding-inline-start:18px;font-size:11px;line-height:1.8">${conflictItems}${brokenItems}</ul><small class="muted" style="display:block;margin-top:6px">أرقام هذه الكابينات لا تعتبر مطابقة حتى تعالج هذه الحالات.</small></span></div>`;
+ }
+ if(unmapped.length){
+  const items=unmapped.map(cabinet=>`<li><b>${esc(cabinet.name)}</b>: ${esc(cabinet.issues.join(' '))}</li>`).join('');
+  html+=`<div class="insight warn" style="display:block;margin-bottom:12px"><span class="insight-dot"></span><span><b>ربط الوكلاء غير مكتمل</b><ul style="margin:8px 0 0;padding-inline-start:18px;font-size:11px;line-height:1.8">${items}</ul><small class="muted" style="display:block;margin-top:6px">مجاميع هذه الكابينات وعمولتها صحيحة ومطابقة؛ الناقص هو نسبة بعض الحسابات إلى وكيل معروف. أضف الحساب في إعدادات الربط ثم أعد رفع الملف.</small></span></div>`;
+ }
+ return html;
 }
 function newZoneAgentBlock(agent){
  const badge=agent.resolved?'':' <span class="badge bpending">حساب غير مربوط بوكيل</span>';

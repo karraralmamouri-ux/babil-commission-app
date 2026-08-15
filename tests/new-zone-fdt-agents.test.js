@@ -303,3 +303,38 @@ test('a reconciliation failure is surfaced in the panel instead of being hidden'
   assert.ok(html.includes('تعذر التحقق من تطابق'));
   assert.ok(html.includes('يحتاج مراجعة'));
 });
+
+test('an unmapped account is a mapping warning, not a reconciliation failure', () => {
+  const app = loadCurrentApp();
+  withNewZone(app, [
+    cabinet('FDT-200', [
+      { parent: 'r.unmapped', agentId: '', agentName: '', fdt: 200, p35: 6, p45: 0, p65: 0 },
+    ]),
+  ]);
+
+  app.renderAgentHierarchy();
+  const html = app.__elements.get('panel-hierarchy').innerHTML;
+
+  // The figures do reconcile, so the danger notice must not appear.
+  assert.ok(!html.includes('تعذر التحقق من تطابق'));
+  assert.ok(!html.includes('لا تعتبر مطابقة'));
+  // It is reported as an incomplete-mapping warning instead.
+  assert.ok(html.includes('ربط الوكلاء غير مكتمل'));
+  assert.ok(html.includes('صحيحة ومطابقة'));
+});
+
+test('a real reconciliation failure still raises the danger notice', () => {
+  const app = loadCurrentApp();
+  const rows = [
+    cabinet('FDT-400', [
+      { parent: 'r.a', agentId: 'a', agentName: 'Agent A', fdt: 400, p35: 5, p45: 0, p65: 0 },
+    ]),
+  ];
+  rows[0].p35 = 9; // cabinet no longer matches its agents
+  withNewZone(app, rows);
+
+  app.renderAgentHierarchy();
+  const html = app.__elements.get('panel-hierarchy').innerHTML;
+  assert.ok(html.includes('تعذر التحقق من تطابق'));
+  assert.ok(html.includes('لا تعتبر مطابقة'));
+});
