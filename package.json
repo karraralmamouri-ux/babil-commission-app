@@ -8,6 +8,10 @@
     "test:staging": "node scripts/verify-supabase-staging.mjs",
     "test:staging-admin": "node scripts/verify-admin-users-staging.mjs",
     "test:staging-breakdown": "node scripts/verify-source-breakdown-staging.mjs",
+    "localdb:up": "bash tests/sql/local-db-up.sh",
+    "localdb:rebuild": "bash tests/sql/rebuild-local.sh",
+    "localdb:test": "bash tests/sql/run-local-tests.sh",
+    "localdb:down": "docker rm -f babil-local-pg",
     "inspect:backup": "node scripts/inspect-local-backup.mjs",
     "reconcile:backup": "node scripts/reconcile-local-backup.mjs",
     "guard:project-ref": "node scripts/assert-project-ref.mjs"
