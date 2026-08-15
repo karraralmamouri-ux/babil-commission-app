@@ -223,6 +223,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
   <div class="zoneActions">
    <div class="actions">
     <button class="btn" data-permission="edit" onclick="document.getElementById('installationFileInput').click()">📥 استيراد ملف أجور التنصيب</button>
+    <button class="btn" data-permission="edit" onclick="openInstallationHistoryImport()">🗂 استيراد تاريخي ابتدائي</button>
     <button class="btn gold" data-permission="payment" onclick="openInstallationPaymentReview()">💳 مراجعة صرف وكيل</button>
     <button class="btn" onclick="exportInstallationCsv()">📤 تصدير CSV</button>
     <button class="btn" onclick="exportInstallationExcel()">▦ تصدير Excel</button>
@@ -230,6 +231,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
    </div>
   </div>
   <input type="file" id="installationFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importInstallationFile(event)">
+  <input type="file" id="installationHistoryFileInput" accept=".xlsx,.xls" style="display:none" onchange="readInstallationHistoryFile(event)">
  </div>
 </section>
 </div>
@@ -1619,7 +1621,7 @@ window.addEventListener('beforeunload',e=>{if(hasUnsavedChanges){e.preventDefaul
 /* ===================== أجور التنصيب ===================== */
 /* نطاق مستقل: لا يشارك نطاق العمولات أي قاعدة حساب. الحماية الفعلية في RLS
    والـRPCs؛ ما هنا تجربة استخدام فقط ولا يُعتمد عليه كضابط أمان. */
-const installationState={rows:[],loading:false,error:'',lastPreview:null};
+const installationState={rows:[],loading:false,error:'',lastPreview:null,subscribers:[],historySheets:null,historyPreview:null,historyFileName:''};
 const INSTALLATION_STAGE_LABELS={P1:'الدفعة 1',P2:'الدفعة 2',P3:'الدفعة 3',P4:'الدفعة 4',DONE:'مكتمل'};
 const INSTALLATION_INVOICE_LABELS={pending:'بانتظار التدقيق',approved:'معتمدة',missing:'مفقودة',rejected:'مرفوضة'};
 const INSTALLATION_PAYMENT_LABELS={not_eligible:'غير مؤهل',awaiting_invoice:'بانتظار الفاتورة',eligible:'مؤهل للصرف',paid:'مصروف'};
@@ -1629,11 +1631,25 @@ async function fetchInstallationEntitlements(){
  const select='id,period,subscriber_id,subscriber_name,reseller,zone,fdt,remaining,stage,amount,invoice_status,invoice_audited_at,invoice_note,payment_status,paid_amount,paid_at,updated_at';
  return fetchCentralPages(`/rest/v1/installation_entitlements?select=${select}&order=period.desc,reseller.asc,subscriber_id.asc`);
 }
+/* سجلات المشتركين وحالتهم وتاريخ دفعاتهم. تُستعمل في معاينة الاستيراد
+   التاريخي للتمييز بين مشترك جديد وآخر قائم قبل الاعتماد لا بعده.
+   الجداول قد لا تكون منشورة على البيئة، فغيابها لا يُفشل التحديث كله. */
+async function fetchInstallationSubscribers(){
+ try{
+   const select='subscriber_id,reseller,fdt,start_date,installation_subscriber_state(as_of_date,remaining,current_stage,resolution),installation_payment_history(stage,amount,payment_date)';
+   const rows=await fetchCentralPages(`/rest/v1/installation_subscribers?select=${select}&order=subscriber_id.asc`);
+   return rows.map(row=>({...row,payment_stages:(row.installation_payment_history||[]).map(p=>p.stage)}));
+ }catch(error){
+   if(error?.status===404||error?.status===400)return [];
+   throw error;
+ }
+}
 async function refreshInstallation(silent=false){
  if(!authUser)return;
  installationState.loading=true;installationState.error='';renderInstallation();
  try{
    installationState.rows=await fetchInstallationEntitlements();
+   installationState.subscribers=await fetchInstallationSubscribers();
    installationState.error='';
    if(!silent)toast('تم تحديث أجور التنصيب');
  }catch(error){
@@ -1886,6 +1902,117 @@ async function confirmInstallationImport(){
    console.error(error);
    if(statusBox)statusBox.innerHTML='<div class="insight danger" style="display:block"><span class="insight-dot"></span><span><b>تعذر اعتماد الاستيراد</b><small>'+esc((error&&error.message)||'')+'</small></span></div>';
  }finally{if(button&&button.style.display!=='none'){button.disabled=false;button.textContent='✓ اعتماد الاستيراد مركزياً'}}
+}
+/* ------------------------------------------------------------------ الاستيراد التاريخي الابتدائي --
+   ملف المتابعة يحمل لكل مشترك دفعاته الأربع بتواريخها. هذا المسار منفصل عن
+   الاستيراد الشهري أعلاه: ذاك يكتب استحقاق شهر، وهذا يبني خط الأساس التاريخي
+   كاملاً. تاريخ اللقطة يختاره المستخدم ولا يُشتق من الملف. */
+function openInstallationHistoryImport(){
+ if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}
+ installationState.historyPreview=null;
+ document.getElementById('installationHistoryFileInput').click();
+}
+/* يقرأ كل شيتات الوكلاء. اسم الشيت هو الوكيل، وشيت Dashboard تجميعي فيُستثنى. */
+async function readInstallationHistoryFile(event){
+ const file=event.target.files&&event.target.files[0];
+ event.target.value='';
+ if(!file)return;
+ if(typeof XLSX==='undefined'){toast('مكتبة Excel غير متاحة');return}
+ try{
+   const workbook=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
+   const sheets=workbook.SheetNames.filter(name=>name.trim().toLowerCase()!=='dashboard')
+     .map(name=>({reseller:name.trim(),rows:XLSX.utils.sheet_to_json(workbook.Sheets[name],{defval:null,raw:true})}));
+   if(!sheets.length){toast('لا توجد شيتات وكلاء في الملف');return}
+   installationState.historySheets=sheets;
+   installationState.historyFileName=file.name;
+   renderInstallationHistoryPreview();
+ }catch(error){console.error(error);toast('تعذر قراءة الملف: '+((error&&error.message)||''))}
+}
+/* المعاينة تُعاد بناؤها كلما تغيّر تاريخ اللقطة، لأن التاريخ جزء من ما سيُكتب. */
+function rebuildInstallationHistoryPreview(){renderInstallationHistoryPreview(true)}
+function renderInstallationHistoryPreview(keepDate){
+ const sheets=installationState.historySheets||[];
+ const dateInput=document.getElementById('installationHistoryAsOf');
+ const asOfDate=keepDate&&dateInput?dateInput.value:'';
+ /* الحالة المخزّنة حالياً تُميّز المشترك الجديد عن القائم، فتظهر أعداد
+    "جديد" و"محدَّث" الحقيقية قبل الاعتماد لا بعده. */
+ const known=new Map((installationState.subscribers||[]).map(row=>[
+   String(row.subscriber_id||'').trim().toLowerCase(),
+   {reseller:row.reseller,paymentStages:row.payment_stages||[]}]));
+ const preview=installationFees().buildHistoricalPreview(sheets,{asOfDate,known});
+ installationState.historyPreview=preview;
+ openModal('الاستيراد التاريخي الابتدائي',installationHistoryPreviewHtml(preview));
+ const restored=document.getElementById('installationHistoryAsOf');
+ if(restored&&asOfDate)restored.value=asOfDate;
+}
+function installationHistoryPreviewHtml(preview){
+ const s=preview.stages,p=preview.paymentsByStage;
+ const cell=(label,value,tone)=>`<div class="mini-card${tone?' '+tone:''}"><div class="mini-label">${esc(label)}</div><div class="mini-value">${fmt(value)}</div></div>`;
+ let html=`<div class="muted" style="font-size:12px;margin-bottom:10px">الملف: ${esc(installationState.historyFileName||'')} — يُقرأ ${fmt(preview.perReseller.length)} شيت وكيل.</div>`;
+ /* تاريخ اللقطة إلزامي ولا يُخمَّن من آخر دفعة. */
+ html+=`<div class="insight ${preview.asOfDateProvided?'good':'warn'}" style="display:block;margin-bottom:12px"><span class="insight-dot"></span><span><b>تاريخ اللقطة (as-of)</b>
+  <div style="margin-top:8px"><input type="date" id="installationHistoryAsOf" class="input" max="${new Date().toISOString().slice(0,10)}" onchange="rebuildInstallationHistoryPreview()" value="${esc(preview.asOfDate||'')}"></div>
+  <small>الملف لا يحمل تاريخ لقطة صريحاً، فاختره بنفسك. لن يُشتق من آخر تاريخ دفع.</small></span></div>`;
+ html+=`<div class="cards" style="margin-bottom:12px">
+  ${cell('صفوف مقروءة',preview.totalRows)}
+  ${cell('صفوف قالب مُهملة',preview.ignoredRows)}
+  ${cell('مشتركون فعليون',preview.realSubscribers)}
+  ${cell('غير محسوم',preview.unresolved,preview.unresolved?'warn':'')}
+ </div>`;
+ html+=`<div class="cards" style="margin-bottom:12px">
+  ${cell('DONE',s.DONE)}${cell('P1',s.P1)}${cell('P2',s.P2)}${cell('P3',s.P3)}${cell('P4',s.P4)}
+ </div>`;
+ html+=`<div class="cards" style="margin-bottom:12px">
+  ${cell('تاريخ دفعات موجود',preview.historicalPayments)}
+  ${cell('P1 مدفوعة',p.P1)}${cell('P2 مدفوعة',p.P2)}${cell('P3 مدفوعة',p.P3)}${cell('P4 مدفوعة',p.P4)}
+ </div>`;
+ html+=`<div class="cards" style="margin-bottom:12px">
+  ${cell('مشتركون جدد',preview.newSubscribers)}
+  ${cell('مشتركون سيُحدَّثون',preview.existingUpdated)}
+  ${cell('دفعات جديدة',preview.newPayments)}
+  ${cell('دفعات موجودة سلفاً',preview.duplicatePayments)}
+  ${cell('معرّفات مكررة في الملف',preview.duplicates.length,preview.duplicates.length?'warn':'')}
+ </div>`;
+ if(preview.resellerChanged)html+=`<div class="insight warn" style="display:block;margin-bottom:12px"><span class="insight-dot"></span><span><b>${fmt(preview.resellerChanged)} مشترك يظهر تحت وكيل مختلف عن المسجَّل</b><small>سيُحدَّث وكيله على سجله نفسه دون إنشاء نسخة ثانية.</small></span></div>`;
+ if(preview.warningCount){
+  const kinds=new Map();
+  preview.warnings.forEach(w=>w.warnings.forEach(k=>{const key=k.split(':')[0];kinds.set(key,(kinds.get(key)||0)+1)}));
+  const label={remaining_missing:'المتبقي فارغ — يُصنَّف غير محسوم',remaining_unmapped:'متبقٍّ لا يطابق أي مرحلة معرّفة',received_total_mismatch:'مجموع الدفعات لا يساوي Received Total',remaining_mismatch:'Total − Received لا يساوي Remaining',payment_date_missing:'دفعة بلا تاريخ'};
+  html+=`<div class="insight warn" style="display:block;margin-bottom:12px"><span class="insight-dot"></span><span><b>${fmt(preview.warningCount)} صفاً يحتاج مراجعة</b><ul style="margin:8px 0 0;padding-inline-start:18px;font-size:11px;line-height:1.8">${[...kinds.entries()].map(([k,v])=>`<li>${esc(label[k]||k)} — ${fmt(v)}</li>`).join('')}</ul><small>لا يُرفض الملف ولا تُخمَّن أي قيمة؛ تُستورد كما هي وتبقى مُعلَّمة للمراجعة.</small></span></div>`;
+ }
+ html+=`<div class="panel" style="max-height:220px;overflow:auto"><table><thead><tr><th>الوكيل</th><th>فعليون</th><th>مُهملة</th><th>DONE</th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>غير محسوم</th><th>تنبيهات</th></tr></thead><tbody>
+  ${preview.perReseller.map(r=>`<tr><td>${esc(r.reseller)}</td><td>${fmt(r.real)}</td><td>${fmt(r.ignored)}</td><td>${fmt(r.stages.DONE)}</td><td>${fmt(r.stages.P1)}</td><td>${fmt(r.stages.P2)}</td><td>${fmt(r.stages.P3)}</td><td>${fmt(r.stages.P4)}</td><td>${fmt(r.unresolved)}</td><td>${fmt(r.warnings)}</td></tr>`).join('')}
+ </tbody></table></div>`;
+ html+=`<div id="installationHistoryStatus" style="margin-top:10px"></div>`;
+ const ready=preview.asOfDateProvided&&preview.realSubscribers>0&&roleAllows('edit');
+ html+=`<div class="actions" style="margin-top:12px">${ready?`<button id="installationHistoryConfirm" class="btn gold" onclick="confirmInstallationHistoryImport()">✓ اعتماد الاستيراد التاريخي</button>`:`<button class="btn" disabled title="اختر تاريخ اللقطة أولاً">✓ اعتماد الاستيراد التاريخي</button>`}<button class="btn" onclick="closeModal()">إغلاق</button></div>`;
+ return html;
+}
+/* الاعتماد يرسل ما قُرئ من الملف فقط؛ المرحلة والمبلغ يشتقهما الخادم. */
+async function confirmInstallationHistoryImport(){
+ const preview=installationState.historyPreview;
+ if(!preview){toast('لا توجد معاينة لاعتمادها');return}
+ if(!preview.asOfDateProvided){toast('اختر تاريخ اللقطة أولاً');return}
+ if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}
+ const button=document.getElementById('installationHistoryConfirm');
+ const statusBox=document.getElementById('installationHistoryStatus');
+ if(button){button.disabled=true;button.textContent='جاري بناء خط الأساس...'}
+ if(statusBox)statusBox.innerHTML='<div class="insight warn" style="display:block"><span class="insight-dot"></span><span><b>جاري كتابة المشتركين وتاريخ دفعاتهم</b><small>لا تغلق النافذة حتى تظهر النتيجة.</small></span></div>';
+ try{
+   const rows=installationFees().buildHistoricalImportRows(preview);
+   const result=await sbRequest('/rest/v1/rpc/import_installation_history',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({p_as_of_date:preview.asOfDate,p_file_name:installationState.historyFileName||'',p_file_checksum:null,p_rows:rows,p_request_id:createRequestId()})});
+   const batch=(result&&result.batch)||{};
+   installationState.historyPreview=null;
+   installationState.historySheets=null;
+   await refreshInstallation(true);
+   if(statusBox)statusBox.innerHTML='<div class="insight good" style="display:block"><span class="insight-dot"></span><span><b>تم بناء خط الأساس التاريخي</b><small>مشتركون جدد '+fmt(batch.new_subscribers||0)+' • محدَّثون '+fmt(batch.updated_subscribers||0)+' • دفعات مسجَّلة '+fmt(batch.payments_recorded||0)+' • غير محسوم '+fmt(batch.unresolved||0)+' • مرفوض '+fmt(batch.rejected||0)+'</small></span></div>';
+   if(button)button.style.display='none';
+   toast('تم استيراد '+fmt(batch.new_subscribers||0)+' مشتركاً جديداً');
+ }catch(error){
+   console.error(error);
+   if(statusBox)statusBox.innerHTML='<div class="insight danger" style="display:block"><span class="insight-dot"></span><span><b>تعذر اعتماد الاستيراد التاريخي</b><small>'+esc((error&&error.message)||'')+'</small></span></div>';
+ }finally{if(button&&button.style.display!=='none'){button.disabled=false;button.textContent='✓ اعتماد الاستيراد التاريخي'}}
 }
 function installationExportRows(){return installationFees().buildExportRows(filteredInstallationRows())}
 function exportInstallationCsv(){

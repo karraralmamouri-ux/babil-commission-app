@@ -145,6 +145,11 @@ function loadCurrentApp(options = {}) {
       renderInstallation,
       showInstallationImportPreview,
       installationState,
+      installationHistoryPreviewHtml,
+      // Test-only: authProfile is a module-level binding in index.html, so the
+      // harness reaches it here rather than production code growing a setter.
+      __setAuthProfile: (profile) => { authProfile = profile; },
+      renderInstallationHistoryPreview,
       installationPaymentReview,
       installationExportRows,
       buildInstallationWorkbook,
