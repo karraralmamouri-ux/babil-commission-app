@@ -317,20 +317,366 @@
     }));
   }
 
+  /* ---------------------------------------------------------------------
+     الاستيراد التاريخي الابتدائي.
+
+     ملف المتابعة يحمل لكل مشترك أربع دفعات بتواريخها، لا الاستحقاق الحالي
+     وحده. الفرق الجوهري عن mapImportRow أعلاه: هناك الـstage هو كامل
+     المعلومة، وهنا الـstage حالة حاضرة مشتقة من المتبقي بينما الدفعات
+     السابقة وقائع مستقلة يجب حفظها كما هي.
+
+     Stage تعني "الدفعة التالية"، ولا تعني إطلاقاً أن ما قبلها لم يُدفع.
+     --------------------------------------------------------------------- */
+
+  const HISTORY_ALIASES = {
+    subscriberId: ['subscriber name', 'subscriber_id', 'subscriber id', 'subscriber', 'اسم المشترك', 'رقم المشترك'],
+    startDate: ['start date', 'start_date', 'تاريخ البدء', 'تاريخ التنصيب'],
+    fdt: ['fdt', 'cabinet', 'الكابينة'],
+    totalAmount: ['total amount', 'total_amount', 'المبلغ الكلي'],
+    receivedTotal: ['received total', 'received_total', 'المستلم', 'إجمالي المستلم'],
+    remaining: ['remaining', 'المتبقي'],
+    notes: ['notes', 'note', 'ملاحظات', 'ملاحظة'],
+  };
+
+  /* الدفعة رقم i تُقرأ من PaymentN وDateN. المرحلة هنا رقم الدفعة نفسه،
+     وليست مشتقة من المتبقي. */
+  const HISTORY_PAYMENT_ALIASES = [1, 2, 3, 4].map((i) => ({
+    stage: `P${i}`,
+    amount: [`payment${i}`, `payment ${i}`, `payment_${i}`, `الدفعة ${i}`],
+    date: [`date${i}`, `date ${i}`, `date_${i}`, `تاريخ ${i}`],
+  }));
+
+  /* المبلغ المتوقع لكل دفعة حسب ترتيبها. للتحقق فقط،
+     ولا يُستنتج منه مبلغ غير موجود في الملف. */
+  const HISTORY_STAGE_AMOUNT = new Map([['P1', 3000], ['P2', 3000], ['P3', 3000], ['P4', 4000]]);
+
+  function normalizedCells(row) {
+    const map = new Map();
+    Object.keys(row || {}).forEach((key) => {
+      map.set(String(key).trim().toLowerCase().replace(/\s+/g, ' '), row[key]);
+    });
+    return map;
+  }
+
+  function pick(cells, aliases) {
+    for (const alias of aliases) {
+      if (cells.has(alias)) return cells.get(alias);
+      const squashed = alias.replace(/\s+/g, '');
+      for (const [key, value] of cells) {
+        if (key.replace(/\s+/g, '') === squashed) return value;
+      }
+    }
+    return null;
+  }
+
+  function historyInteger(value) {
+    if (value === null || value === undefined) return null;
+    const raw = String(value).trim();
+    if (raw === '') return null;
+    const cleaned = raw.replace(/[,\s]/g, '');
+    if (!/^-?\d+$/.test(cleaned)) return null;
+    return Number(cleaned);
+  }
+
+  /* التواريخ تصل إما ككائن Date من SheetJS أو كنص. لا نخترع تاريخاً أبداً:
+     غياب التاريخ يُحفظ كغياب. */
+  function historyDate(value) {
+    if (value === null || value === undefined) return null;
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      const y = value.getFullYear();
+      const m = String(value.getMonth() + 1).padStart(2, '0');
+      const d = String(value.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    const raw = String(value).trim();
+    if (raw === '') return null;
+    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return historyDate(parsed);
+  }
+
+  /* هوية المشترك. الملف الحقيقي يعطي معرّفات فريدة عالمياً عبر كل الشيتات،
+     فالمفتاح هو المعرّف وحده: هذا يجعل انتقال المشترك بين وكيلين تحديثاً
+     لسجله لا نسخة ثانية منه. الوكيل يُحفظ ويُراقب تغيّره بدل أن يكون جزءاً
+     من الهوية. */
+  function subscriberKey(subscriberId) {
+    return text(subscriberId).toLowerCase();
+  }
+
+  /* مفتاح الدفعة التاريخية. المشترك لا يملك أكثر من دفعة واحدة لكل مرحلة،
+     فالمفتاح (المشترك، المرحلة) أقوى من (المشترك، المرحلة، التاريخ، المبلغ):
+     إعادة الرفع بتاريخ مصحّح تحدّث الدفعة بدل أن تنشئ ثانية. */
+  function historyPaymentKey(subscriberId, stage) {
+    return `${subscriberKey(subscriberId)}${text(stage)}`;
+  }
+
+  /* يحوّل صفاً من شيت وكيل إلى سجل مشترك + وقائع دفع.
+     يعيد null للصفوف التي لا تحمل مشتركاً فعلياً — صفوف القالب الفارغة. */
+  function parseHistoryRow(row, options) {
+    const settings = options || {};
+    const cells = normalizedCells(row);
+    const subscriberId = text(pick(cells, HISTORY_ALIASES.subscriberId));
+    if (!subscriberId) return null;
+
+    const remaining = historyInteger(pick(cells, HISTORY_ALIASES.remaining));
+    const receivedTotal = historyInteger(pick(cells, HISTORY_ALIASES.receivedTotal));
+    const totalAmount = historyInteger(pick(cells, HISTORY_ALIASES.totalAmount));
+
+    const payments = [];
+    HISTORY_PAYMENT_ALIASES.forEach((spec) => {
+      const amount = historyInteger(pick(cells, spec.amount));
+      /* لا تُنشأ واقعة دفع من خانة فارغة أو صفرية. */
+      if (amount === null || amount <= 0) return;
+      payments.push({
+        stage: spec.stage,
+        amount,
+        paymentDate: historyDate(pick(cells, spec.date)),
+      });
+    });
+
+    /* المرحلة تُشتق من المتبقي وحده. اشتقاقها لا يعني أنها نهائية:
+       النهائية تقررها المطابقة المحاسبية أدناه. */
+    const stageKnown = remaining !== null && STAGE_BY_REMAINING.has(remaining);
+    const currentStage = stageKnown ? STAGE_BY_REMAINING.get(remaining).stage : null;
+
+    const warnings = [];
+    if (!stageKnown) warnings.push(remaining === null ? 'remaining_missing' : 'remaining_unmapped');
+
+    const paidSum = payments.reduce((sum, payment) => sum + payment.amount, 0);
+    if (receivedTotal !== null && payments.length && paidSum !== receivedTotal) {
+      warnings.push('received_total_mismatch');
+    }
+
+    /* الاختلال المحاسبي: المبلغ الكلي ناقص المستلم لا يساوي المتبقي.
+       القيم الخام تُحفظ كما هي ولا تُصحَّح، لكن الصف يخرج من دائرة الثقة. */
+    const financialMismatch = totalAmount !== null && receivedTotal !== null && remaining !== null
+      && totalAmount - receivedTotal !== remaining;
+    if (financialMismatch) warnings.push('remaining_mismatch');
+
+    payments.forEach((payment) => {
+      if (!payment.paymentDate) warnings.push(`payment_date_missing:${payment.stage}`);
+    });
+
+    /* حالة مكتملة بلا دفعة رابعة مسجّلة. لا تُخترع P4: يُعلَّم النقص فقط.
+       إن كانت الأرقام متطابقة محاسبياً تبقى الحالة محسومة، وإلا فقاعدة
+       الاختلال أعلاه هي التي تحكم. */
+    const historyIncomplete = currentStage === 'DONE'
+      && !payments.some((payment) => payment.stage === 'P4');
+    if (historyIncomplete) warnings.push('historical_payment_detail_incomplete');
+
+    const resolution = (stageKnown && !financialMismatch) ? 'resolved' : 'unresolved';
+
+    /* الأهلية للصرف مشتقة، لا مُدخلة: صف غير محسوم لا يصرف مهما بدا،
+       وDONE لا يبقى فيه شيء يُصرف. */
+    const paymentEligible = resolution === 'resolved'
+      && PENDING_STAGES.includes(currentStage);
+
+    return {
+      subscriberId,
+      subscriberKey: subscriberKey(subscriberId),
+      reseller: text(settings.reseller),
+      fdt: text(pick(cells, HISTORY_ALIASES.fdt)) || null,
+      startDate: historyDate(pick(cells, HISTORY_ALIASES.startDate)),
+      totalAmount,
+      receivedTotal,
+      remaining,
+      currentStage,
+      stageIsFinal: resolution === 'resolved',
+      resolution,
+      financialMismatch,
+      historyIncomplete,
+      paymentEligible,
+      notes: text(pick(cells, HISTORY_ALIASES.notes)) || null,
+      payments,
+      paidSum,
+      warnings,
+    };
+  }
+
+  /* معاينة الاستيراد التاريخي عبر كل شيتات الوكلاء.
+     `sheets` مصفوفة { reseller, rows }. `known` خريطة اختيارية للحالة
+     المخزّنة حالياً، تُستعمل للتمييز بين مشترك جديد ومشترك يُحدَّث. */
+  function buildHistoricalPreview(sheets, options) {
+    const settings = options || {};
+    const known = settings.known instanceof Map ? settings.known : new Map();
+    const asOfDate = historyDate(settings.asOfDate);
+
+    const subscribers = new Map();
+    const perReseller = new Map();
+    const stages = { P1: 0, P2: 0, P3: 0, P4: 0, DONE: 0 };
+    const paymentsByStage = { P1: 0, P2: 0, P3: 0, P4: 0 };
+    const warningRows = [];
+    const duplicates = [];
+    let totalRows = 0;
+    let ignoredRows = 0;
+    let resolved = 0;
+    let unresolved = 0;
+    let financialMismatches = 0;
+    let incompleteHistories = 0;
+    let eligible = 0;
+    let blocked = 0;
+    let newSubscribers = 0;
+    let existingUpdated = 0;
+    let resellerChanged = 0;
+    let newPayments = 0;
+    let duplicatePayments = 0;
+
+    (sheets || []).forEach((sheet) => {
+      const reseller = text(sheet && sheet.reseller);
+      const rows = (sheet && sheet.rows) || [];
+      const bucket = perReseller.get(reseller) || {
+        reseller, real: 0, ignored: 0, resolved: 0, unresolved: 0,
+        financialMismatches: 0, incompleteHistories: 0, eligible: 0, blocked: 0,
+        stages: { P1: 0, P2: 0, P3: 0, P4: 0, DONE: 0 },
+        payments: { P1: 0, P2: 0, P3: 0, P4: 0 },
+        warnings: 0,
+      };
+
+      rows.forEach((raw, index) => {
+        totalRows += 1;
+        const parsed = parseHistoryRow(raw, { reseller });
+        if (!parsed) { ignoredRows += 1; bucket.ignored += 1; return; }
+
+        /* نفس المعرّف مرتين داخل الرفعة نفسها: يُحتسب مرة واحدة ويُبلَّغ عنه. */
+        if (subscribers.has(parsed.subscriberKey)) {
+          duplicates.push({ subscriberKey: parsed.subscriberKey, reseller, row: index + 2 });
+          return;
+        }
+
+        bucket.real += 1;
+        subscribers.set(parsed.subscriberKey, parsed);
+
+        /* المرحلة تُعدّ حيثما اشتُقت، حتى لو كان الصف غير محسوم — فالعدّ
+           وصف لما في الملف. الحسم والأهلية يُعدّان منفصلين حتى لا يختلط
+           "أين يقف" بـ"هل يُصرف". */
+        if (parsed.currentStage) {
+          stages[parsed.currentStage] += 1;
+          bucket.stages[parsed.currentStage] += 1;
+        }
+        if (parsed.resolution === 'resolved') {
+          resolved += 1;
+          bucket.resolved += 1;
+        } else {
+          unresolved += 1;
+          bucket.unresolved += 1;
+        }
+        if (parsed.financialMismatch) { financialMismatches += 1; bucket.financialMismatches += 1; }
+        if (parsed.historyIncomplete) { incompleteHistories += 1; bucket.incompleteHistories += 1; }
+        if (parsed.paymentEligible) { eligible += 1; bucket.eligible += 1; }
+        else { blocked += 1; bucket.blocked += 1; }
+
+        parsed.payments.forEach((payment) => {
+          paymentsByStage[payment.stage] += 1;
+          bucket.payments[payment.stage] += 1;
+        });
+
+        const prior = known.get(parsed.subscriberKey);
+        if (!prior) {
+          newSubscribers += 1;
+          newPayments += parsed.payments.length;
+        } else {
+          existingUpdated += 1;
+          if (prior.reseller && text(prior.reseller) !== parsed.reseller) resellerChanged += 1;
+          const seen = new Set(prior.paymentStages || []);
+          parsed.payments.forEach((payment) => {
+            if (seen.has(payment.stage)) duplicatePayments += 1;
+            else newPayments += 1;
+          });
+        }
+
+        if (parsed.warnings.length) {
+          bucket.warnings += 1;
+          warningRows.push({
+            subscriberKey: parsed.subscriberKey,
+            reseller,
+            row: index + 2,
+            warnings: parsed.warnings.slice(),
+            remaining: parsed.remaining,
+            receivedTotal: parsed.receivedTotal,
+            totalAmount: parsed.totalAmount,
+            paidSum: parsed.paidSum,
+          });
+        }
+      });
+
+      perReseller.set(reseller, bucket);
+    });
+
+    const historicalPayments = paymentsByStage.P1 + paymentsByStage.P2
+      + paymentsByStage.P3 + paymentsByStage.P4;
+
+    return {
+      asOfDate: asOfDate || null,
+      asOfDateProvided: Boolean(asOfDate),
+      totalRows,
+      ignoredRows,
+      realSubscribers: subscribers.size,
+      stages,
+      resolved,
+      unresolved,
+      financialMismatches,
+      incompleteHistories,
+      eligible,
+      blocked,
+      paymentsByStage,
+      historicalPayments,
+      newSubscribers,
+      existingUpdated,
+      resellerChanged,
+      newPayments,
+      duplicatePayments,
+      duplicates,
+      warnings: warningRows,
+      warningCount: warningRows.length,
+      perReseller: Array.from(perReseller.values()),
+      rows: Array.from(subscribers.values()),
+    };
+  }
+
+  /* الشكل الذي يُرسل إلى RPC الاستيراد التاريخي. المراحل والمبالغ تُشتق
+     مجدداً على الخادم؛ ما يُرسل هنا هو ما قُرئ من الملف فقط. */
+  function buildHistoricalImportRows(preview) {
+    return (preview && preview.rows ? preview.rows : []).map((row) => ({
+      subscriber_id: row.subscriberId,
+      reseller: row.reseller,
+      fdt: row.fdt,
+      start_date: row.startDate,
+      total_amount: row.totalAmount,
+      received_total: row.receivedTotal,
+      remaining: row.remaining,
+      notes: row.notes,
+      warnings: row.warnings,
+      payments: row.payments.map((payment) => ({
+        stage: payment.stage,
+        amount: payment.amount,
+        payment_date: payment.paymentDate,
+      })),
+    }));
+  }
+
   return {
     ALL_STAGES,
+    HISTORY_ALIASES,
+    HISTORY_STAGE_AMOUNT,
     IMPORT_ALIASES,
     INVOICE_STATUSES,
     PAYMENT_STATUSES,
     PENDING_STAGES,
     STAGE_BY_REMAINING,
     buildExportRows,
+    buildHistoricalImportRows,
+    buildHistoricalPreview,
     buildImportPreview,
     entitlementKey,
+    historyPaymentKey,
     mapImportRow,
     normalizeInstallationRow,
+    parseHistoryRow,
     parseRemaining,
     resolveInstallationStage,
+    subscriberKey,
     summarizeByReseller,
     summarizeEntitlements,
     summarizeInstallationBatch,

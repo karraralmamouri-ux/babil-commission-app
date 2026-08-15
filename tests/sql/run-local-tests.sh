@@ -21,6 +21,28 @@ echo "$out2" | grep -E "pass |FAIL|ERROR" || true
 if echo "$out2" | grep -qE "FAIL|ERROR"; then echo "IMPORT TESTS FAILED" >&2; exit 1; fi
 passed=$((passed + $(echo "$out2" | grep -c "pass  ")))
 
+# The historical suite reports through a results table rather than notices, so
+# it is counted from that table instead of by grepping for "pass  ".
+echo "== initial historical import =="
+out3=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q \
+        < tests/sql/installation-history-rules.sql 2>&1)
+if echo "$out3" | grep -qE "FAILED:|ERROR"; then
+  echo "$out3" | grep -E "FAILED:|ERROR" || true
+  echo "HISTORICAL IMPORT TESTS FAILED" >&2; exit 1
+fi
+echo "$out3" | grep -E "\| (pass|FAIL)" || true
+passed=$((passed + $(echo "$out3" | grep -c "| pass")))
+
+echo "== payment eligibility guards =="
+out4=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q \
+        < tests/sql/installation-history-eligibility.sql 2>&1)
+if echo "$out4" | grep -qE "FAILED:|ERROR"; then
+  echo "$out4" | grep -E "FAILED:|ERROR" || true
+  echo "ELIGIBILITY TESTS FAILED" >&2; exit 1
+fi
+echo "$out4" | grep -E "\| (pass|FAIL)" || true
+passed=$((passed + $(echo "$out4" | grep -c "| pass")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 
