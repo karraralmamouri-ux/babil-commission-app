@@ -115,3 +115,16 @@
 - حسابات اختبار Staging.
 
 تُحذف نسخة Access Token ومفاتيح API بعد انتهاء عمليات الإدارة. تُحفظ كلمة مرور Staging وحسابات الاختبار محلياً فقط إلى أن يتوفر مخزن أسرار معتمد.
+
+## حارس بيئة Staging (2026-08-15)
+
+معرّف Staging المعتمد: `unohqhxubraelqgjhxgh` (`babil-commission-staging`). عاد للعمل في 2026-08-15 بعد فترة توقف.
+
+يوجد حارسان منفصلان لا يقبل أحدهما هدف الآخر:
+
+- `scripts/assert-project-ref.mjs` — إنتاج فقط، يقبل `fbgffpxpskjzgheheikd` حصراً ويرفض Staging ومشروع لوحة الموظفين.
+- `scripts/assert-staging-project-ref.mjs` — Staging فقط، يقبل `unohqhxubraelqgjhxgh` حصراً ويرفض الإنتاج ومشروع لوحة الموظفين.
+
+كل أمر يمسّ Staging يستدعي `guard:staging-ref` أولاً، وكل أمر يمسّ الإنتاج يستدعي `guard:project-ref` أولاً. يثبت `tests/project-guards.test.js` أن تبديل المعرّفين يُفشل الحارسين، وأن أي سكربت يحمل اسم أو أمر staging يبدأ بحارسه.
+
+مشروع لوحة أداء الموظفين `qolrsefpbvfuugwyqggu` متوقف حالياً وخارج نطاق هذا المستودع؛ يرفضه الحارسان صراحةً.
