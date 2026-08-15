@@ -238,6 +238,8 @@
     const freshAmount = fresh.reduce((sum, row) => sum + row.amount, 0);
     return {
       period,
+      /* الصفوف كما قُرئت، تُرسل إلى الخادم ليتحقق ويصنّف بنفسه. */
+      mappedRows: mapped,
       totalRows: (rawRows || []).length,
       valid: batch.accepted.length,
       invalid: batch.invalid.length,

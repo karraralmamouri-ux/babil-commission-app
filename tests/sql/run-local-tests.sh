@@ -15,6 +15,12 @@ echo "$out" | grep -E "pass |FAIL|ERROR" || true
 if echo "$out" | grep -qE "FAIL|ERROR"; then echo "RULE TESTS FAILED" >&2; exit 1; fi
 passed=$(echo "$out" | grep -c "pass  ")
 
+echo "== end-to-end import =="
+out2=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q         < tests/sql/installation-fees-import.sql 2>&1)
+echo "$out2" | grep -E "pass |FAIL|ERROR" || true
+if echo "$out2" | grep -qE "FAIL|ERROR"; then echo "IMPORT TESTS FAILED" >&2; exit 1; fi
+passed=$((passed + $(echo "$out2" | grep -c "pass  ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 

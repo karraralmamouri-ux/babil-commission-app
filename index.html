@@ -1815,7 +1815,7 @@ async function importInstallationFile(event){
    if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(period.trim()))throw new Error('صيغة الفترة يجب أن تكون YYYY-MM');
    const existingKeys=installationState.rows.map(row=>installationFees().entitlementKey({subscriberId:row.subscriber_id,stage:row.stage,period:row.period}));
    const preview=installationFees().buildImportPreview(raw,{period:period.trim(),existingKeys});
-   installationState.lastPreview=preview;
+   preview.fileName=file.name;installationState.lastPreview=preview;
    showInstallationImportPreview(preview,file.name);
  }catch(error){console.error(error);alert(`تعذر قراءة ملف أجور التنصيب: ${error.message||''}`)}
  finally{input.value=''}
@@ -1846,8 +1846,35 @@ function showInstallationImportPreview(preview,fileName){
     </div>
    </div>
    <div class="muted" style="font-size:10px;margin-top:10px">الصفوف غير الصالحة والمكررة لا تُستورد ولا تُحتسب في المبلغ. المشترك المسجل مسبقاً لنفس الدفعة والفترة لا يُنشئ استحقاقاً ثانياً.</div>
-   <div class="actions" style="margin-top:12px"><button class="btn" onclick="closeModal()">إغلاق المعاينة</button></div>
-   <div class="insight warn" style="display:block;margin-top:10px"><b>الكتابة المركزية غير مفعّلة بعد</b><small>هذه معاينة للقراءة فقط. مسار حفظ الاستحقاقات مركزياً ينتظر نشر مهاجرة أجور التنصيب.</small></div>`);
+   <div id="installationImportStatus" style="margin-top:10px"></div>
+   <div class="actions" style="margin-top:12px">${preview.importable&&roleAllows('edit')?`<button id="installationConfirmButton" class="btn gold" onclick="confirmInstallationImport()">✓ اعتماد الاستيراد مركزياً</button>`:''}<button class="btn" onclick="closeModal()">إغلاق</button></div>
+   ${preview.importable?'':`<div class="insight warn" style="display:block;margin-top:10px"><span class="insight-dot"></span><span><b>لا يوجد استحقاق جديد لاعتماده</b><small>كل الصفوف الصالحة مسجلة مسبقاً لهذه الفترة، أو لا يوجد صف صالح.</small></span></div>`}`);
+}
+/* اعتماد الاستيراد: تُرسل الصفوف الخام كما قُرئت، والخادم يتحقق ويشتق الدفعة
+   والمبلغ ويمنع التكرار ويعيد الأعداد المعتمدة. الواجهة لا تُدخل صفوفاً بحرية. */
+async function confirmInstallationImport(){
+ const preview=installationState.lastPreview;
+ if(!preview){toast('لا توجد معاينة لاعتمادها');return}
+ if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}
+ const button=document.getElementById('installationConfirmButton');
+ const statusBox=document.getElementById('installationImportStatus');
+ if(button){button.disabled=true;button.textContent='جاري الاعتماد المركزي...'}
+ if(statusBox)statusBox.innerHTML='<div class="insight warn" style="display:block"><span class="insight-dot"></span><span><b>جاري كتابة الاستحقاقات مركزياً</b><small>لا تغلق النافذة حتى تظهر النتيجة.</small></span></div>';
+ try{
+   const rows=preview.mappedRows.map(row=>({subscriber_id:row.subscriberId,subscriber_name:row.subscriberName,reseller:row.reseller,zone:row.zone||null,fdt:row.fdt||null,remaining:row.remaining}));
+   const result=await sbRequest('/rest/v1/rpc/import_installation_entitlements',{method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({p_period:preview.period,p_file_name:preview.fileName||'',p_file_checksum:null,p_rows:rows,p_request_id:createRequestId()})});
+   const batch=(result&&result.batch)||{};
+   installationState.lastPreview=null;
+   /* المصدر الرسمي بعد الاعتماد هو قاعدة البيانات، لا ناتج قراءة الملف. */
+   await refreshInstallation(true);
+   if(statusBox)statusBox.innerHTML='<div class="insight good" style="display:block"><span class="insight-dot"></span><span><b>تم الاعتماد المركزي</b><small>مقبول '+fmt(batch.accepted||0)+' • مكرر '+fmt(batch.duplicates||0)+' • مرفوض '+fmt(batch.rejected||0)+' • من '+fmt(batch.source_rows||0)+' صف</small></span></div>';
+   if(button)button.style.display='none';
+   toast('تم استيراد '+fmt(batch.accepted||0)+' استحقاقاً');
+ }catch(error){
+   console.error(error);
+   if(statusBox)statusBox.innerHTML='<div class="insight danger" style="display:block"><span class="insight-dot"></span><span><b>تعذر اعتماد الاستيراد</b><small>'+esc((error&&error.message)||'')+'</small></span></div>';
+ }finally{if(button&&button.style.display!=='none'){button.disabled=false;button.textContent='✓ اعتماد الاستيراد مركزياً'}}
 }
 function installationExportRows(){return installationFees().buildExportRows(filteredInstallationRows())}
 function exportInstallationCsv(){

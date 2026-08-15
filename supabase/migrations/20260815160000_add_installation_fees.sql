@@ -51,10 +51,16 @@ create table public.installation_batches (
   file_checksum text,
   source_rows integer not null default 0,
   accepted_rows integer not null default 0,
+  duplicate_rows integer not null default 0,
+  rejected_rows integer not null default 0,
+  status text not null default 'completed',
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   constraint installation_batches_period_check check (period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
-  constraint installation_batches_counts_check check (source_rows >= 0 and accepted_rows >= 0)
+  constraint installation_batches_status_check check (status in ('completed', 'no_new_rows')),
+  constraint installation_batches_counts_check check (
+    source_rows >= 0 and accepted_rows >= 0 and duplicate_rows >= 0 and rejected_rows >= 0
+  )
 );
 
 create table public.installation_entitlements (
@@ -194,6 +200,176 @@ grant select on table public.installation_payments to authenticated;
 revoke insert, update, delete on table public.installation_batches from authenticated;
 revoke insert, update, delete on table public.installation_entitlements from authenticated;
 revoke insert, update, delete on table public.installation_payments from authenticated;
+
+-- The only write path for entitlements. The browser sends raw subscriber rows;
+-- the stage and the amount are derived here and never accepted from the caller.
+-- The whole import is one transaction: it either lands completely or not at all.
+create or replace function public.import_installation_entitlements(
+  p_period text,
+  p_file_name text,
+  p_file_checksum text,
+  p_rows jsonb,
+  p_request_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := auth.uid();
+  v_existing public.audit_logs%rowtype;
+  v_batch_id uuid;
+  v_item jsonb;
+  v_subscriber text;
+  v_reseller text;
+  v_zone text;
+  v_remaining bigint;
+  v_stage text;
+  v_amount bigint;
+  v_key text;
+  v_seen text[] := array[]::text[];
+  v_source integer := 0;
+  v_accepted integer := 0;
+  v_duplicate integer := 0;
+  v_rejected integer := 0;
+  v_rejects jsonb := '[]'::jsonb;
+  v_status text;
+  v_result jsonb;
+begin
+  if v_actor is null or public.current_app_role() <> 'admin' then
+    raise exception 'Admin permission is required' using errcode = '42501';
+  end if;
+  if p_request_id is null then
+    raise exception 'request_id is required' using errcode = '22023';
+  end if;
+  if p_period is null or p_period !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' then
+    raise exception 'Period must use YYYY-MM' using errcode = '22023';
+  end if;
+  if jsonb_typeof(p_rows) <> 'array' then
+    raise exception 'Rows must be an array' using errcode = '22023';
+  end if;
+  if jsonb_array_length(p_rows) = 0 or jsonb_array_length(p_rows) > 20000 then
+    raise exception 'Rows must contain between 1 and 20000 entries' using errcode = '22023';
+  end if;
+
+  -- Replaying the same request returns the original outcome instead of importing twice.
+  select * into v_existing from public.audit_logs
+  where actor_id = v_actor and request_id = p_request_id;
+  if found then
+    if v_existing.action <> 'installation.batch.imported' then
+      raise exception 'request_id was already used for another operation' using errcode = '23505';
+    end if;
+    return jsonb_build_object('batch', v_existing.after_data, 'replayed', true);
+  end if;
+
+  -- One import per period at a time, so two uploads cannot interleave.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('installation-import:' || p_period, 0)
+  );
+
+  insert into public.installation_batches (period, file_name, file_checksum, created_by)
+  values (p_period, coalesce(btrim(p_file_name), ''), nullif(btrim(coalesce(p_file_checksum, '')), ''), v_actor)
+  returning id into v_batch_id;
+
+  for v_item in select value from jsonb_array_elements(p_rows)
+  loop
+    v_source := v_source + 1;
+    v_subscriber := btrim(coalesce(v_item ->> 'subscriber_id', ''));
+    v_reseller := btrim(coalesce(v_item ->> 'reseller', ''));
+    v_zone := nullif(lower(btrim(coalesce(v_item ->> 'zone', ''))), '');
+
+    if v_subscriber = '' then
+      v_rejected := v_rejected + 1;
+      v_rejects := v_rejects || jsonb_build_object('row', v_source, 'reason', 'missing_subscriber');
+      continue;
+    end if;
+    if v_reseller = '' then
+      v_rejected := v_rejected + 1;
+      v_rejects := v_rejects || jsonb_build_object('row', v_source, 'reason', 'missing_reseller');
+      continue;
+    end if;
+    if v_zone is not null and v_zone not in ('old', 'new') then
+      v_rejected := v_rejected + 1;
+      v_rejects := v_rejects || jsonb_build_object('row', v_source, 'reason', 'invalid_zone');
+      continue;
+    end if;
+
+    -- Remaining must be an exact integer; anything else has no stage.
+    begin
+      v_remaining := (v_item ->> 'remaining')::bigint;
+    exception when others then
+      v_remaining := null;
+    end;
+    v_stage := case when v_remaining is null then null
+                    else public.installation_stage_for_remaining(v_remaining) end;
+    if v_stage is null then
+      v_rejected := v_rejected + 1;
+      v_rejects := v_rejects || jsonb_build_object('row', v_source, 'reason', 'unknown_remaining');
+      continue;
+    end if;
+    v_amount := public.installation_amount_for_stage(v_stage);
+
+    v_key := lower(v_subscriber) || chr(31) || v_stage;
+    if v_key = any(v_seen) then
+      v_duplicate := v_duplicate + 1;
+      continue;
+    end if;
+    v_seen := array_append(v_seen, v_key);
+
+    if exists (
+      select 1 from public.installation_entitlements
+      where period = p_period and subscriber_id = v_subscriber and stage = v_stage
+    ) then
+      v_duplicate := v_duplicate + 1;
+      continue;
+    end if;
+
+    insert into public.installation_entitlements (
+      batch_id, period, subscriber_id, subscriber_name, reseller, zone, fdt,
+      remaining, stage, amount, payment_status, created_by
+    ) values (
+      v_batch_id, p_period, v_subscriber,
+      btrim(coalesce(v_item ->> 'subscriber_name', '')), v_reseller, v_zone,
+      nullif(btrim(coalesce(v_item ->> 'fdt', '')), ''),
+      v_remaining, v_stage, v_amount,
+      case when v_stage = 'DONE' then 'not_eligible' else 'awaiting_invoice' end,
+      v_actor
+    );
+    v_accepted := v_accepted + 1;
+  end loop;
+
+  v_status := case when v_accepted = 0 then 'no_new_rows' else 'completed' end;
+  update public.installation_batches
+  set source_rows = v_source,
+      accepted_rows = v_accepted,
+      duplicate_rows = v_duplicate,
+      rejected_rows = v_rejected,
+      status = v_status
+  where id = v_batch_id;
+
+  v_result := jsonb_build_object(
+    'id', v_batch_id, 'period', p_period, 'file_name', coalesce(btrim(p_file_name), ''),
+    'source_rows', v_source, 'accepted', v_accepted, 'duplicates', v_duplicate,
+    'rejected', v_rejected, 'status', v_status,
+    'rejections', case when jsonb_array_length(v_rejects) > 50
+                       then jsonb_build_object('truncated', true)
+                       else v_rejects end
+  );
+
+  insert into public.audit_logs (
+    actor_id, action, entity_type, entity_id, field,
+    old_value, new_value, extra, before_data, after_data, request_id
+  ) values (
+    v_actor, 'installation.batch.imported', 'installation_batch', v_batch_id, 'entitlements',
+    '0', v_accepted::text, p_period,
+    jsonb_build_object('period', p_period, 'file_name', coalesce(btrim(p_file_name), '')),
+    v_result, p_request_id
+  );
+
+  return jsonb_build_object('batch', v_result, 'replayed', false);
+end;
+$$;
 
 -- Accounts audits the invoice. Approving an invoice does not pay it.
 create or replace function public.audit_installation_invoice(
@@ -388,8 +564,10 @@ $$;
 
 revoke execute on function public.installation_stage_for_remaining(bigint) from public, anon;
 revoke execute on function public.installation_amount_for_stage(text) from public, anon;
+revoke execute on function public.import_installation_entitlements(text, text, text, jsonb, uuid) from public, anon;
 revoke execute on function public.audit_installation_invoice(uuid, text, text, uuid) from public, anon;
 revoke execute on function public.record_installation_payment(uuid, timestamptz, uuid) from public, anon;
+grant execute on function public.import_installation_entitlements(text, text, text, jsonb, uuid) to authenticated;
 grant execute on function public.audit_installation_invoice(uuid, text, text, uuid) to authenticated;
 grant execute on function public.record_installation_payment(uuid, timestamptz, uuid) to authenticated;
 

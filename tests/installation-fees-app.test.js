@@ -278,3 +278,54 @@ test('index.html loads the installation-fees module from a path that exists', ()
     .map((m) => m[1]).filter((s) => s.trim());
   assert.equal(inline.length, 1);
 });
+
+// ------------------------------------------------------------ confirm import --
+test('the confirm payload carries only raw subscriber fields, never a stage or amount', () => {
+  const preview = fees.buildImportPreview(
+    [
+      { 'Subscriber ID': 'S1', Reseller: 'R', Remaining: 13000, Zone: 'new', FDT: '108' },
+      { 'Subscriber ID': 'S2', Reseller: 'R', Remaining: 5500 },
+    ],
+    { period: '2026-07', existingKeys: [] },
+  );
+
+  // Every read row is forwarded, including the invalid one, so the server does
+  // its own classification and owns the authoritative counts.
+  assert.equal(preview.mappedRows.length, 2);
+
+  const fields = new Set(preview.mappedRows.flatMap((row) => Object.keys(row)));
+  assert.deepEqual(own(fields).sort(), [
+    'fdt', 'remaining', 'reseller', 'subscriberId', 'subscriberName', 'zone',
+  ]);
+  // The client has no field in which to smuggle a price.
+  assert.ok(!fields.has('stage'));
+  assert.ok(!fields.has('amount'));
+});
+
+test('the preview refuses a confirm action when nothing new would be written', () => {
+  const app = loadCurrentApp();
+  const alreadyStored = fees.buildImportPreview(
+    [{ 'Subscriber ID': 'S1', Reseller: 'R', Remaining: 13000 }],
+    {
+      period: '2026-07',
+      existingKeys: [fees.entitlementKey({ subscriberId: 'S1', stage: 'P1', period: '2026-07' })],
+    },
+  );
+  app.showInstallationImportPreview(alreadyStored, 'file.xlsx');
+  const html = app.__elements.get('modalBody').innerHTML;
+
+  assert.equal(alreadyStored.importable, false);
+  assert.ok(!html.includes('confirmInstallationImport()'));
+  assert.ok(html.includes('لا يوجد استحقاق جديد لاعتماده'));
+});
+
+test('the confirm action is gated on the edit permission, not just on the preview', () => {
+  const fsMod = require('node:fs');
+  const html = fsMod.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  // Rendered only when the preview is importable AND the role allows editing.
+  assert.ok(html.includes("preview.importable&&roleAllows('edit')?"));
+  // The server call re-checks the permission before sending anything.
+  assert.ok(html.includes("if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}"));
+  // The payload is built from the mapped rows only.
+  assert.ok(html.includes('preview.mappedRows.map('));
+});

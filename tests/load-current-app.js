@@ -143,6 +143,7 @@ function loadCurrentApp(options = {}) {
       monthOrder,
       renderAgentHierarchy,
       renderInstallation,
+      showInstallationImportPreview,
       installationState,
       installationPaymentReview,
       installationExportRows,
