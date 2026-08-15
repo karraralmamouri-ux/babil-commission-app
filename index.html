@@ -1957,11 +1957,21 @@ function installationHistoryPreviewHtml(preview){
   ${cell('صفوف مقروءة',preview.totalRows)}
   ${cell('صفوف قالب مُهملة',preview.ignoredRows)}
   ${cell('مشتركون فعليون',preview.realSubscribers)}
+  ${cell('محسوم',preview.resolved)}
   ${cell('غير محسوم',preview.unresolved,preview.unresolved?'warn':'')}
+ </div>`;
+ /* الأهلية للصرف تُعرض منفصلة عن المرحلة عمداً: المرحلة تقول "أين يقف"،
+    والأهلية تقول "هل يجوز الصرف". اختلال محاسبي واحد يكفي لمنع الثانية. */
+ html+=`<div class="cards" style="margin-bottom:12px">
+  ${cell('مؤهَّل للصرف',preview.eligible)}
+  ${cell('محجوب عن الصرف',preview.blocked,preview.blocked?'warn':'')}
+  ${cell('اختلال محاسبي',preview.financialMismatches,preview.financialMismatches?'danger':'')}
+  ${cell('تاريخ دفعات ناقص',preview.incompleteHistories,preview.incompleteHistories?'warn':'')}
  </div>`;
  html+=`<div class="cards" style="margin-bottom:12px">
   ${cell('DONE',s.DONE)}${cell('P1',s.P1)}${cell('P2',s.P2)}${cell('P3',s.P3)}${cell('P4',s.P4)}
  </div>`;
+ if(preview.financialMismatches)html+=`<div class="insight danger" style="display:block;margin-bottom:12px"><span class="insight-dot"></span><span><b>${fmt(preview.financialMismatches)} صفاً لا تتوازن أرقامه</b><small>المبلغ الكلي ناقص المستلم لا يساوي المتبقي. تُحفظ قيمه الخام كما هي، لكنه يُصنَّف غير محسوم ولا يكون مؤهلاً لأي صرف حتى يُراجَع.</small></span></div>`;
  html+=`<div class="cards" style="margin-bottom:12px">
   ${cell('تاريخ دفعات موجود',preview.historicalPayments)}
   ${cell('P1 مدفوعة',p.P1)}${cell('P2 مدفوعة',p.P2)}${cell('P3 مدفوعة',p.P3)}${cell('P4 مدفوعة',p.P4)}
@@ -1977,11 +1987,11 @@ function installationHistoryPreviewHtml(preview){
  if(preview.warningCount){
   const kinds=new Map();
   preview.warnings.forEach(w=>w.warnings.forEach(k=>{const key=k.split(':')[0];kinds.set(key,(kinds.get(key)||0)+1)}));
-  const label={remaining_missing:'المتبقي فارغ — يُصنَّف غير محسوم',remaining_unmapped:'متبقٍّ لا يطابق أي مرحلة معرّفة',received_total_mismatch:'مجموع الدفعات لا يساوي Received Total',remaining_mismatch:'Total − Received لا يساوي Remaining',payment_date_missing:'دفعة بلا تاريخ'};
+  const label={historical_payment_detail_incomplete:'حالة مكتملة بلا دفعة رابعة مسجّلة',remaining_missing:'المتبقي فارغ — يُصنَّف غير محسوم',remaining_unmapped:'متبقٍّ لا يطابق أي مرحلة معرّفة',received_total_mismatch:'مجموع الدفعات لا يساوي Received Total',remaining_mismatch:'Total − Received لا يساوي Remaining',payment_date_missing:'دفعة بلا تاريخ'};
   html+=`<div class="insight warn" style="display:block;margin-bottom:12px"><span class="insight-dot"></span><span><b>${fmt(preview.warningCount)} صفاً يحتاج مراجعة</b><ul style="margin:8px 0 0;padding-inline-start:18px;font-size:11px;line-height:1.8">${[...kinds.entries()].map(([k,v])=>`<li>${esc(label[k]||k)} — ${fmt(v)}</li>`).join('')}</ul><small>لا يُرفض الملف ولا تُخمَّن أي قيمة؛ تُستورد كما هي وتبقى مُعلَّمة للمراجعة.</small></span></div>`;
  }
- html+=`<div class="panel" style="max-height:220px;overflow:auto"><table><thead><tr><th>الوكيل</th><th>فعليون</th><th>مُهملة</th><th>DONE</th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>غير محسوم</th><th>تنبيهات</th></tr></thead><tbody>
-  ${preview.perReseller.map(r=>`<tr><td>${esc(r.reseller)}</td><td>${fmt(r.real)}</td><td>${fmt(r.ignored)}</td><td>${fmt(r.stages.DONE)}</td><td>${fmt(r.stages.P1)}</td><td>${fmt(r.stages.P2)}</td><td>${fmt(r.stages.P3)}</td><td>${fmt(r.stages.P4)}</td><td>${fmt(r.unresolved)}</td><td>${fmt(r.warnings)}</td></tr>`).join('')}
+ html+=`<div class="panel" style="max-height:220px;overflow:auto"><table><thead><tr><th>الوكيل</th><th>فعليون</th><th>مُهملة</th><th>DONE</th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>غير محسوم</th><th>مؤهَّل</th><th>محجوب</th><th>اختلال</th><th>تنبيهات</th></tr></thead><tbody>
+  ${preview.perReseller.map(r=>`<tr><td>${esc(r.reseller)}</td><td>${fmt(r.real)}</td><td>${fmt(r.ignored)}</td><td>${fmt(r.stages.DONE)}</td><td>${fmt(r.stages.P1)}</td><td>${fmt(r.stages.P2)}</td><td>${fmt(r.stages.P3)}</td><td>${fmt(r.stages.P4)}</td><td>${fmt(r.unresolved)}</td><td>${fmt(r.eligible)}</td><td>${fmt(r.blocked)}</td><td>${fmt(r.financialMismatches)}</td><td>${fmt(r.warnings)}</td></tr>`).join('')}
  </tbody></table></div>`;
  html+=`<div id="installationHistoryStatus" style="margin-top:10px"></div>`;
  const ready=preview.asOfDateProvided&&preview.realSubscribers>0&&roleAllows('edit');

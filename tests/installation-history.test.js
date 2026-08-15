@@ -280,3 +280,142 @@ test('rows sent to the server carry no stage or amount the server should derive'
   assert.equal(row.remaining, 0);
   assert.equal(row.payments.length, 4);
 });
+
+// ---------------------------------------------------------------- eligibility --
+// A validation mismatch must not be able to reach payment eligibility by any
+// route: not through the stage it happens to sit on, and not through DONE.
+
+test('a financial mismatch keeps its raw values but loses resolution and eligibility', () => {
+  const row = fees.parseHistoryRow(sheetRow({
+    'Subscriber Name': 'sub-mismatch', 'Total Amount': 13000,
+    Payment1: 3000, Date1: new Date(2025, 11, 20),
+    Payment2: 3000, Date2: new Date(2026, 0, 20),
+    Payment3: 3000, Date3: new Date(2026, 1, 20),
+    'Received Total': 9000, Remaining: 0,
+  }), { reseller: 'R' });
+
+  assert.equal(row.totalAmount, 13000, 'raw values are preserved');
+  assert.equal(row.receivedTotal, 9000);
+  assert.equal(row.remaining, 0);
+  assert.equal(row.financialMismatch, true);
+  assert.equal(row.resolution, 'unresolved');
+  assert.equal(row.stageIsFinal, false, 'the derived stage is not final');
+  assert.equal(row.paymentEligible, false);
+  assert.ok(row.warnings.includes('remaining_mismatch'));
+});
+
+test('a mismatch sitting on a payable stage is still blocked', () => {
+  const row = fees.parseHistoryRow(sheetRow({
+    'Subscriber Name': 'sub-mismatch-p4', 'Total Amount': 13000,
+    Payment1: 3000, Date1: new Date(2025, 11, 20),
+    'Received Total': 3000, Remaining: 4000,
+  }), { reseller: 'R' });
+
+  assert.equal(row.currentStage, 'P4');
+  assert.equal(row.financialMismatch, true);
+  assert.equal(row.paymentEligible, false, 'a P4 that does not reconcile must not be payable');
+});
+
+test('a blank Remaining is never payment eligible', () => {
+  const row = fees.parseHistoryRow(sheetRow({
+    'Subscriber Name': 'sub-blank', 'Total Amount': 13000,
+    Payment1: 3000, Date1: new Date(2025, 11, 20),
+    'Received Total': 3000, Remaining: null,
+  }), { reseller: 'R' });
+
+  assert.equal(row.currentStage, null);
+  assert.equal(row.resolution, 'unresolved');
+  assert.equal(row.paymentEligible, false);
+  assert.equal(row.payments.length, 1, 'its history is still kept');
+});
+
+test('a balanced DONE without P4 stays resolved but is flagged as incomplete', () => {
+  const row = fees.parseHistoryRow(sheetRow({
+    'Subscriber Name': 'sub-done-no-p4', 'Total Amount': 13000,
+    Payment1: 3000, Date1: new Date(2025, 11, 20),
+    Payment2: 3000, Date2: new Date(2026, 0, 20),
+    Payment3: 7000, Date3: new Date(2026, 1, 20),
+    'Received Total': 13000, Remaining: 0,
+  }), { reseller: 'R' });
+
+  assert.equal(row.resolution, 'resolved');
+  assert.equal(row.historyIncomplete, true);
+  assert.ok(row.warnings.includes('historical_payment_detail_incomplete'));
+  assert.equal(row.payments.length, 3, 'no phantom P4 is invented');
+  assert.equal(row.paymentEligible, false, 'DONE has nothing left to pay');
+});
+
+test('an unbalanced DONE without P4 falls under the mismatch rule instead', () => {
+  const row = fees.parseHistoryRow(sheetRow({
+    'Subscriber Name': 'sub-done-broken', 'Total Amount': 13000,
+    Payment1: 3000, Date1: new Date(2025, 11, 20),
+    'Received Total': 3000, Remaining: 0,
+  }), { reseller: 'R' });
+
+  assert.equal(row.resolution, 'unresolved');
+  assert.equal(row.financialMismatch, true);
+  assert.equal(row.paymentEligible, false);
+});
+
+test('a clean pending row is the only shape that IS eligible', () => {
+  const row = fees.parseHistoryRow(sheetRow({
+    'Subscriber Name': 'sub-clean', 'Total Amount': 13000,
+    Payment1: 3000, Date1: new Date(2025, 11, 20),
+    Payment2: 3000, Date2: new Date(2026, 0, 20),
+    Payment3: 3000, Date3: new Date(2026, 1, 20),
+    'Received Total': 9000, Remaining: 4000,
+  }), { reseller: 'R' });
+
+  assert.equal(row.resolution, 'resolved');
+  assert.equal(row.stageIsFinal, true);
+  assert.equal(row.paymentEligible, true);
+  assert.deepEqual(row.warnings, []);
+});
+
+test('no row carrying any validation warning is ever eligible', () => {
+  const preview = fees.buildHistoricalPreview([{
+    reseller: 'R',
+    rows: [
+      sheetRow({ 'Subscriber Name': 'w-1', 'Total Amount': 13000, 'Received Total': 9000, Remaining: 0 }),
+      sheetRow({ 'Subscriber Name': 'w-2', 'Total Amount': 13000, Remaining: null }),
+      sheetRow({ 'Subscriber Name': 'w-3', 'Total Amount': 13000, Remaining: 5500 }),
+      sheetRow({
+        'Subscriber Name': 'w-4', 'Total Amount': 13000,
+        Payment1: 3000, Date1: new Date(2025, 11, 20),
+        'Received Total': 3000, Remaining: 10000,
+      }),
+    ],
+  }], { asOfDate: '2026-08-15' });
+
+  preview.rows.forEach((row) => {
+    const blocking = row.warnings.filter((w) => !w.startsWith('payment_date_missing')
+      && w !== 'historical_payment_detail_incomplete');
+    if (blocking.length) {
+      assert.equal(row.paymentEligible, false, `${row.subscriberId} carries ${blocking} yet is eligible`);
+    }
+  });
+
+  assert.equal(preview.eligible, 1, 'only the clean P2 row is eligible');
+  assert.equal(preview.blocked, 3);
+  assert.equal(preview.financialMismatches, 1);
+});
+
+test('the preview reports resolution, mismatches, incompleteness and eligibility', () => {
+  const preview = fees.buildHistoricalPreview([{
+    reseller: 'R',
+    rows: [
+      sheetRow({ 'Subscriber Name': 'p-clean', 'Total Amount': 13000, Payment1: 3000, Date1: new Date(2025, 11, 20), 'Received Total': 3000, Remaining: 10000 }),
+      sheetRow({ 'Subscriber Name': 'p-mismatch', 'Total Amount': 13000, 'Received Total': 9000, Remaining: 0 }),
+      sheetRow({ 'Subscriber Name': 'p-incomplete', 'Total Amount': 13000, Payment1: 13000, Date1: new Date(2026, 1, 20), 'Received Total': 13000, Remaining: 0 }),
+    ],
+  }], { asOfDate: '2026-08-15' });
+
+  assert.equal(preview.resolved, 2);
+  assert.equal(preview.unresolved, 1);
+  assert.equal(preview.financialMismatches, 1);
+  assert.equal(preview.incompleteHistories, 2, 'both DONE rows lack a P4 payment');
+  assert.equal(preview.eligible, 1);
+  assert.equal(preview.blocked, 2);
+  assert.equal(preview.resolved + preview.unresolved, preview.realSubscribers);
+  assert.equal(preview.eligible + preview.blocked, preview.realSubscribers);
+});

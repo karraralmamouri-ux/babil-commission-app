@@ -436,23 +436,42 @@
       });
     });
 
-    const resolved = remaining !== null && STAGE_BY_REMAINING.has(remaining);
-    const currentStage = resolved ? STAGE_BY_REMAINING.get(remaining).stage : null;
+    /* المرحلة تُشتق من المتبقي وحده. اشتقاقها لا يعني أنها نهائية:
+       النهائية تقررها المطابقة المحاسبية أدناه. */
+    const stageKnown = remaining !== null && STAGE_BY_REMAINING.has(remaining);
+    const currentStage = stageKnown ? STAGE_BY_REMAINING.get(remaining).stage : null;
 
     const warnings = [];
-    if (!resolved) warnings.push(remaining === null ? 'remaining_missing' : 'remaining_unmapped');
+    if (!stageKnown) warnings.push(remaining === null ? 'remaining_missing' : 'remaining_unmapped');
 
     const paidSum = payments.reduce((sum, payment) => sum + payment.amount, 0);
     if (receivedTotal !== null && payments.length && paidSum !== receivedTotal) {
       warnings.push('received_total_mismatch');
     }
-    if (totalAmount !== null && receivedTotal !== null && remaining !== null
-      && totalAmount - receivedTotal !== remaining) {
-      warnings.push('remaining_mismatch');
-    }
+
+    /* الاختلال المحاسبي: المبلغ الكلي ناقص المستلم لا يساوي المتبقي.
+       القيم الخام تُحفظ كما هي ولا تُصحَّح، لكن الصف يخرج من دائرة الثقة. */
+    const financialMismatch = totalAmount !== null && receivedTotal !== null && remaining !== null
+      && totalAmount - receivedTotal !== remaining;
+    if (financialMismatch) warnings.push('remaining_mismatch');
+
     payments.forEach((payment) => {
       if (!payment.paymentDate) warnings.push(`payment_date_missing:${payment.stage}`);
     });
+
+    /* حالة مكتملة بلا دفعة رابعة مسجّلة. لا تُخترع P4: يُعلَّم النقص فقط.
+       إن كانت الأرقام متطابقة محاسبياً تبقى الحالة محسومة، وإلا فقاعدة
+       الاختلال أعلاه هي التي تحكم. */
+    const historyIncomplete = currentStage === 'DONE'
+      && !payments.some((payment) => payment.stage === 'P4');
+    if (historyIncomplete) warnings.push('historical_payment_detail_incomplete');
+
+    const resolution = (stageKnown && !financialMismatch) ? 'resolved' : 'unresolved';
+
+    /* الأهلية للصرف مشتقة، لا مُدخلة: صف غير محسوم لا يصرف مهما بدا،
+       وDONE لا يبقى فيه شيء يُصرف. */
+    const paymentEligible = resolution === 'resolved'
+      && PENDING_STAGES.includes(currentStage);
 
     return {
       subscriberId,
@@ -464,7 +483,11 @@
       receivedTotal,
       remaining,
       currentStage,
-      resolution: resolved ? 'resolved' : 'unresolved',
+      stageIsFinal: resolution === 'resolved',
+      resolution,
+      financialMismatch,
+      historyIncomplete,
+      paymentEligible,
       notes: text(pick(cells, HISTORY_ALIASES.notes)) || null,
       payments,
       paidSum,
@@ -488,7 +511,12 @@
     const duplicates = [];
     let totalRows = 0;
     let ignoredRows = 0;
+    let resolved = 0;
     let unresolved = 0;
+    let financialMismatches = 0;
+    let incompleteHistories = 0;
+    let eligible = 0;
+    let blocked = 0;
     let newSubscribers = 0;
     let existingUpdated = 0;
     let resellerChanged = 0;
@@ -499,7 +527,8 @@
       const reseller = text(sheet && sheet.reseller);
       const rows = (sheet && sheet.rows) || [];
       const bucket = perReseller.get(reseller) || {
-        reseller, real: 0, ignored: 0, unresolved: 0,
+        reseller, real: 0, ignored: 0, resolved: 0, unresolved: 0,
+        financialMismatches: 0, incompleteHistories: 0, eligible: 0, blocked: 0,
         stages: { P1: 0, P2: 0, P3: 0, P4: 0, DONE: 0 },
         payments: { P1: 0, P2: 0, P3: 0, P4: 0 },
         warnings: 0,
@@ -519,13 +548,24 @@
         bucket.real += 1;
         subscribers.set(parsed.subscriberKey, parsed);
 
-        if (parsed.resolution === 'resolved') {
+        /* المرحلة تُعدّ حيثما اشتُقت، حتى لو كان الصف غير محسوم — فالعدّ
+           وصف لما في الملف. الحسم والأهلية يُعدّان منفصلين حتى لا يختلط
+           "أين يقف" بـ"هل يُصرف". */
+        if (parsed.currentStage) {
           stages[parsed.currentStage] += 1;
           bucket.stages[parsed.currentStage] += 1;
+        }
+        if (parsed.resolution === 'resolved') {
+          resolved += 1;
+          bucket.resolved += 1;
         } else {
           unresolved += 1;
           bucket.unresolved += 1;
         }
+        if (parsed.financialMismatch) { financialMismatches += 1; bucket.financialMismatches += 1; }
+        if (parsed.historyIncomplete) { incompleteHistories += 1; bucket.incompleteHistories += 1; }
+        if (parsed.paymentEligible) { eligible += 1; bucket.eligible += 1; }
+        else { blocked += 1; bucket.blocked += 1; }
 
         parsed.payments.forEach((payment) => {
           paymentsByStage[payment.stage] += 1;
@@ -574,7 +614,12 @@
       ignoredRows,
       realSubscribers: subscribers.size,
       stages,
+      resolved,
       unresolved,
+      financialMismatches,
+      incompleteHistories,
+      eligible,
+      blocked,
       paymentsByStage,
       historicalPayments,
       newSubscribers,

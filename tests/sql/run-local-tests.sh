@@ -33,6 +33,16 @@ fi
 echo "$out3" | grep -E "\| (pass|FAIL)" || true
 passed=$((passed + $(echo "$out3" | grep -c "| pass")))
 
+echo "== payment eligibility guards =="
+out4=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q \
+        < tests/sql/installation-history-eligibility.sql 2>&1)
+if echo "$out4" | grep -qE "FAILED:|ERROR"; then
+  echo "$out4" | grep -E "FAILED:|ERROR" || true
+  echo "ELIGIBILITY TESTS FAILED" >&2; exit 1
+fi
+echo "$out4" | grep -E "\| (pass|FAIL)" || true
+passed=$((passed + $(echo "$out4" | grep -c "| pass")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 

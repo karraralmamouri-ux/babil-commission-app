@@ -98,8 +98,13 @@ create table if not exists public.installation_subscriber_state (
   as_of_date date not null,
   remaining bigint,
   received_total bigint,
+  total_amount bigint,
   current_stage text,
   resolution text not null default 'resolved',
+  -- الأهلية للصرف حقل محسوب على الخادم لا مُدخل، وقيود أدناه تجعل تخزين
+  -- صف غير محسوم كمؤهَّل مستحيلاً حتى لو أخطأ الاستدعاء.
+  payment_eligible boolean not null default false,
+  warnings text[] not null default '{}',
   batch_id uuid references public.installation_batches(id) on delete restrict,
   updated_by uuid references auth.users(id),
   updated_at timestamptz not null default now(),
@@ -115,12 +120,22 @@ create table if not exists public.installation_subscriber_state (
   -- عليها، وهي الثغرة التي ظهرت في المهاجرة السابقة.
   constraint installation_state_stage_matches_remaining
     check (current_stage is not distinct from public.installation_stage_for_remaining(remaining)),
-  -- متبقٍّ غير معروف يعني حالة غير محسومة، ولا يجوز تخمينها.
-  constraint installation_state_unresolved_has_no_stage
+  -- متبقٍّ غير معروف لا يُخمَّن له مرحلة.
+  constraint installation_state_unknown_remaining_has_no_stage
+    check (remaining is not null or current_stage is null),
+  -- اختلال محاسبي يعني حالة غير محسومة، مهما كانت المرحلة المشتقة.
+  -- المتغيّرات الثلاثة مطلوبة معاً حتى تكون المطابقة ذات معنى.
+  constraint installation_state_mismatch_is_unresolved
     check (
-      (resolution = 'resolved' and current_stage is not null)
-      or (resolution = 'unresolved' and current_stage is null)
-    )
+      total_amount is null or received_total is null or remaining is null
+      or total_amount - received_total = remaining
+      or resolution = 'unresolved'
+    ),
+  -- لا صرف من صف غير محسوم، ولا صرف حيث لا توجد دفعة قادمة.
+  constraint installation_state_unresolved_is_never_eligible
+    check (payment_eligible is false or resolution = 'resolved'),
+  constraint installation_state_eligible_needs_pending_stage
+    check (payment_eligible is false or current_stage in ('P1', 'P2', 'P3', 'P4'))
 );
 
 -- ---------------------------------------------------------------------------
@@ -202,6 +217,14 @@ declare
   v_total bigint;
   v_stage text;
   v_resolution text;
+  v_mismatch boolean;
+  v_incomplete boolean;
+  v_eligible boolean;
+  v_warnings text[];
+  v_mismatches integer := 0;
+  v_incompletes integer := 0;
+  v_eligibles integer := 0;
+  v_blocked integer := 0;
   v_uuid uuid;
   v_is_new boolean;
   v_prev_reseller text;
@@ -305,8 +328,32 @@ begin
 
     -- المرحلة تُشتق على الخادم؛ ما يرسله العميل لا يُصدَّق.
     v_stage := public.installation_stage_for_remaining(v_remaining);
-    v_resolution := case when v_stage is null then 'unresolved' else 'resolved' end;
+
+    -- الاختلال المحاسبي يُحسب هنا لا في المتصفح. القيم الخام تُخزَّن كما
+    -- وصلت، لكن الصف يفقد صفة الحسم ومعها الأهلية للصرف.
+    v_mismatch := v_total is not null and v_received is not null and v_remaining is not null
+                  and v_total - v_received <> v_remaining;
+    if v_mismatch then v_mismatches := v_mismatches + 1; end if;
+
+    v_resolution := case when v_stage is null or v_mismatch then 'unresolved' else 'resolved' end;
     if v_resolution = 'unresolved' then v_unresolved := v_unresolved + 1; end if;
+
+    -- حالة مكتملة بلا دفعة رابعة: يُعلَّم النقص ولا تُخترع دفعة.
+    v_incomplete := v_stage = 'DONE' and not exists (
+      select 1 from jsonb_array_elements(coalesce(v_item -> 'payments', '[]'::jsonb)) as p
+      where p.value ->> 'stage' = 'P4' and coalesce((p.value ->> 'amount')::bigint, 0) > 0
+    );
+    if v_incomplete then v_incompletes := v_incompletes + 1; end if;
+
+    v_eligible := v_resolution = 'resolved' and v_stage in ('P1', 'P2', 'P3', 'P4');
+    if v_eligible then v_eligibles := v_eligibles + 1; else v_blocked := v_blocked + 1; end if;
+
+    v_warnings := array[]::text[];
+    if v_remaining is null then v_warnings := v_warnings || 'remaining_missing'::text;
+    elsif v_stage is null then v_warnings := v_warnings || 'remaining_unmapped'::text;
+    end if;
+    if v_mismatch then v_warnings := v_warnings || 'remaining_mismatch'::text; end if;
+    if v_incomplete then v_warnings := v_warnings || 'historical_payment_detail_incomplete'::text; end if;
 
     select id, reseller into v_uuid, v_prev_reseller
     from public.installation_subscribers where subscriber_key = v_key;
@@ -343,17 +390,21 @@ begin
     end if;
 
     insert into public.installation_subscriber_state (
-      subscriber_uuid, as_of_date, remaining, received_total,
-      current_stage, resolution, batch_id, updated_by
+      subscriber_uuid, as_of_date, remaining, received_total, total_amount,
+      current_stage, resolution, payment_eligible, warnings, batch_id, updated_by
     ) values (
-      v_uuid, p_as_of_date, v_remaining, v_received, v_stage, v_resolution, v_batch_id, v_actor
+      v_uuid, p_as_of_date, v_remaining, v_received, v_total,
+      v_stage, v_resolution, v_eligible, v_warnings, v_batch_id, v_actor
     )
     on conflict (subscriber_uuid) do update
       set as_of_date = excluded.as_of_date,
           remaining = excluded.remaining,
           received_total = excluded.received_total,
+          total_amount = excluded.total_amount,
           current_stage = excluded.current_stage,
           resolution = excluded.resolution,
+          payment_eligible = excluded.payment_eligible,
+          warnings = excluded.warnings,
           batch_id = excluded.batch_id,
           updated_by = excluded.updated_by,
           updated_at = now();
@@ -410,6 +461,10 @@ begin
     'payments_recorded', v_new_payments,
     'payments_changed', v_touched_payments,
     'unresolved', v_unresolved,
+    'financial_mismatches', v_mismatches,
+    'incomplete_histories', v_incompletes,
+    'eligible', v_eligibles,
+    'blocked', v_blocked,
     'reseller_moves', v_reseller_moves,
     'duplicates', v_duplicate,
     'rejected', v_rejected,
