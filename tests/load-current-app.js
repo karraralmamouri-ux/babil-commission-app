@@ -43,11 +43,17 @@ function loadCurrentApp(options = {}) {
   const html = fs.readFileSync(htmlPath, 'utf8');
   const applicationScript = extractInlineApplicationScript(html);
   const storage = options.storage || new Map();
+  // Stable per-id elements so render functions can be inspected after they run.
+  const elements = options.elements || new Map();
   const document = {
     addEventListener() {},
     createElement,
-    getElementById() {
-      return createElement();
+    elements,
+    getElementById(id) {
+      if (!elements.has(id)) {
+        elements.set(id, createElement());
+      }
+      return elements.get(id);
     },
     querySelectorAll() {
       return [];
@@ -132,6 +138,10 @@ function loadCurrentApp(options = {}) {
       getPreviousRow,
       monthKey,
       monthOrder,
+      renderAgentHierarchy,
+      newZoneAgentTotals,
+      newZoneFdtAgentExportRows,
+      newZoneFdtBreakdown,
       newZoneOwnerSummaries,
       nextMonthKey,
       normalizeImport,
@@ -156,7 +166,7 @@ function loadCurrentApp(options = {}) {
     filename: 'index.inline.js',
   }).runInContext(context);
 
-  return context.__characterization;
+  return Object.assign(context.__characterization, { __elements: elements });
 }
 
 module.exports = { loadCurrentApp };
