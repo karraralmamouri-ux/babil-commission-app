@@ -1633,10 +1633,14 @@ async function fetchInstallationEntitlements(){
 }
 /* سجلات المشتركين وحالتهم وتاريخ دفعاتهم. تُستعمل في معاينة الاستيراد
    التاريخي للتمييز بين مشترك جديد وآخر قائم قبل الاعتماد لا بعده.
-   الجداول قد لا تكون منشورة على البيئة، فغيابها لا يُفشل التحديث كله. */
+   الجداول قد لا تكون منشورة على البيئة، فغيابها لا يُفشل التحديث كله.
+
+   payment_eligible وwarnings مطلوبان صراحةً: الأهلية تُشتق على الخادم وتُخزَّن،
+   فإن لم تُطلب هنا فقدتها الواجهة بعد إعادة التحميل وعرضت أصفاراً بينما
+   القاعدة تحمل القيم الصحيحة. لا تُشتق الأهلية في المتصفح مجدداً. */
 async function fetchInstallationSubscribers(){
  try{
-   const select='subscriber_id,reseller,fdt,start_date,installation_subscriber_state(as_of_date,remaining,current_stage,resolution),installation_payment_history(stage,amount,payment_date)';
+   const select='subscriber_id,reseller,fdt,start_date,installation_subscriber_state(as_of_date,remaining,current_stage,resolution,payment_eligible,warnings),installation_payment_history(stage,amount,payment_date)';
    const rows=await fetchCentralPages(`/rest/v1/installation_subscribers?select=${select}&order=subscriber_id.asc`);
    return rows.map(row=>({...row,payment_stages:(row.installation_payment_history||[]).map(p=>p.stage)}));
  }catch(error){
