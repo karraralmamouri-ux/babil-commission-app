@@ -130,13 +130,28 @@ test('the dashboard counters cover stages, invoices and payments', () => {
 // ------------------------------------------------------------ payment gate --
 test('the payment review separates eligible money from blocked money with reasons', () => {
   const app = loadCurrentApp();
+  // The review is fed by the merged dashboard rows, so it sees the shape the
+  // table renders: an entitlement id marks a row that actually has money to
+  // disburse.
+  const operational = (overrides) => Object.assign({
+    entitlementId: `ent-${Math.random().toString(16).slice(2)}`,
+    subscriberId: 'SUB-1', subscriberName: '', reseller: 'Saeed Ammar',
+    stage: 'P1', amount: 3000, invoiceStatus: 'approved', paymentStatus: 'awaiting_invoice',
+    paidAmount: 0, paidAt: '', warnings: [], historicalPayments: 0,
+  }, overrides);
+
   const rows = [
-    entitlement({ reseller: 'Saeed Ammar', stage: 'P1', amount: 3000, invoice_status: 'approved', payment_status: 'eligible' }),
-    entitlement({ reseller: 'Saeed Ammar', stage: 'P4', amount: 4000, invoice_status: 'approved', payment_status: 'eligible' }),
-    entitlement({ reseller: 'Saeed Ammar', stage: 'P2', amount: 3000, invoice_status: 'missing' }),
-    entitlement({ reseller: 'Saeed Ammar', stage: 'P3', amount: 3000, invoice_status: 'rejected' }),
-    entitlement({ reseller: 'Saeed Ammar', stage: 'DONE', remaining: 0, amount: 0 }),
-    entitlement({ reseller: 'Other Agent', stage: 'P1', amount: 3000, invoice_status: 'approved', payment_status: 'eligible' }),
+    operational({ stage: 'P1', amount: 3000, paymentStatus: 'eligible' }),
+    operational({ stage: 'P4', amount: 4000, paymentStatus: 'eligible' }),
+    operational({ stage: 'P2', amount: 3000, invoiceStatus: 'missing' }),
+    operational({ stage: 'P3', amount: 3000, invoiceStatus: 'rejected' }),
+    operational({ stage: 'DONE', amount: 0 }),
+    operational({ reseller: 'Other Agent', paymentStatus: 'eligible' }),
+    // A baseline-only subscriber has no entitlement and must stay out of both
+    // tallies: there is nothing to pay against it yet.
+    { entitlementId: null, subscriberId: 'BASE-1', reseller: 'Saeed Ammar', stage: 'P1',
+      amount: null, invoiceStatus: null, paymentStatus: null, paidAmount: 0,
+      warnings: [], historicalPayments: 2 },
   ];
 
   const review = app.installationPaymentReview(rows, 'Saeed Ammar');
@@ -163,8 +178,11 @@ test('the export carries every reviewed field', () => {
     }),
   ]);
 
+  // The baseline columns joined the export when the dashboard began showing
+  // the historical state; every operational column it already had is kept.
   assert.deepEqual(Object.keys(rows[0]), [
     'SubscriberID', 'SubscriberName', 'Reseller', 'Zone', 'FDT', 'Remaining', 'Stage',
+    'Resolution', 'PaymentEligible', 'Warnings', 'HistoricalPayments', 'AsOfDate',
     'DueAmount', 'InvoiceStatus', 'InvoiceAuditDate', 'PaymentStatus', 'PaidAmount',
     'PaymentDate', 'Period',
   ]);

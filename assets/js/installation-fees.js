@@ -297,22 +297,31 @@
     };
   }
 
-  /* صفوف التصدير — نفس الحقول لـCSV وExcel حتى لا يختلف الملفان. */
+  /* صفوف التصدير — نفس الحقول لـCSV وExcel حتى لا يختلف الملفان.
+     تقبل الشكل المدموج المعروض في اللوحة، والشكل الخام للاستحقاق كما يأتي
+     من قاعدة البيانات، فلا يتغير التصدير بتغير مصدر الصف. */
   function buildExportRows(rows) {
+    const pickField = (row, camel, snake) =>
+      row[camel] !== undefined ? row[camel] : row[snake];
     return (rows || []).map((row) => ({
-      SubscriberID: text(row.subscriber_id),
-      SubscriberName: text(row.subscriber_name),
+      SubscriberID: text(pickField(row, 'subscriberId', 'subscriber_id')),
+      SubscriberName: text(pickField(row, 'subscriberName', 'subscriber_name')),
       Reseller: text(row.reseller),
       Zone: text(row.zone).toUpperCase(),
       FDT: text(row.fdt),
       Remaining: Number(row.remaining) || 0,
       Stage: text(row.stage),
+      Resolution: text(row.resolution),
+      PaymentEligible: row.paymentEligible === true ? 'yes' : 'no',
+      Warnings: Array.isArray(row.warnings) ? row.warnings.join(' ') : '',
+      HistoricalPayments: Number(row.historicalPayments) || 0,
+      AsOfDate: text(pickField(row, 'asOfDate', 'as_of_date')).slice(0, 10),
       DueAmount: Number(row.amount) || 0,
-      InvoiceStatus: text(row.invoice_status),
-      InvoiceAuditDate: text(row.invoice_audited_at).slice(0, 10),
-      PaymentStatus: text(row.payment_status),
-      PaidAmount: Number(row.paid_amount) || 0,
-      PaymentDate: text(row.paid_at).slice(0, 10),
+      InvoiceStatus: text(pickField(row, 'invoiceStatus', 'invoice_status')),
+      InvoiceAuditDate: text(pickField(row, 'invoiceAuditedAt', 'invoice_audited_at')).slice(0, 10),
+      PaymentStatus: text(pickField(row, 'paymentStatus', 'payment_status')),
+      PaidAmount: Number(pickField(row, 'paidAmount', 'paid_amount')) || 0,
+      PaymentDate: text(pickField(row, 'paidAt', 'paid_at')).slice(0, 10),
       Period: text(row.period),
     }));
   }
@@ -656,6 +665,185 @@
     }));
   }
 
+  /* ---------------------------------------------------------------------
+     خط الأساس مقابل الاستحقاق التشغيلي.
+
+     مصدران مختلفان لا يلغي أحدهما الآخر:
+
+       installation_subscriber_state  الحالة الحالية لكل مشترك وتاريخه.
+                                      هذه هي حقيقة "أين يقف كل مشترك الآن".
+       installation_entitlements      الاستحقاق التشغيلي: الفاتورة والصرف.
+                                      تُنشأ عند تجهيز دفعة صرف، وقد لا توجد.
+
+     اللوحة كانت تقرأ الثاني وحده، فعرضت أصفاراً لأن لا استحقاقات تشغيلية
+     بعد، بينما خط الأساس يحمل آلاف المشتركين. الصف المعروض يجمع الاثنين:
+     الحالة من خط الأساس دائماً، وأعمدة الفاتورة والصرف حين يوجد استحقاق.
+     --------------------------------------------------------------------- */
+
+  /* PostgREST يعيد العلاقة المضمّنة إما ككائن أو كمصفوفة بعنصر واحد. */
+  function embedded(value) {
+    if (Array.isArray(value)) return value[0] || null;
+    return value || null;
+  }
+
+  /* يسطّح سجل مشترك قادماً من قاعدة البيانات إلى شكل واحد تستهلكه اللوحة. */
+  function normalizeSubscriberRecord(row) {
+    const record = row || {};
+    const state = embedded(record.installation_subscriber_state) || {};
+    const history = record.installation_payment_history || [];
+    return {
+      subscriberId: text(record.subscriber_id),
+      reseller: text(record.reseller),
+      fdt: record.fdt === null || record.fdt === undefined ? null : text(record.fdt),
+      startDate: text(record.start_date) || null,
+      asOfDate: text(state.as_of_date) || null,
+      remaining: state.remaining === null || state.remaining === undefined
+        ? null : Number(state.remaining),
+      currentStage: text(state.current_stage) || null,
+      resolution: text(state.resolution) || 'resolved',
+      /* الأهلية تُقرأ كما خزّنها الخادم ولا تُشتق هنا مطلقاً. */
+      paymentEligible: state.payment_eligible === true,
+      warnings: Array.isArray(state.warnings) ? state.warnings.slice() : [],
+      payments: history.map((payment) => ({
+        stage: text(payment.stage),
+        amount: Number(payment.amount) || 0,
+        paymentDate: text(payment.payment_date) || null,
+      })),
+    };
+  }
+
+  /* عدّادات اللوحة من خط الأساس. المرحلة تُعدّ حيثما اشتُقت، والأهلية
+     تُعدّ من القيمة المخزّنة، فلا يختلط "أين يقف" بـ"هل يجوز الصرف". */
+  function summarizeSubscriberStates(records) {
+    const summary = {
+      total: 0,
+      stages: { P1: 0, P2: 0, P3: 0, P4: 0, DONE: 0 },
+      noStage: 0,
+      resolved: 0,
+      unresolved: 0,
+      eligible: 0,
+      blocked: 0,
+      historicalPayments: 0,
+      paymentsByStage: { P1: 0, P2: 0, P3: 0, P4: 0 },
+      warnings: {},
+      resellers: 0,
+    };
+    const resellers = new Set();
+
+    (records || []).forEach((record) => {
+      summary.total += 1;
+      if (record.reseller) resellers.add(record.reseller);
+
+      if (record.currentStage && summary.stages[record.currentStage] !== undefined) {
+        summary.stages[record.currentStage] += 1;
+      } else {
+        summary.noStage += 1;
+      }
+
+      if (record.resolution === 'unresolved') summary.unresolved += 1;
+      else summary.resolved += 1;
+
+      if (record.paymentEligible) summary.eligible += 1;
+      else summary.blocked += 1;
+
+      (record.payments || []).forEach((payment) => {
+        summary.historicalPayments += 1;
+        if (summary.paymentsByStage[payment.stage] !== undefined) {
+          summary.paymentsByStage[payment.stage] += 1;
+        }
+      });
+
+      (record.warnings || []).forEach((warning) => {
+        const kind = String(warning).split(':')[0];
+        summary.warnings[kind] = (summary.warnings[kind] || 0) + 1;
+      });
+    });
+
+    summary.resellers = resellers.size;
+    return summary;
+  }
+
+  /* يدمج خط الأساس مع الاستحقاقات التشغيلية بمفتاح المشترك.
+     كل مشترك في خط الأساس يظهر؛ ومن له استحقاق يحمل أعمدة الفاتورة والصرف
+     ومعرّف الاستحقاق الذي تعمل عليه أزرار التدقيق والصرف. */
+  function buildInstallationDashboardRows(records, entitlements) {
+    const bySubscriber = new Map();
+    (entitlements || []).forEach((entitlement) => {
+      const key = text(entitlement.subscriber_id).toLowerCase();
+      if (!key) return;
+      /* أحدث فترة تمثّل الاستحقاق القائم لهذا المشترك. */
+      const current = bySubscriber.get(key);
+      if (!current || text(entitlement.period) > text(current.period)) {
+        bySubscriber.set(key, entitlement);
+      }
+    });
+
+    const seen = new Set();
+    const rows = (records || []).map((record) => {
+      const key = record.subscriberId.toLowerCase();
+      seen.add(key);
+      const entitlement = bySubscriber.get(key) || null;
+      return {
+        source: entitlement ? 'baseline+entitlement' : 'baseline',
+        entitlementId: entitlement ? entitlement.id : null,
+        subscriberId: record.subscriberId,
+        subscriberName: entitlement ? text(entitlement.subscriber_name) : '',
+        reseller: record.reseller,
+        zone: entitlement ? text(entitlement.zone) : '',
+        fdt: record.fdt,
+        startDate: record.startDate,
+        asOfDate: record.asOfDate,
+        remaining: record.remaining,
+        stage: record.currentStage,
+        resolution: record.resolution,
+        paymentEligible: record.paymentEligible,
+        warnings: record.warnings,
+        historicalPayments: record.payments.length,
+        period: entitlement ? text(entitlement.period) : '',
+        amount: entitlement ? Number(entitlement.amount) || 0 : null,
+        invoiceStatus: entitlement ? text(entitlement.invoice_status) : null,
+        invoiceNote: entitlement ? text(entitlement.invoice_note) : '',
+        paymentStatus: entitlement ? text(entitlement.payment_status) : null,
+        paidAmount: entitlement ? Number(entitlement.paid_amount) || 0 : 0,
+        paidAt: entitlement ? text(entitlement.paid_at) : '',
+      };
+    });
+
+    /* استحقاق بلا مشترك في خط الأساس يبقى ظاهراً بدل أن يختفي بصمت. */
+    (entitlements || []).forEach((entitlement) => {
+      const key = text(entitlement.subscriber_id).toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      rows.push({
+        source: 'entitlement',
+        entitlementId: entitlement.id,
+        subscriberId: text(entitlement.subscriber_id),
+        subscriberName: text(entitlement.subscriber_name),
+        reseller: text(entitlement.reseller),
+        zone: text(entitlement.zone),
+        fdt: entitlement.fdt === null || entitlement.fdt === undefined ? null : text(entitlement.fdt),
+        startDate: null,
+        asOfDate: null,
+        remaining: entitlement.remaining === null || entitlement.remaining === undefined
+          ? null : Number(entitlement.remaining),
+        stage: text(entitlement.stage) || null,
+        resolution: 'resolved',
+        paymentEligible: text(entitlement.payment_status) === 'eligible',
+        warnings: [],
+        historicalPayments: 0,
+        period: text(entitlement.period),
+        amount: Number(entitlement.amount) || 0,
+        invoiceStatus: text(entitlement.invoice_status),
+        invoiceNote: text(entitlement.invoice_note),
+        paymentStatus: text(entitlement.payment_status),
+        paidAmount: Number(entitlement.paid_amount) || 0,
+        paidAt: text(entitlement.paid_at),
+      });
+    });
+
+    return rows;
+  }
+
   return {
     ALL_STAGES,
     HISTORY_ALIASES,
@@ -669,10 +857,12 @@
     buildHistoricalImportRows,
     buildHistoricalPreview,
     buildImportPreview,
+    buildInstallationDashboardRows,
     entitlementKey,
     historyPaymentKey,
     mapImportRow,
     normalizeInstallationRow,
+    normalizeSubscriberRecord,
     parseHistoryRow,
     parseRemaining,
     resolveInstallationStage,
@@ -680,5 +870,6 @@
     summarizeByReseller,
     summarizeEntitlements,
     summarizeInstallationBatch,
+    summarizeSubscriberStates,
   };
 });
