@@ -166,11 +166,26 @@ test('the rendered panel shows baseline subscribers when no entitlement exists',
   const cards = app.__elements.get("installationCards").innerHTML;
   const panel = app.__elements.get("installationPanel").innerHTML;
 
-  assert.ok(cards.includes('إجمالي المشتركين'));
-  assert.ok(!/إجمالي المشتركين[\s\S]{0,120}>0</.test(cards), 'the total must not render as zero');
-  assert.ok(cards.includes('مؤهل للصرف'));
-  assert.ok(cards.includes('محجوب عن الصرف'));
-  assert.ok(cards.includes('غير محسوم'));
+  // Read the value out of each card rather than checking a label exists: the
+  // first cut of this fix rendered every stage card as 0 because the summary
+  // was handed the merged row shape and looked for the normalized one, and a
+  // label-only assertion sailed straight past it.
+  const cardValues = new Map(
+    [...cards.matchAll(/<div class="label">([^<]*)<\/div><div class="value">([^<]*)<\/div>/g)]
+      .map((m) => [m[1], m[2]]),
+  );
+  const expected = {
+    'إجمالي المشتركين': '7',
+    'مكتمل DONE': '2',
+    P1: '1', P2: '1', P3: '1', P4: '1',
+    'مؤهل للصرف': '4',
+    'محجوب عن الصرف': '3',
+    'غير محسوم': '2',
+    'دفعات تاريخية': '5',
+  };
+  Object.entries(expected).forEach(([label, value]) => {
+    assert.equal(cardValues.get(label), value, `card "${label}" should read ${value}`);
+  });
   // Every baseline subscriber reaches the table body; the header row is not one.
   const bodyRows = ((panel.match(/<tbody>([\s\S]*)<\/tbody>/) || [])[1] || '')
     .match(/<tr>/g) || [];

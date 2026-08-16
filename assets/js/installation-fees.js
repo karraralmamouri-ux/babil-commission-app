@@ -713,7 +713,20 @@
   }
 
   /* عدّادات اللوحة من خط الأساس. المرحلة تُعدّ حيثما اشتُقت، والأهلية
-     تُعدّ من القيمة المخزّنة، فلا يختلط "أين يقف" بـ"هل يجوز الصرف". */
+     تُعدّ من القيمة المخزّنة، فلا يختلط "أين يقف" بـ"هل يجوز الصرف".
+
+     تقبل الشكلين: السجل المطبَّع القادم من normalizeSubscriberRecord،
+     والصف المدموج المعروض في اللوحة بعد التصفية. بدون ذلك تُعدّ الكروت
+     أصفاراً حين تُمرَّر إليها الصفوف المصفّاة. */
+  function stateStage(record) {
+    return record.currentStage !== undefined ? record.currentStage : (record.stage || null);
+  }
+
+  function statePaymentCount(record) {
+    if (Array.isArray(record.payments)) return record.payments.length;
+    return Number(record.historicalPayments) || 0;
+  }
+
   function summarizeSubscriberStates(records) {
     const summary = {
       total: 0,
@@ -734,11 +747,9 @@
       summary.total += 1;
       if (record.reseller) resellers.add(record.reseller);
 
-      if (record.currentStage && summary.stages[record.currentStage] !== undefined) {
-        summary.stages[record.currentStage] += 1;
-      } else {
-        summary.noStage += 1;
-      }
+      const stage = stateStage(record);
+      if (stage && summary.stages[stage] !== undefined) summary.stages[stage] += 1;
+      else summary.noStage += 1;
 
       if (record.resolution === 'unresolved') summary.unresolved += 1;
       else summary.resolved += 1;
@@ -746,8 +757,8 @@
       if (record.paymentEligible) summary.eligible += 1;
       else summary.blocked += 1;
 
+      summary.historicalPayments += statePaymentCount(record);
       (record.payments || []).forEach((payment) => {
-        summary.historicalPayments += 1;
         if (summary.paymentsByStage[payment.stage] !== undefined) {
           summary.paymentsByStage[payment.stage] += 1;
         }
