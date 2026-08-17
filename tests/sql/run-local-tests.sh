@@ -62,6 +62,15 @@ fi
 echo "$out6" | grep -E "| (pass|FAIL)" || true
 passed=$((passed + $(echo "$out6" | grep -c "| pass")))
 
+echo "== ledger integration =="
+out7=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q         < tests/sql/financial-ledger-integration.sql 2>&1)
+if echo "$out7" | grep -qE "FAILED:|ERROR"; then
+  echo "$out7" | grep -E "FAILED:|ERROR" || true
+  echo "LEDGER INTEGRATION TESTS FAILED" >&2; exit 1
+fi
+echo "$out7" | grep -E "| (pass|FAIL)" || true
+passed=$((passed + $(echo "$out7" | grep -c "| pass")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
