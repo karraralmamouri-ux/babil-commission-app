@@ -33,9 +33,18 @@ begin;
 revoke all on table public.app_settings from authenticated;
 grant select on table public.app_settings to authenticated;
 
+-- anon وPUBLIC لا يملكان شيئاً على الإنتاج اليوم؛ السحب صريح كي لا يعيد
+-- امتياز افتراضي مستقبلي فتحَ ما أُغلق هنا.
 revoke all on table public.app_settings from anon;
+revoke all on table public.app_settings from public;
 
--- الكتابة تبقى حصراً عبر save_import_settings، وهي SECURITY DEFINER وتفحص
--- الدور وتكتب في سجل التدقيق. هذه المهاجرة لا تغيّر ذلك المسار.
+-- ما لا تمسّه هذه المهاجرة عمداً:
+--   • postgres (المالك) وservice_role يحتفظان بصلاحياتهما الكاملة. الأول مالك
+--     الجدول، والثاني دور الخلفية الموثوق الذي تعمل به Edge Functions.
+--   • RLS وسياسة القراءة الوحيدة تبقيان كما هما.
+--   • مسار الكتابة الوحيد يبقى save_import_settings: وهي SECURITY DEFINER
+--     مملوكة لـpostgres بـsearch_path مثبَّت، فتنفّذ بصلاحيات المالك ولا
+--     تتأثر بسحب صلاحيات الجدول عن authenticated. الفحص قبل النشر يؤكد ذلك.
+--   • لا صف يُقرأ أو يُكتب أو يُحذف. هذه مهاجرة صلاحيات بحتة.
 
 commit;

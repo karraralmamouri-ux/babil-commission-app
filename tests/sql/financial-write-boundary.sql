@@ -60,6 +60,15 @@ select pg_temp.assert_that(
      and privilege_type <> 'SELECT'));
 
 select pg_temp.assert_that(
+  'PUBLIC holds nothing on any financial table',
+  (select count(*) = 0 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+   cross join lateral aclexplode(c.relacl) x
+   where n.nspname = 'public' and c.relacl is not null
+     and (c.relname like 'commission%' or c.relname like 'installation%'
+          or c.relname in ('app_settings', 'audit_logs', 'profiles'))
+     and x.grantee = 0));
+
+select pg_temp.assert_that(
   'anon holds nothing on any financial table',
   (select count(*) = 0 from information_schema.role_table_grants
    where grantee = 'anon' and table_schema = 'public'
@@ -157,6 +166,7 @@ on conflict (key) do nothing;
 revoke all on table public.app_settings from authenticated;
 grant select on table public.app_settings to authenticated;
 revoke all on table public.app_settings from anon;
+revoke all on table public.app_settings from public;
 
 do $$
 declare v_uid uuid; v_truncated boolean := false;
@@ -176,6 +186,13 @@ begin
     not v_truncated);
 end;
 $$;
+
+select pg_temp.assert_that(
+  'the privileged write path survives the revoke',
+  (select p.prosecdef and coalesce(array_to_string(p.proconfig, ','), '') like '%search_path=%'
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'save_import_settings'),
+  'save_import_settings must stay SECURITY DEFINER with a pinned search_path');
 
 select pg_temp.assert_that(
   'app_settings ends SELECT-only for authenticated',
