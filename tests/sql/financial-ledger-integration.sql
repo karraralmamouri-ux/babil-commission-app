@@ -264,6 +264,45 @@ select pg_temp.assert_that('every correction kept its audit entry',
   (select count(*)::text from public.audit_logs
    where action in ('financial.corrected', 'financial.reversed')));
 
+-- ---------------------------------------------------------------------------
+-- 8. الترحيل من ما قبل الدفتر — الانحدار الذي كشفته مراجعة المرحلة التالية.
+--
+-- سجل دُفع له 3000 قبل وجود الدفتر، ثم زيادة 2000. الوضع الفعلي يجب أن يصير
+-- 5000. قبل الإصلاح كان يصير 2000، فيُنقِص الوضع ويفتح باب دفع زائد من جديد.
+-- ---------------------------------------------------------------------------
+
+insert into public.commission_rows (id, month_id, zone, name, p35, p45, p65, custom_tier, paid, created_by)
+values ('bbbb1111-0000-0000-0000-000000000003', 'aaaa1111-0000-0000-0000-000000000001',
+  'old', 'Pre Ledger Agent', 10, 0, 0, 't1', 3000, '11111111-1111-1111-1111-111111111111');
+
+select pg_temp.assert_that('a pre-ledger row starts with no ledger entry',
+  (select count(*) = 0 from public.financial_ledger
+   where source_id = 'bbbb1111-0000-0000-0000-000000000003'));
+
+select pg_temp.act_as('accountant');
+select public.record_commission_payment(
+  'bbbb1111-0000-0000-0000-000000000003'::uuid,
+  pg_temp.row_stamp('bbbb1111-0000-0000-0000-000000000003'),
+  5000, current_date, '00000000-0000-0000-0000-00000000e020'::uuid);
+
+select pg_temp.assert_that('the amount paid before the ledger existed is carried forward',
+  public.effective_paid_amount('commission', 'bbbb1111-0000-0000-0000-000000000003'::uuid, 5000) = 5000,
+  'losing it would understate the position and reopen the overpayment hole');
+
+select pg_temp.assert_that('the carried-forward amount is labelled as a backfill',
+  (select count(*) = 1 from public.financial_ledger
+   where source_id = 'bbbb1111-0000-0000-0000-000000000003'
+     and source_origin = 'LEGACY_BACKFILL' and amount = 3000));
+
+select pg_temp.assert_that('the new increment is recorded separately at its own size',
+  (select count(*) = 1 from public.financial_ledger
+   where source_id = 'bbbb1111-0000-0000-0000-000000000003'
+     and source_origin = 'PAYMENT_PATH' and amount = 2000));
+
+select pg_temp.assert_that('a later top-up on that row still cannot exceed the due',
+  (select count(*) = 0 from public.financial_ledger
+   where source_id = 'bbbb1111-0000-0000-0000-000000000003' and amount > 10000));
+
 select check_name, result from public.integration_results order by check_name;
 drop table public.integration_results;
 
