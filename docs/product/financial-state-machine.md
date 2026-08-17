@@ -1,6 +1,8 @@
 # Financial State Machine
 
-Tags: **FACT** / **INFERENCE** / **RECOMMENDATION** / **OPEN DECISION**.
+Tags: **FACT** / **INFERENCE** / **RECOMMENDATION** / **APPROVED** / **OPEN DECISION**.
+
+Architecture review closed 2026-08-16. Sections 7.1 and 8 are approved policy.
 
 ---
 
@@ -146,4 +148,67 @@ Draft → SaaS Imported → Matching → Under Review → Finance Review
 
 A closed cycle owns an immutable snapshot: imported data reference, matching decisions,
 eligibility set, batches, exceptions, configuration versions used, tier snapshots.
-Reopening is an audited event, never a silent state change.
+
+### 7.1 Reopening a closed cycle — **APPROVED POLICY (D-09)**
+
+The answer depends on one question only: **has money moved?**
+
+```
+              closed cycle
+                    │
+      ┌─────────────┴──────────────┐
+      │                            │
+ no posted or paid           has posted or paid
+  transactions                 transactions
+      │                            │
+      ▼                            ▼
+   REOPEN allowed            REOPEN of the money is FORBIDDEN
+   requires capability       history is immutable
+   + reason                  use Correction / Adjustment / Reversal
+   + actor                   posted rows are never rewritten
+   + timestamp
+   + audit event
+```
+
+**Rule 1 — clean cycle.** A cycle closed with nothing posted or paid may be reopened by an
+authorised capability (`cycle.reopen`). Reason, actor and timestamp are mandatory and the
+reopen is itself an audit event.
+
+**Rule 2 — cycle with money.** A cycle containing posted or paid transactions is
+**immutable**. It is never silently rewritten. Anything that must change is expressed as a
+new financial event — correction, adjustment or reversal — which references the original and
+leaves it intact.
+
+**The distinction is the whole policy: reopening is about the cycle's workflow state,
+never about editing money that has already moved.**
+
+---
+
+## 8. Financial corrections — **APPROVED FOUNDATION (R-03)**
+
+Promoted at review from "gap" to **critical implementation foundation**. It must land before
+payment workflows expand, not after.
+
+**Principle.** The system must always offer a legal, audited correction path. Direct database
+editing must never be the normal correction mechanism — if operators have to edit rows by
+hand, every safeguard in §4 becomes theatre.
+
+**Worked example — payment sent to the wrong agent:**
+
+| # | Ledger row | Kind | Retained |
+|---|---|---|---|
+| 1 | original payment to Agent A | `PAYMENT` | **yes, untouched** |
+| 2 | reversal of row 1 | `REVERSAL`, `reverses_ledger_id = 1` | yes |
+| 3 | payment to Agent B | `PAYMENT` | yes |
+
+All three rows stay in the ledger permanently. Row 1 is never deleted, never edited, never
+hidden. Net position is derived, not stored by overwriting.
+
+**Transaction types** (`financial-domain-model-vnext.md` §2.5):
+
+`HISTORICAL_PAYMENT` · `PAYMENT` · `ADJUSTMENT` · `CORRECTION` · `REVERSAL`
+
+Every row keeps its origin, its actor, its reason and its `request_id`.
+
+**Capabilities.** `payment.reverse` is distinct from `payment.execute` — the ability to send
+money and the ability to unwind it are different authorities.

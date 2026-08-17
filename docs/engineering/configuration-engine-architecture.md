@@ -130,9 +130,15 @@ Seeding V1 with `tier_basis = 'activation_events'` records today's truth honestl
 to `unique_active_users` becomes V2 with its own `effective_from`, leaving closed months
 untouched.
 
-**OPEN DECISION D-03.** The formal definition of "active user". The code does not establish
-one — there is no `enabled`, `status` or `expiration` field anywhere in the current import.
-It must not be invented here.
+**APPROVED.** The intended tier basis is **unique active users**, and tier population is
+`COUNT(DISTINCT subscriber)` while commissionable activations are counted per event
+(**D-02**).
+
+**OPEN — D-03.** The formal definition of *active* remains pending business confirmation.
+The code establishes none — there is no `enabled`, `status` or `expiration` field anywhere in
+the current import. Potential evidence once raw SaaS storage lands: `enabled`, `expiration` /
+`new_expiration`, service or account state. **It must not be invented here.** V1 records
+`activation_events` honestly; V2 waits.
 
 ---
 

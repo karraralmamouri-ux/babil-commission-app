@@ -71,16 +71,28 @@ Every step is additive; the 5,693 rows are never rewritten.
 | 2 | Backfill `effective_agent_id` from `reseller` via the new `agents`/`agent_aliases` | **low** — `reseller` is already the canonical name from the sheet |
 | 3 | Seed fee scheme V1 from the current constants | none — mechanical |
 | 4 | Create one enrolment per subscriber, `scheme_version_id = V1`, `entry_stage_code = current_stage` | **the critical step** |
-| 5 | Copy 17,117 `installation_payment_history` rows into the ledger with `kind = 'historical'` | none — additive, verify count |
+| 5 | Present the 17,117 rows as `HISTORICAL_PAYMENT` — in place via a compatibility layer, or copied | none — additive, verify count |
 | 6 | Derive current state from the ledger and compare with the stored state | **verification gate** |
 | 7 | Only after 6 reconciles exactly: raise entitlements for the first operational cycle | — |
 
 **Step 6 is the gate.** If ledger-derived state does not reproduce
 `5,693 / 2,196 / 3,497 / 19` exactly, stop. Do not proceed to step 7.
 
-**The 5 subscribers with no stage and the 14 with a financial mismatch must remain
-unresolved and unpayable after migration.** They are the canary: if migration "fixes" them,
-migration is wrong.
+### 4.1 The historical exceptions — APPROVED at review
+
+These 34 subscribers are the migration's canary. If any phase "fixes" one of them without an
+audited business correction, that phase has a bug.
+
+| Group | Count | Approved treatment |
+|---|---|---|
+| Financial mismatch (`Total − Received ≠ Remaining`) | 14 | Stay **unresolved** and **blocked**. No automatic entitlement or payment. Clearing one requires an audited correction. |
+| Blank `Remaining`, real subscriber | 5 | Stay **unresolved** and **blocked**. `Remaining` and stage are **never** inferred or guessed. |
+| Balanced DONE with no P4 detail | 15 | Stay **financially resolved** on the accepted historical balance. P4 details and dates are **never synthesised**. The flag `historical_payment_detail_incomplete` is retained so the gap stays visible to audit. |
+
+The first two groups are unpayable by construction — the CHECK constraints in
+`finance-payment-controls.md` §1 already guarantee it. The third group is payable-by-nothing
+because DONE has no next instalment, so no constraint is needed; what matters is that the
+flag survives migration.
 
 ---
 
@@ -90,10 +102,11 @@ Run before and after every migration step:
 
 ```sql
 select count(*) from subscribers;                        -- 5693
-select count(*) from installation_payment_ledger
-  where kind = 'historical';                             -- 17117
-select count(*) from installation_payment_ledger
-  where kind = 'historical' and occurred_on is null;     -- 0
+select count(*) from <ledger>
+  where txn_type = 'HISTORICAL_PAYMENT';                 -- 17117
+select count(*) from <ledger>
+  where txn_type = 'HISTORICAL_PAYMENT'
+    and occurred_on is null;                             -- 0
 select current_stage, count(*) from ... group by 1;      -- 3492/774/347/385/690/5
 select count(*) where payment_eligible;                  -- 2196
 select count(*) where resolution = 'unresolved';         -- 19

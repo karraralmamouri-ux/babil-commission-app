@@ -1,12 +1,16 @@
 # Risks and Open Decisions
 
+**Architecture review closed on 2026-08-16.** Nine of the ten open decisions are now
+approved business rules and appear in §2. One remains open (**D-03**) and is the only
+business input still blocking the commission engine.
+
 ---
 
 ## 1. Risks found in the current system
 
 Ordered by exposure.
 
-### R-01 — Commission tier basis is client-supplied · **HIGH**
+### R-01 — Commission tier basis is client-supplied · **CRITICAL**
 
 **FACT.** `publish_commission_month` accepts `tier_basis_qty` from the browser and only
 checks that it is not *below* the row's own quantity, then validates the applied tier against
@@ -16,8 +20,13 @@ it (`20260815113000` lines 195–256). The basis is never recomputed server-side
 4,000 → 6,000 IQD per P35 activation on the shipped defaults. The database cannot prove a
 published month's tier was correct.
 
-**Fix.** Recompute the pooled basis from the payload rows grouped by `tier_group_id` and
-reject a mismatch. The data is already present; only the check is missing.
+**Approved at review: the client-supplied basis must not remain the financial source of
+truth.** The server/database derives or verifies the authoritative basis from trusted
+persisted data. The browser may show a projected tier; it may never determine it.
+
+**Fix.** Short term (Phase 0): recompute the pooled basis from the payload rows grouped by
+`tier_group_id` and reject a mismatch — the data is already present, only the check is
+missing. Long term (Phase 8): derive the basis from persisted subscriber-level data.
 
 ### R-02 — The stage table is defined twice · **MEDIUM**
 
@@ -29,7 +38,7 @@ than a clean failure.
 
 **Fix.** Single published scheme version; the SQL function becomes a lookup.
 
-### R-03 — No reversal path · **MEDIUM-HIGH**
+### R-03 — No reversal path · **CRITICAL — foundation, not a later feature**
 
 **FACT.** `protect_settled_installation_entitlement` and
 `unique (entitlement_id)` correctly prevent mutation of settled payments. No reversal or
@@ -39,7 +48,16 @@ adjustment mechanism exists.
 direct database edit — precisely what the safeguards forbid, which means it would be done
 outside audit.
 
-**Fix.** Ledger with `kind = 'reversal'` and `reverses_ledger_id`.
+**Approved at review: promoted to a critical implementation foundation.** The system must
+offer a legal, audited correction path. Direct database editing must never be the normal
+correction mechanism.
+
+A wrong-agent payment resolves as three ledger rows, all retained:
+original payment · reversal · correct replacement payment. The original posted transaction
+is never deleted or overwritten.
+
+**Fix.** Ledger with transaction types and `reverses_ledger_id`. **Sequencing rule: this
+must land before payment workflows are expanded, not after.**
 
 ### R-04 — Raw activation data is never stored · **MEDIUM**
 
@@ -57,8 +75,12 @@ identity is impossible.
 (`index.html:697`), counting it as `duplicateIds`.
 
 **Impact.** This makes the tier basis unique-per-subscriber *by accident*, which happens to
-match the desired tier rule — but it also means a second activation earns **no commission at
-all**. Whether that is correct is **D-02**.
+match the approved tier-population rule — but it also means a second activation earns **no
+commission at all**, which **contradicts approved decision D-02**.
+
+**Status: formally incompatible legacy behaviour.** Must be replaced in Commission Engine
+vNext (Phase 8) with event-level deduplication keyed on activation identity, never on the
+subscriber.
 
 ### R-06 — Permission model cannot express the requirement · **MEDIUM**
 
@@ -97,28 +119,92 @@ three times during recent releases.
 
 ---
 
-## 2. Open decisions — business input required
+## 2. Approved decisions
 
-| # | Decision | Why it cannot be decided from code |
+Resolved at architecture review, 2026-08-16. These are business rules now, not questions.
+
+### D-02 — Repeated activations · **APPROVED**
+
+> A subscriber counts **once** toward tier population. The same subscriber **may** earn
+> commission on **multiple distinct qualifying activation events** in the same cycle.
+
+Two separate measures, never conflated:
+
+| Measure | Counts | Deduplicated by |
 |---|---|---|
-| **D-01** | Threshold logic separating NEW from NEEDS_REVIEW when the registry has no hit | No engine exists; `activations_count` alone is explicitly insufficient in both directions |
-| **D-02** | Should a subscriber's 2nd/3rd activation in one month earn commission? | Current code silently says no by dropping it. Requirement §24 implies yes. **These conflict.** |
-| **D-03** | Formal definition of "active user" for tier population | No `enabled`, `status` or expiry field exists in the current import. Must not be invented |
-| **D-04** | Treatment of the 14 financial-mismatch subscribers | They are frozen as unresolved. Someone must decide whether to correct, write off, or investigate |
-| **D-05** | Treatment of the 5 blank-Remaining subscribers | Same |
-| **D-06** | Do the 15 incomplete-detail DONE subscribers need a back-filled P4 record? | They are accounting-balanced but missing detail |
-| **D-07** | Is NEW ZONE tier really per-FDT, or per-FDT-owner? | Code says per-FDT row. Whether that matches intent is unconfirmed |
-| **D-08** | Who may reverse a payment, and within what window? | No reversal exists yet |
-| **D-09** | Can a closed cycle be reopened, by whom, and what happens to posted payments? | No cycle close exists yet |
-| **D-10** | Does Odoo own invoice identity, or does Babil issue and Odoo mirror? | Determines whether `external_invoice_id` is authoritative or a reference |
+| **Tier population** | `COUNT(DISTINCT active subscriber identity)` | subscriber |
+| **Commissionable activations** | every distinct qualifying activation event | **event identity** |
 
-**D-02 is the one to resolve first.** It is the only place where the written requirement and
-the shipped behaviour actively contradict each other, and it changes how much money agents
-are owed.
+Worked example — subscriber A with activation events X and Y:
+tier contribution **1**, commissionable activations **2**. If event X arrives twice through a
+duplicate import, X counts **once** — that is import deduplication, not business
+deduplication.
+
+**Consequence for the current code.** `seenIds` (`index.html:697`) drops the second
+activation of a subscriber within a file, so event Y earns nothing. This is now formally
+**incompatible legacy behaviour** and must be replaced in Commission Engine vNext. It is
+recorded as **R-05**.
+
+**Event identity.** Deduplication must key on a stable *activation* identity — SaaS
+activation id, or `transaction_id`, or the safest composite the export supports
+(`saas_user_id + activated_at + profile_name`). It must never key on the subscriber.
+
+### D-04 — 14 financial-mismatch subscribers · **APPROVED**
+
+Remain **unresolved** and **blocked**. No automatic entitlement, no automatic payment.
+Clearing one requires an audited correction.
+
+### D-05 — 5 subscribers with blank Remaining · **APPROVED**
+
+Remain **unresolved** and **blocked**. `Remaining` and stage are **never** inferred or
+guessed.
+
+### D-06 — 15 balanced subscribers with incomplete P4 detail · **APPROVED**
+
+Remain **financially resolved** on the accepted historical balance. Missing P4 payment
+details and dates are **never synthesised**. The flag
+`historical_payment_detail_incomplete` is retained so the gap stays visible to audit.
+
+### D-08 / D-09 — Reversal authority and cycle reopening · **APPROVED**
+
+See §4 of `../product/financial-state-machine.md`. A closed cycle with no posted or paid
+transactions may be reopened by an authorised capability with reason, actor, timestamp and
+audit event. A closed cycle containing posted or paid transactions is **immutable**;
+change happens through correction, adjustment or reversal.
+
+### D-01, D-07, D-10 — deferred, not blocking
+
+Still unanswered but they block nothing in phases 0–5:
+
+| # | Decision | Needed by |
+|---|---|---|
+| D-01 | NEW vs NEEDS_REVIEW threshold when the registry has no hit | Phase 3 |
+| D-07 | Is NEW ZONE tier per-FDT or per-FDT-owner? | Phase 8 |
+| D-10 | Does Odoo own invoice identity, or mirror Babil's? | Phase 10 |
 
 ---
 
-## 3. Hard scenarios
+## 3. The one decision still open
+
+### D-03 — Definition of "active user" · **OPEN**
+
+**The intended tier basis is UNIQUE ACTIVE USERS.** That much is approved. What remains
+undecided is what makes a user *active*.
+
+**FACT.** The current import carries no such field. There is no `enabled`, no account state,
+no expiry in the columns `calculateRawImport` reads. The formula cannot be derived from this
+repository.
+
+Potential evidence once raw SaaS storage exists (Phase 2): `enabled`, `expiration` /
+`new_expiration`, service or account state.
+
+**This must not be invented.** Until it is confirmed, commission scheme V1 records the honest
+current basis (`activation_events`) and V2 waits. Phase 8 is blocked on this and on nothing
+else.
+
+---
+
+## 4. Hard scenarios
 
 For each: **source of truth · what is mutable · who may change it · what blocks payment ·
 what is audited · what stays immutable.**
@@ -140,9 +226,9 @@ what is audited · what stays immutable.**
 | S-13 | Partial payment | Ledger holds each posting; stage closes only when fully paid. |
 | S-14 | Payment then hold | Payments stand; future stages blocked. Release resumes at the next stage. |
 | S-15 | Whole-agent hold | Hold at agent scope blocks all its subscribers' payments; erases nothing. |
-| S-16 | Incorrect payment | Reversal row, never a delete. `payment.reverse`. Audited. |
-| S-17 | Correction after cycle close | Requires reopen (audited) or a correction posted to the next open cycle. **D-09.** |
-| S-18 | Reopening a closed cycle | Audited event; snapshot retained; prior batches remain posted. **D-09.** |
+| S-16 | Incorrect payment | **APPROVED (R-03):** original `PAYMENT` + `REVERSAL` + replacement `PAYMENT`, all three retained. Never a delete or an edit. `payment.reverse`. Audited. |
+| S-17 | Correction after cycle close | **APPROVED (D-09):** if the cycle has no posted/paid money, reopen with capability + reason + actor + timestamp + audit. If it has, the money is immutable — use Correction / Adjustment / Reversal. |
+| S-18 | Reopening a closed cycle | **APPROVED (D-09):** allowed only for a cycle with no posted or paid transactions. Snapshot retained; the reopen is itself an audit event. |
 | S-19 | Incomplete upload | Batch stays `draft`; nothing derived until confirm. |
 | S-20 | Same file, different name | `file_checksum` unique per (domain, period). **R-09** — hook exists, unused. |
 | S-21 | Overlapping activation uploads | Raw rows deduplicated by natural key; dispositions make the overlap visible. |
@@ -151,5 +237,5 @@ what is audited · what stays immutable.**
 | S-24 | SaaS vs Odoo invoice conflict | Odoo is the accounting authority; SaaS `transaction_id` is never promoted to an invoice id. Conflict blocks payment and is queued. |
 | S-25 | Configuration change mid-cycle | Published versions are immutable; a new version's `effective_from` decides. In-flight entitlements keep their `scheme_version_id`. |
 | S-26 | Commission tier changes during an open cycle | Open cycle shows a projected tier; close persists the final snapshot. Closed months already keep their own `tiers` — **FACT**, this part works today. |
-| S-27 | One subscriber, several activation events | Counts **once** toward tier population. Commissionable activations counted separately — **D-02.** |
+| S-27 | One subscriber, several activation events | **APPROVED (D-02):** counts **once** toward tier population; **each qualifying event is commissionable**. Deduplicate on activation identity, never on the subscriber. |
 | S-28 | Active-user definition changes | New commission scheme version with its own `effective_from`. Closed snapshots unaffected. |

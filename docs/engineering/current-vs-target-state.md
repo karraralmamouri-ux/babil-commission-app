@@ -112,8 +112,8 @@ Evidence is cited from this repository at `main` @ `94b1873`.
 | **Current** | Two tables, no reversal. `installation_payments` unique per entitlement; settled rows frozen by trigger. |
 | **Target** | One ledger with `kind` and `reverses_ledger_id`. |
 | **Gap** | **No legal correction path exists** (**R-03**). |
-| **Risk** | **High** — a wrong payment forces an out-of-audit database edit. |
-| **Migration** | Phase 5. |
+| **Risk** | **Critical** — a wrong payment forces an out-of-audit database edit. |
+| **Migration** | **Phase 0b — promoted at review to a foundation that must land before payment workflows expand.** Typed transactions (`HISTORICAL_PAYMENT`/`PAYMENT`/`ADJUSTMENT`/`CORRECTION`/`REVERSAL`); physical table consolidation optional, compatibility layer preferred. |
 
 ## Commission tier calculation
 
@@ -122,8 +122,8 @@ Evidence is cited from this repository at `main` @ `94b1873`.
 | **Current** | Basis = `p35+p45+p65` (activation counts), deduplicated by `id` within one file. Scope: **agent** for OLD ZONE (`tierGroupId`/`groupTotals`), **per-FDT** for NEW ZONE. Basis is **client-supplied**; the server validates the tier against it but never recomputes it. Tiers are snapshotted per month — that part is correct. |
 | **Target** | Basis = `COUNT(DISTINCT active subscriber)` in scope; commissionable activations counted separately; both frozen in `commission_cycle_snapshots`. |
 | **Gap** | Wrong basis; repeat activations dropped rather than paid; server cannot prove the tier. |
-| **Risk** | **Highest** (**R-01**, **R-05**). |
-| **Migration** | Phase 0 for the server-side check; Phase 8 for the basis change, after **D-02** and **D-03**. |
+| **Risk** | **Highest** (**R-01** critical, **R-05**). |
+| **Migration** | Phase 0a: server-side basis check (**approved as a critical integrity requirement**). Phase 8: unique-active-user basis and event-level commissionable activations per **approved D-02** — waits on **D-03** only. |
 
 ## Configuration
 
@@ -141,7 +141,7 @@ Evidence is cited from this repository at `main` @ `94b1873`.
 |---|---|
 | **Current** | 4 roles × 6 booleans, hardcoded in `ROLE_PERMISSIONS` **and** in `profiles_role_check`. Server-side enforcement is real and works. |
 | **Target** | Capabilities + role templates + per-user overrides + scopes. |
-| **Gap** | No granularity, no overrides, no scoping (**R-06**). |
+| **Gap** | No granularity, no overrides, no scoping, **and no explainability** (**R-06**). |
 | **Risk** | Medium. |
 | **Migration** | Phase 7, starting with a behaviour-preserving shim. |
 
@@ -163,7 +163,7 @@ Evidence is cited from this repository at `main` @ `94b1873`.
 | **Target** | Full lifecycle with an immutable close snapshot for both domains. |
 | **Gap** | Installation has none; commission's is two states. |
 | **Risk** | Medium. |
-| **Migration** | Phase 6. Depends on **D-09**. |
+| **Migration** | Phase 6. **D-09 approved:** reopen only when no posted or paid money exists; otherwise correction/adjustment/reversal. |
 
 ## Archive
 

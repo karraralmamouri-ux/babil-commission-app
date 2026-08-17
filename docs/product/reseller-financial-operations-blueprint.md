@@ -1,6 +1,6 @@
 # Reseller Financial Operations — Architecture Blueprint
 
-Status: **architecture freeze proposal, not implemented.**
+Status: **architecture frozen. Review closed 2026-08-16. Not implemented.**
 Repository state inspected: `main` @ `94b1873`.
 Every claim below is tagged.
 
@@ -9,7 +9,8 @@ Every claim below is tagged.
 | **FACT** | Read directly from this repository or the production database. |
 | **INFERENCE** | Derived from evidence, but not stated anywhere explicitly. |
 | **RECOMMENDATION** | Proposed target design. |
-| **OPEN DECISION** | Business input required; not decidable from the code. |
+| **APPROVED** | Resolved at architecture review, 2026-08-16. A business rule now. |
+| **OPEN DECISION** | Business input still required; not decidable from the code. |
 
 ---
 
@@ -161,6 +162,27 @@ Nothing enforces that they keep agreeing. See `risk-and-open-decisions.md` R-02.
 Draft → Review → Published lifecycle. Published financial configuration is never edited;
 change creates a new version. Existing enrolments keep
 `scheme_version_id_at_enrollment`. See `configuration-engine-architecture.md`.
+
+---
+
+## 6.5 What the architecture review settled
+
+**APPROVED.** Nine decisions closed on 2026-08-16; see
+`../engineering/risk-and-open-decisions.md` §2 for each.
+
+| Area | Rule |
+|---|---|
+| Repeated activations (**D-02**) | A subscriber counts **once** toward tier population; **each** qualifying activation event is commissionable. Deduplicate on activation identity, never on the subscriber. |
+| Tier basis (**R-01**) | Must be server-derived from trusted persisted data. The browser may project; it may never decide. Critical integrity requirement. |
+| Financial corrections (**R-03**) | Promoted to a **critical foundation**, scheduled before payment expansion. Original + reversal + replacement, all retained. Direct database editing is never the normal correction path. |
+| Historical exceptions (**D-04/05/06**) | 14 mismatch and 5 blank-Remaining stay unresolved and blocked; 15 incomplete-detail stay resolved with the flag retained. Nothing is inferred or synthesised. |
+| Cycle reopening (**D-09**) | No posted or paid money → reopen with capability, reason, actor, timestamp, audit. Money already moved → immutable; use correction, adjustment or reversal. |
+| Ledger (**§6**) | One coherent ledger *concept* with typed transactions. Physical separation may persist through migration; a compatibility layer is preferred over a big-bang rewrite. |
+| Permissions | Role templates + user overrides + future scopes, and every effective permission must be **explainable** — granted or denied, and by which rule. |
+
+**Still open: one.** **D-03** — the formal definition of "active user". The tier basis is
+approved as unique active users; the activity test itself awaits business confirmation and
+must not be invented.
 
 ---
 

@@ -141,16 +141,33 @@ installation_entitlements        (exists) + scheme_version_id, enrollment_id,
 
 installation_payment_ledger      id, subscriber_id, entitlement_id,
                                  stage_code, amount, direction ('debit'|'credit'),
-                                 kind ('historical'|'payment'|'reversal'|'adjustment'),
-                                 agent_id_at_payment, batch_id,
+                                 txn_type, source_origin,
+                                 agent_id_at_payment, batch_id, cycle_id,
                                  occurred_on, posted_at, posted_by,
-                                 request_id, reverses_ledger_id
+                                 reason, request_id, reverses_ledger_id
 ```
 
-**Key design point.** `installation_payment_history` (17,117 historical rows) and
-`installation_payments` (operational) become **one ledger** distinguished by `kind`. Current
-state is derived; history is permanent. A reversal is a new row pointing at the row it
-reverses — never a delete.
+**Transaction types — APPROVED at review.**
+
+| `txn_type` | Meaning | Typical origin |
+|---|---|---|
+| `HISTORICAL_PAYMENT` | an instalment paid before cutover | Excel baseline |
+| `PAYMENT` | an operational disbursement | payment batch |
+| `ADJUSTMENT` | a deliberate change in the amount owed | finance |
+| `CORRECTION` | a fix to a mis-recorded attribute | finance |
+| `REVERSAL` | undoes one specific prior row | finance, with `reverses_ledger_id` |
+
+`source_origin` records provenance (`excel_baseline`, `batch:<id>`, `correction:<id>`).
+
+**Key design point.** Current state is derived from the ledger; history is permanent. A
+reversal is a new row pointing at the row it reverses — **never a delete, never an edit**.
+
+**Physical migration — APPROVED to remain compatible.** `installation_payment_history`
+(17,117 rows) and `installation_payments` may stay **physically separate during migration**.
+What the architecture requires is one *coherent ledger concept*, not one table on day one. A
+view or compatibility layer presenting both under the vocabulary above satisfies it, and is
+safer than a big-bang rewrite. Physical consolidation, if it happens at all, comes only after
+the reconciliation gate proves derived state matches stored state exactly.
 
 ### 2.6 Holds, invoices, cycles, batches
 
@@ -202,13 +219,39 @@ subscriber is counted once. That happens to match "unique users" for tier popula
 it also means the second and third activations **earn no commission at all**, which does not
 match the requirement that commissionable activations may be paid per event.
 
-**RECOMMENDATION.** Separate the two explicitly:
+**APPROVED (D-02).** The two measures are separate and must never be conflated:
 
-- `active_unique_users_snapshot` = `COUNT(DISTINCT subscriber)` in scope → drives tier
-- `commissionable_activations` = qualifying events → drives payout
+- `active_unique_users_snapshot` = `COUNT(DISTINCT subscriber)` in scope → **drives the tier**
+- `commissionable_activations` = every distinct qualifying activation event → **drives payout**
 
-Both frozen into `commission_cycle_snapshots` at close. **OPEN DECISION D-02:** whether
-repeat activations should be paid; the current code silently says no.
+A subscriber with two qualifying events in one cycle contributes **1** to tier population and
+**2** commissionable activations.
+
+```
+commission_activation_facts   id, cycle_id, subscriber_id, agent_id_at_activation,
+                              raw_event_id, activation_identity,
+                              package_code, commission_bucket,
+                              is_qualifying, counted_for_tier, counted_for_payout
+                              unique (cycle_id, activation_identity)
+```
+
+**`activation_identity` is an event key, never a subscriber key.** Derived from the SaaS
+activation id, or `transaction_id`, or the safest composite the export supports
+(`saas_user_id + activated_at + profile_name`). The unique constraint deduplicates a
+*re-imported event*; it must never deduplicate a *second genuine activation*.
+
+Tier population is then `count(distinct subscriber_id) where counted_for_tier`, and payout is
+driven by `count(*) where counted_for_payout` — one table, two questions, no ambiguity.
+
+Both figures are frozen into `commission_cycle_snapshots` at close.
+
+**Legacy note.** `seenIds` in `calculateRawImport` deduplicates by subscriber and therefore
+drops the second activation entirely. This is incompatible with the approved rule and is
+replaced in Phase 8 (**R-05**).
+
+**OPEN — D-03:** the definition of "active" in `active_unique_users_snapshot`. The tier basis
+is approved as unique active users; the activity test itself is still pending business
+confirmation and must not be invented.
 
 ### 2.8 Permissions and audit
 

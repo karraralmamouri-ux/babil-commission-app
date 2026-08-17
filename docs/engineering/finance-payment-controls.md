@@ -37,7 +37,7 @@ Never `revoke` a list of verbs.
 | Gap | Consequence |
 |---|---|
 | No hold model | nothing can pause a subscriber without deleting or editing financial state |
-| No reversal path | a wrong payment can only be corrected by mutating history, which the triggers correctly forbid — so today there is **no** legal correction path |
+| No reversal path | **CRITICAL, approved as a Phase 0 foundation.** A wrong payment can only be corrected by mutating history, which the triggers correctly forbid — so today there is **no** legal correction path |
 | No payment batch | payments are one-at-a-time; no reviewed set, no batch total |
 | No cycle close | nothing freezes a period |
 | Tier basis client-supplied | see §4 |
@@ -97,9 +97,19 @@ to T3. Using the shipped default tiers that is 4000 → 6000 IQD per P35 activat
 This requires an authenticated admin, so it is not an anonymous exploit. It is an integrity
 gap: **the database cannot currently prove a published month's tier was correct.**
 
-**RECOMMENDATION.** Recompute the pooled basis server-side from the rows in the same
-publish payload, grouped by `tier_group_id`, and reject any mismatch. The data needed is
-already in the payload; only the check is missing.
+**APPROVED at review.** The client-supplied basis must not remain the financial source of
+truth. The server or database derives or verifies the authoritative basis from trusted
+persisted data. The browser may display a projected tier; it must never determine it. This is
+a **critical integrity migration requirement**, not a nice-to-have.
+
+**Fix, in two steps.**
+
+- *Phase 0a* — recompute the pooled basis from the rows in the same publish payload, grouped
+  by `tier_group_id`, and reject a mismatch. The data is already there; only the check is
+  missing.
+- *Phase 8* — derive the basis from persisted subscriber-level facts
+  (`commission_activation_facts`), so the payload stops being an input to the calculation at
+  all.
 
 ---
 
@@ -120,7 +130,20 @@ already in the payload; only the check is missing.
 
 ## 6. Reversals
 
-**RECOMMENDATION.** A reversal is a new ledger row with `kind = 'reversal'` and
-`reverses_ledger_id` pointing at the original. The original is never modified or deleted.
-Requires `payment.reverse`, a mandatory reason, and full audit. Current state is recomputed
-from the ledger, so the subscriber returns to eligible for that stage automatically.
+**APPROVED — critical foundation, scheduled in Phase 0b.**
+
+A reversal is a new ledger row with `txn_type = 'REVERSAL'` and `reverses_ledger_id` pointing
+at the original. The original is never modified or deleted. Requires `payment.reverse`, a
+mandatory reason, and full audit. Current state is recomputed from the ledger, so the
+subscriber returns to eligible for that stage automatically.
+
+**Wrong-agent payment resolves as three retained rows:**
+
+| # | Row | `txn_type` |
+|---|---|---|
+| 1 | original payment to Agent A | `PAYMENT` |
+| 2 | reversal of row 1 | `REVERSAL` |
+| 3 | payment to Agent B | `PAYMENT` |
+
+**Direct database editing must never be the normal correction mechanism.** If operators have
+to edit rows by hand, every control in §1 becomes theatre.

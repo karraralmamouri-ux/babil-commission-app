@@ -133,6 +133,39 @@ survive the change.
 
 ---
 
+## 2.5 Explainability — **APPROVED REQUIREMENT**
+
+An effective permission must always be able to say **why** it is what it is. "Denied" with no
+reason is an administration and audit failure: nobody can tell whether it was intended.
+
+Every capability resolves to a verdict **and its source**:
+
+| Capability | Effective | Source |
+|---|---|---|
+| `payment.execute` | Granted | Finance role template |
+| `subscriber.correct_agent` | Granted | Explicit user grant — *"cycle cover, approved 2026-08-16"* |
+| `payment.reverse` | Denied | Explicit user denial — overrides the Finance template |
+| `cycle.close` | Denied | Not in any template, no grant |
+
+Resolution order, and the answer records which rule won:
+
+```
+1. explicit user denial     → Denied  (wins over everything)
+2. explicit user grant      → Granted
+3. role template            → Granted
+4. otherwise                → Denied ("not granted")
+```
+
+**RECOMMENDATION.** A function `explain_capability(user_id, capability)` returning
+`{effective, source, source_id, reason, granted_by, granted_at}`, surfaced on the user
+administration screen next to every capability. The same function answers the auditor's
+question — "who could have done this on that date" — without reconstructing it by hand.
+
+Scopes are explained the same way: a capability may be *granted but scoped*, and the screen
+must say so rather than showing a bare "Granted" that silently applies to two agents.
+
+---
+
 ## 3. Permission audit
 
 **RECOMMENDATION.** Every grant or revocation writes an audit row: actor, target user,

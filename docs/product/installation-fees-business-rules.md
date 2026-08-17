@@ -1,7 +1,9 @@
 # Installation Fees — Business Rules
 
 Companion to `reseller-financial-operations-blueprint.md`. Tags: **FACT** / **INFERENCE** /
-**RECOMMENDATION** / **OPEN DECISION**.
+**RECOMMENDATION** / **APPROVED** / **OPEN DECISION**.
+
+Architecture review closed 2026-08-16. Sections 2, 3 and 4 are approved business rules.
 
 ---
 
@@ -33,7 +35,7 @@ retroactively move a subscriber enrolled under V1.
 
 ## 2. Resolution and eligibility
 
-**FACT.** A row is `unresolved` when either:
+**FACT / APPROVED.** A row is `unresolved` when either:
 
 1. `Remaining` is blank or is not one of the five known values, or
 2. `total_amount − received_total ≠ remaining` (financial mismatch).
@@ -57,16 +59,22 @@ value (`fetchInstallationSubscribers` selects `payment_eligible`).
 
 ## 3. Incomplete payment detail
 
-**FACT.** 15 subscribers are `DONE` with no P4 payment recorded. They carry the warning
-`historical_payment_detail_incomplete`, remain `resolved`, and **no P4 event is invented**.
-If such a row also fails the accounting check, rule §2 governs and it becomes unresolved.
+**FACT, and APPROVED at review (D-06).** 15 subscribers are `DONE` with no P4 payment
+recorded. They carry the warning `historical_payment_detail_incomplete`, remain `resolved` on
+the accepted historical balance, and **no P4 event or date is ever synthesised**. The flag is
+retained permanently so the gap stays visible to audit. If such a row also fails the
+accounting check, rule §2 governs and it becomes unresolved.
+
+**APPROVED (D-04, D-05).** The 14 financial-mismatch and 5 blank-`Remaining` subscribers
+remain **unresolved and blocked**. No automatic entitlement, no automatic payment, and
+`Remaining` is never inferred. Clearing one requires an audited correction.
 
 ---
 
 ## 4. Loan-3 — FINAL
 
-**OPEN DECISION (implementation), rule is FINAL (business).** Loan-3 does not exist anywhere
-in the current codebase — `grep` finds no reference. It is a forward requirement.
+**APPROVED and FINAL.** Loan-3 does not exist anywhere in the current codebase — `grep` finds
+no reference. It is a forward requirement, and the rule below is settled.
 
 Loan-3 is a **debt service**, not a qualifying activation:
 
@@ -113,8 +121,13 @@ show `Loan-3 + P-35000` → `activations_count = 2`. Conversely one raw event th
 **Outputs:** `NEW` · `EXISTING` · `NEEDS_REVIEW`.
 `NEEDS_REVIEW` must never auto-generate a financial entitlement.
 
-**OPEN DECISION D-01.** The exact threshold logic separating NEW from NEEDS_REVIEW when the
-registry has no hit. Must be versioned configuration, not code.
+**DEFERRED — D-01.** The exact threshold logic separating NEW from NEEDS_REVIEW when the
+registry has no hit. Not blocking today: rule 1 above (registry hit → EXISTING) is approved
+and covers every migrated subscriber. D-01 is needed by Phase 3 and must land as versioned
+configuration, not code.
+
+The only decision still blocking work is **D-03**, the definition of "active user"
+(`../engineering/risk-and-open-decisions.md` §3).
 
 ---
 

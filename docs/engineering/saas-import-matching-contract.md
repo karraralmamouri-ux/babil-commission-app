@@ -44,9 +44,9 @@ previews, server derives and decides.
    trace anywhere.
 3. **Within-file deduplication only.** `seenIds` resets per file. Cross-month identity does
    not exist.
-4. **Repeat activations are discarded.** The second activation of the same `id` in a month
-   is counted as a duplicate and dropped — it earns nothing. Whether that is intended is
-   **OPEN DECISION D-02**.
+4. **Repeat activations are discarded.** The second activation of the same `id` in a month is
+   counted as a duplicate and dropped — it earns nothing. **Approved decision D-02 says this
+   is wrong**: the event should be paid. Formally incompatible legacy behaviour (**R-05**).
 5. **Client-side derivation.** Bucket assignment and tier basis are computed in the browser
    and posted. The server re-checks the tier *given* the basis but never recomputes the basis
    itself.
@@ -91,6 +91,23 @@ unmatched_subscriber · needs_review
 
 The rule: **every raw row ends in exactly one disposition, and every disposition is
 reviewable in the UI.** No row disappears into a counter.
+
+### 3.2.1 Deduplication is event-level — APPROVED
+
+**The single most important correction to the current import.**
+
+| Deduplicate by | Purpose | Correct? |
+|---|---|---|
+| **activation identity** | the same event arriving twice through a re-import | **yes** |
+| subscriber identity | the same subscriber activating twice | **no — this is real business** |
+
+`activation_identity` comes from the SaaS activation id, or `transaction_id`, or the safest
+composite the export supports (`saas_user_id + activated_at + profile_name`).
+
+Consequences: subscriber A with events X and Y contributes **1** to tier population and
+**2** commissionable activations. If X is imported twice, X counts once.
+
+Today's `seenIds` does the opposite — it keys on the subscriber and silently drops Y.
 
 ### 3.3 Matching
 
