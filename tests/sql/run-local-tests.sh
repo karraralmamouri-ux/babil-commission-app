@@ -43,6 +43,16 @@ fi
 echo "$out4" | grep -E "\| (pass|FAIL)" || true
 passed=$((passed + $(echo "$out4" | grep -c "| pass")))
 
+echo "== financial write boundary =="
+out5=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q \
+        < tests/sql/financial-write-boundary.sql 2>&1)
+if echo "$out5" | grep -qE "FAILED:|ERROR"; then
+  echo "$out5" | grep -E "FAILED:|ERROR" || true
+  echo "WRITE BOUNDARY TESTS FAILED" >&2; exit 1
+fi
+echo "$out5" | grep -E "\| (pass|FAIL)" || true
+passed=$((passed + $(echo "$out5" | grep -c "| pass")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 
