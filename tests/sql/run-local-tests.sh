@@ -53,8 +53,18 @@ fi
 echo "$out5" | grep -E "\| (pass|FAIL)" || true
 passed=$((passed + $(echo "$out5" | grep -c "| pass")))
 
+echo "== financial correction =="
+out6=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q         < tests/sql/financial-correction.sql 2>&1)
+if echo "$out6" | grep -qE "FAILED:|ERROR"; then
+  echo "$out6" | grep -E "FAILED:|ERROR" || true
+  echo "FINANCIAL CORRECTION TESTS FAILED" >&2; exit 1
+fi
+echo "$out6" | grep -E "| (pass|FAIL)" || true
+passed=$((passed + $(echo "$out6" | grep -c "| pass")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
+bash tests/sql/financial-correction-concurrency.sh
 
 echo
 echo "local database assertions passed: $((passed + 1))"
