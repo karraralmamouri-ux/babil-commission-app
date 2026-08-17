@@ -87,3 +87,22 @@ Supabase
 ```
 
 لا تعتمد العملية المالية على زر حفظ عام أو على `localStorage`.
+
+## البنية المستهدفة — Reseller Financial Operations
+
+هذا الملف يصف البنية القائمة. التصميم المستهدف لتطوير المنتج إلى نظام عمليات مالية
+كامل للوكلاء موثَّق منفصلاً، ولم يُنفَّذ منه شيء بعد:
+
+- [المخطط العام](product/reseller-financial-operations-blueprint.md)
+- [قواعد أجور التنصيب](product/installation-fees-business-rules.md)
+- [آلة الحالات المالية](product/financial-state-machine.md)
+- [خريطة الشاشات المستهدفة](product/navigation-and-screen-map-vnext.md)
+- [نموذج النطاق المالي](engineering/financial-domain-model-vnext.md)
+- [محرك الإعدادات المُصدَّرة](engineering/configuration-engine-architecture.md)
+- [نموذج الصلاحيات والنطاقات](engineering/permission-and-scope-model.md)
+- [عقد الاستيراد والمطابقة](engineering/saas-import-matching-contract.md)
+- [ضوابط الصرف](engineering/finance-payment-controls.md)
+- [الترحيل التاريخي والقطع](engineering/historical-migration-and-cutover.md)
+- [خارطة الترحيل](engineering/migration-roadmap-vnext.md)
+- [الحالة الحالية مقابل المستهدفة](engineering/current-vs-target-state.md)
+- [المخاطر والقرارات المفتوحة](engineering/risk-and-open-decisions.md)
