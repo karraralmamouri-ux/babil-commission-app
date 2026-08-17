@@ -45,12 +45,12 @@ Evidence is cited from this repository at `main` @ `94b1873`.
 | **Risk** | Low — the data itself is safe. |
 | **Migration** | Phase 5, additive copy, reconciliation gate before proceeding. |
 
-## Raw SaaS events
+## Raw SaaS events and user state
 
 | | |
 |---|---|
-| **Current** | **None.** Parsed in the browser, discarded after aggregation. |
-| **Target** | `raw_saas_activation_events`, append-only, with `raw jsonb`. |
+| **Current** | **None persisted.** Parsed in the browser, discarded after aggregation. The evidence exists in the SaaS User Master (`enabled`, `expiration`, `parent_name`, `created_at`); the pipeline simply does not keep it. |
+| **Target** | `raw_saas_activation_events` **and** `raw_saas_user_snapshots`, both append-only, with `raw jsonb`. User state is snapshotted as-of, never one mutable row. |
 | **Gap** | Total. Nothing re-derivable; dropped rows leave no trace. |
 | **Risk** | **High** — everything downstream depends on it. |
 | **Migration** | Phase 2. Gate: derived aggregates match the browser's, exactly. |
@@ -120,7 +120,7 @@ Evidence is cited from this repository at `main` @ `94b1873`.
 | | |
 |---|---|
 | **Current** | Basis = `p35+p45+p65` (activation counts), deduplicated by `id` within one file. Scope: **agent** for OLD ZONE (`tierGroupId`/`groupTotals`), **per-FDT** for NEW ZONE. Basis is **client-supplied**; the server validates the tier against it but never recomputes it. Tiers are snapshotted per month — that part is correct. |
-| **Target** | Basis = `COUNT(DISTINCT active subscriber)` in scope; commissionable activations counted separately; both frozen in `commission_cycle_snapshots`. |
+| **Target** | Basis = `COUNT(DISTINCT active subscriber)` measured **as of the cycle's measurement date** against a user-state snapshot; commissionable activations counted separately per event; both frozen in `commission_cycle_snapshots` with the snapshot reference, so a closed month's tier can never move. |
 | **Gap** | Wrong basis; repeat activations dropped rather than paid; server cannot prove the tier. |
 | **Risk** | **Highest** (**R-01** critical, **R-05**). |
 | **Migration** | Phase 0a: server-side basis check (**approved as a critical integrity requirement**). Phase 8: unique-active-user basis and event-level commissionable activations per **approved D-02** — waits on **D-03** only. |

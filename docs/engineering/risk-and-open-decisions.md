@@ -186,21 +186,28 @@ Still unanswered but they block nothing in phases 0–5:
 
 ## 3. The one decision still open
 
-### D-03 — Definition of "active user" · **OPEN**
+### D-03 — Definition of "active user" · **OPEN, deferred to Phase 8**
 
 **The intended tier basis is UNIQUE ACTIVE USERS.** That much is approved. What remains
 undecided is what makes a user *active*.
 
-**FACT.** The current import carries no such field. There is no `enabled`, no account state,
-no expiry in the columns `calculateRawImport` reads. The formula cannot be derived from this
-repository.
+Three separate layers, deliberately kept apart — conflating them makes the decision look
+harder than it is:
 
-Potential evidence once raw SaaS storage exists (Phase 2): `enabled`, `expiration` /
-`new_expiration`, service or account state.
+| Layer | Status |
+|---|---|
+| **Source capability** | The SaaS User Master **does carry active-state evidence**: `enabled`, `expiration`, `parent_name`, `created_at`, and the SaaS user identity. The data exists at source. |
+| **Current application limitation** | **FACT.** The commission pipeline neither persists nor uses that evidence. `calculateRawImport` reads only `id`, `profile_name`, `parent` and `lastname`, and stores aggregates. Nothing in the database can answer "was this user active on that date". |
+| **Business open decision** | **D-03.** Which combination of those fields authoritatively constitutes ACTIVE. A business rule, and it **must not be invented.** |
 
-**This must not be invented.** Until it is confirmed, commission scheme V1 records the honest
-current basis (`activation_events`) and V2 waits. Phase 8 is blocked on this and on nothing
-else.
+**The gap is in the pipeline, not in SaaS.** Phase 2 — raw SaaS storage including user-state
+snapshots (`saas-import-matching-contract.md` §3.5) — closes the application limitation and
+makes the evidence available and historically queryable. D-03 then decides the formula.
+
+**Blocking scope — explicit.** D-03 blocks **Commission Engine vNext (Phase 8) final tier
+calculation** and nothing else. It does **not** block Phases 0–7. Foundational work proceeds
+without it: commission scheme V1 records the honest current basis (`activation_events`), and
+V2 with `unique_active_users` waits for the answer.
 
 ---
 

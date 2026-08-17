@@ -1,6 +1,9 @@
 # Reseller Financial Operations — Architecture Blueprint
 
-Status: **architecture frozen. Review closed 2026-08-16. Not implemented.**
+Status: **APPROVED — ARCHITECTURE FREEZE.** Review closed 2026-08-16. Not implemented.
+
+One decision remains deferred: **D-03**, the definition of "active user", which blocks
+Phase 8 final tier calculation and nothing else.
 Repository state inspected: `main` @ `94b1873`.
 Every claim below is tagged.
 
@@ -180,9 +183,19 @@ change creates a new version. Existing enrolments keep
 | Ledger (**§6**) | One coherent ledger *concept* with typed transactions. Physical separation may persist through migration; a compatibility layer is preferred over a big-bang rewrite. |
 | Permissions | Role templates + user overrides + future scopes, and every effective permission must be **explainable** — granted or denied, and by which rule. |
 
-**Still open: one.** **D-03** — the formal definition of "active user". The tier basis is
-approved as unique active users; the activity test itself awaits business confirmation and
-must not be invented.
+**Still open: one.** **D-03** — the formal definition of "active user".
+
+Three layers, kept apart:
+
+- **Source capability** — the SaaS User Master carries `enabled`, `expiration`,
+  `parent_name`, `created_at` and the user identity. The evidence exists at source.
+- **Current application limitation** — the commission pipeline neither persists nor uses it.
+  `calculateRawImport` reads only `id`, `profile_name`, `parent` and `lastname`.
+- **Business decision (D-03)** — which combination constitutes ACTIVE. **Must not be
+  invented.**
+
+The tier basis is approved as unique active users; only the activity test awaits
+confirmation. **D-03 blocks Phase 8 final tier calculation. It does not block Phases 0–7.**
 
 ---
 

@@ -44,9 +44,12 @@ Smallest model that satisfies the requirements. Names are suggestions.
 ### 2.1 Raw source — immutable
 
 ```
-raw_saas_users
-  id, saas_user_id (unique), username, subscriber_name,
-  created_at_saas, raw jsonb, imported_at, import_batch_id
+raw_saas_user_snapshots            -- as-of state, append-only, NOT one mutable row
+  id, import_batch_id, snapshot_at, source_file_id,
+  saas_user_id, username, subscriber_name,
+  enabled, expiration, parent_name, created_at_saas,
+  raw jsonb
+  unique (import_batch_id, saas_user_id)
 
 raw_saas_activation_events
   id, import_batch_id, saas_user_id, username,
@@ -61,6 +64,13 @@ raw_saas_activation_events
 **Rule.** Append-only. No `UPDATE`, no `DELETE`. `raw jsonb` preserves every column the
 export carried, including ones not yet modelled — so a later requirement never needs a
 re-export.
+
+**Why user state is snapshotted rather than kept current.** `enabled` and `expiration` change
+over time. A single mutable row would destroy the state a closed cycle's tier depended on the
+next time the file syncs. Unique-active-user calculation must ask *"was this user active on
+the measurement date"*, which only an as-of snapshot can answer. "Current state" is a view
+over the latest snapshot, never a stored row that gets overwritten. See
+`saas-import-matching-contract.md` §3.5.
 
 ### 2.2 Master
 
@@ -201,11 +211,27 @@ commission_tier_definitions  id, scheme_version_id, tier_key, min_qty, max_qty,
                              rate_p35, rate_p45, rate_p65
 
 commission_cycle_snapshots   id, cycle_id, scope_type, scope_id,
+                             user_snapshot_ref,       -- which as-of state was measured
+                             measurement_date,
                              active_unique_users_snapshot,
                              commissionable_activations,
                              tier_key_snapshot, tier_rule_version,
-                             calculated_at
+                             scheme_version_id,
+                             calculated_at, finalized_at
 ```
+
+**As-of requirement — REQUIRED.** Unique-active-user tier calculation must measure against the
+authoritative user-state snapshot for the cycle's measurement date. It must **never**
+recalculate a historical cycle from today's mutable subscriber state.
+
+A closed cycle preserves at minimum: the source user snapshot reference, the measurement
+date, `active_unique_users_snapshot`, `tier_key_snapshot`, `tier_rule_version`, the tier
+scope, and `calculated_at` / `finalized_at`.
+
+**The guarantee this buys:** a subscriber going inactive next month cannot change the tier of
+a month already closed. **FACT:** the commission archive already snapshots `tiers` per month,
+so the product has half of this today — what is missing is the population the tier was
+derived from.
 
 **FACT — why this matters.** Today the tier basis is `p35 + p45 + p65`
 (`index.html` `calc()`), i.e. **activation counts**, and the basis value is

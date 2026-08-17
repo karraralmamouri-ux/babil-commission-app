@@ -134,11 +134,17 @@ untouched.
 `COUNT(DISTINCT subscriber)` while commissionable activations are counted per event
 (**D-02**).
 
-**OPEN — D-03.** The formal definition of *active* remains pending business confirmation.
-The code establishes none — there is no `enabled`, `status` or `expiration` field anywhere in
-the current import. Potential evidence once raw SaaS storage lands: `enabled`, `expiration` /
-`new_expiration`, service or account state. **It must not be invented here.** V1 records
-`activation_events` honestly; V2 waits.
+**OPEN — D-03, deferred to Phase 8.** The formal definition of *active* remains pending
+business confirmation. Three layers, kept apart:
+
+- **Source capability** — the SaaS User Master carries `enabled`, `expiration`,
+  `parent_name`, `created_at` and the user identity. The evidence exists.
+- **Current application limitation** — the commission pipeline neither persists nor uses it;
+  `calculateRawImport` reads only `id`, `profile_name`, `parent`, `lastname`.
+- **Business decision** — which combination constitutes ACTIVE. **Must not be invented here.**
+
+V1 records `activation_events` honestly; V2 waits on the answer. D-03 blocks Phase 8 final
+tier calculation only — Phases 0–7 proceed without it.
 
 ---
 

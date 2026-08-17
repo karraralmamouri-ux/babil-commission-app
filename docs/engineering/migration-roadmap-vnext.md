@@ -52,7 +52,11 @@ Phase 3, so behaviour does not change.
 
 ### Phase 2 — Raw SaaS storage
 
-`import_batches`, `raw_saas_users`, `raw_saas_activation_events`, append-only.
+`import_batches`, `raw_saas_user_snapshots`, `raw_saas_activation_events`, append-only.
+
+**User state is snapshotted, not overwritten.** `enabled` and `expiration` change over time;
+a single mutable row would destroy the state a closed cycle depended on. This is what later
+makes an as-of unique-active-user calculation possible at all.
 
 Import writes raw rows **in addition to** today's aggregate path. Nothing reads them yet.
 
@@ -118,7 +122,14 @@ Three things happen here, all consequences of approved **D-02**:
 3. `seenIds` subscriber-level deduplication is removed as incompatible legacy behaviour
    (**R-05**).
 
-V2 with `unique_active_users` waits on **D-03** only — the definition of "active".
+Tier population is measured **as of the cycle's measurement date**, against the user-state
+snapshot for that date — never against today's mutable state. The closed cycle keeps the
+snapshot reference, the population, the tier, the rule version, the scope and the timestamps,
+so a subscriber going inactive later cannot move a closed month's tier.
+
+V2 with `unique_active_users` waits on **D-03** only — the definition of "active". The
+evidence (`enabled`, `expiration`) is available from Phase 2 onward; what is missing is the
+business rule.
 
 *Gate:* closed months recompute to their stored tier, unchanged. Tier population and
 commissionable activations reconcile independently against a known month.

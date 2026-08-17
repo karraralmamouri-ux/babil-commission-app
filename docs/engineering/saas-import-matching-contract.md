@@ -136,6 +136,41 @@ plus the whole original row as `jsonb`.
 Odoo invoice id without explicit evidence is forbidden — see
 `finance-payment-controls.md` §5.
 
+### 3.5 User-state snapshots — **REQUIRED**
+
+**The SaaS User Master must not be stored as a single mutable current row.** A user's
+`enabled` flag and `expiration` change over time. If storage keeps only the latest value,
+the state a financial calculation depended on is destroyed the next time the file is synced —
+and a closed cycle can no longer be explained, let alone reproduced.
+
+```
+raw_saas_user_snapshots
+  id, import_batch_id, snapshot_at, source_file_id,
+  saas_user_id, username,
+  enabled, expiration, parent_name, created_at_saas,
+  raw jsonb
+  unique (import_batch_id, saas_user_id)
+```
+
+**Rules.**
+
+1. Append-only. A sync writes new snapshot rows; it never updates an old one.
+2. Every row carries `snapshot_at` and the import/file identifier it came from, so any value
+   can be traced to its source.
+3. `raw jsonb` keeps every column the export carried, including fields not yet modelled.
+4. "Current state" is a view — the latest snapshot per `saas_user_id` — never a stored row
+   that gets overwritten.
+
+**Why this is a requirement and not a preference.** Unique-active-user tier calculation
+(**D-03**, Phase 8) needs to ask *"was this user active on the cycle's measurement date"*.
+Only an as-of snapshot can answer that. A mutable current row answers a different and useless
+question: *"is this user active today"*.
+
+Naming is not prescribed. Any immutable snapshot or event model carrying the same fields
+satisfies this. Choose the smallest design that fits the existing schema —
+`raw_saas_user_snapshots` alongside `raw_saas_activation_events` is the obvious candidate
+because both are already append-only and batch-scoped.
+
 ---
 
 ## 4. Idempotency
