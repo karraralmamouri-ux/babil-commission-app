@@ -128,6 +128,57 @@ a **critical integrity migration requirement**, not a nice-to-have.
 
 ---
 
+## 5.5 Implemented in Phase 0b — the correction layer
+
+`20260818090000_add_financial_correction_ledger.sql`.
+
+**`financial_ledger`** — one table serving both domains, with real financial
+columns rather than a JSON blob. `domain` · `txn_type` · `source_origin` ·
+`source_table` / `source_id` · `agent_name` · `subscriber_id` · `stage` ·
+`month_key` · `original_cycle_key` · `amount` · `direction` · `currency` ·
+`status` · `reason` · `reverses_entry_id` · `corrects_entry_id` · `request_id` ·
+actor and timestamps.
+
+**`financial_net_position`** — a view answering original / reversed / corrected /
+**net** per source record, without touching any original row.
+
+**Two RPCs, admin only:**
+
+| RPC | Produces |
+|---|---|
+| `reverse_financial_entry(domain, source_id, reason, request_id)` | `REVERSAL` referencing the original. Net → 0. |
+| `correct_financial_entry(domain, source_id, reason, agent, amount, request_id)` | `REVERSAL` + `CORRECTION` in one transaction. Net → the corrected figure. |
+
+**Why the ledger starts empty.** Production holds zero payments today
+(`installation_payments` 0, commission paid 0.00), so there is nothing to
+backfill and no synthetic history is invented. `ensure_financial_origin` clones a
+live record into the ledger only at the moment it is first corrected, tagged
+`LEGACY_BACKFILL`.
+
+**Why the entitlement is never reset.** A reversal does not return the
+subscriber to `eligible`. Doing so would let the normal payment path pay the same
+stage a second time — the exact failure this phase exists to prevent. The
+entitlement keeps saying `paid`, which remains true: it *was* paid once. What
+changed is the net, and the net lives in the ledger.
+
+**Guards:** one reversal per entry (partial unique index, so it holds under
+concurrency), `(created_by, request_id, txn_type)` unique for idempotency,
+advisory lock per source record, mandatory reason, and a trigger that refuses
+`DELETE` outright and permits `UPDATE` only of `status`.
+
+### UI deliberately deferred
+
+No correction screen ships in this phase. Production has **zero payments**, so a
+correction UI would have nothing to act on and could not be exercised against
+real data — a screen validated only against fixtures is a screen nobody has
+tested. The layer is validated where it actually runs: 26 assertions plus a
+two-session concurrency test against real Postgres.
+
+The entry point belongs with the payment workspace in Phase 6, when there are
+payments to correct.
+
+---
+
 ## 6. Reversals
 
 **APPROVED — critical foundation, scheduled in Phase 0b.**
