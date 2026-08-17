@@ -1494,6 +1494,13 @@ async function saveCurrentMonth(){
   renderMonths();
   toast('تم حفظ جميع التعديلات للشهر مع الأسعار الحالية');
 }
+/* tier_basis_qty هنا LEGACY UNVERIFIED CLIENT INPUT.
+   الخادم يتحقق أن التير المطبَّق يوافق هذا الأساس، وأن الأساس ليس أقل من كمية
+   الصف نفسه — لكنه لا يشتقه بنفسه. الأساس المعتمد مستقبلاً هو «المستخدمون
+   الفريدون النشطون»، ويحتاج حالة مستخدم SaaS محفوظة لا يخزّنها النظام بعد.
+   لا تُعالَج هذه الفجوة بجعل الخادم يعيد حساب p35+p45+p65: ذلك يُثبّت القاعدة
+   القديمة الخاطئة ويجعل تقريباً قديماً يبدو موثوقاً.
+   المرجع: docs/engineering/risk-and-open-decisions.md — R-01 وD-03. */
 function rowsForCentralPublish(){return ['old','new'].flatMap(zone=>state.data[zone].map(row=>{const calculated=calc(row);if(!calculated.t)throw new Error(`تعذر تحديد التير للسجل ${row.name}`);const sourceBreakdown=normalizeSourceBreakdown(row.sourceBreakdown||[],row,`${zone}.${row.name}.sourceBreakdown`);return{zone,name:row.name,p35:calculated.p35,p45:calculated.p45,p65:calculated.p65,tier_mode:row.customTier||'auto',applied_tier:calculated.t.key,tier_basis_qty:calculated.tierQty,tier_group_id:row.tierGroupId||null,tier_group_name:row.tierGroupName||null,source_account:row.sourceAccount||null,source_breakdown:sourceBreakdown,owner_name:row.owner||null}}))}
 async function publishCurrentMonth(){
  if(!(await ensurePermission('edit')))return;
