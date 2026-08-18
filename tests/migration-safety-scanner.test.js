@@ -139,3 +139,54 @@ test('a trigger definition is not mistaken for an UPDATE statement', async () =>
   ].join('\n');
   assert.equal(scan(sql).safe, true, JSON.stringify(scan(sql)));
 });
+
+test('a named dollar tag opens a body just as $$ does', async () => {
+  const { scan } = await loadScanner();
+  // `drop table` inside a function body is runtime behaviour on a temp table,
+  // not migration-time destruction. Counting bare `$$` never saw `$fn$`, so a
+  // correct migration was flagged and the guard became noise.
+  const sql = [
+    'create function public.f() returns void language plpgsql as $fn$',
+    'begin',
+    '  drop table if exists tmp_scratch;',
+    '  insert into public.audit_logs (action) values (\'x\');',
+    'end;',
+    '$fn$;',
+  ].join('\n');
+  const r = scan(sql);
+  assert.deepEqual(r.destructiveStatements, []);
+  assert.deepEqual(r.topLevelWritesToLiveTables, []);
+  assert.equal(r.safe, true);
+});
+
+test('a body closes only on its own tag', async () => {
+  const { scan } = await loadScanner();
+  // `$$` appearing inside a `$fn$` body must not end it. If it did, the rest of
+  // the body would be read as top-level code.
+  const sql = [
+    'create function public.f() returns text language sql as $fn$',
+    '  select \'$$ not a terminator $$\'::text;',
+    '  -- still inside the body here',
+    '$fn$;',
+    'drop table public.commission_rows;',
+  ].join('\n');
+  const r = scan(sql);
+  assert.equal(r.safe, false, 'the real drop after the body must still be caught');
+  assert.equal(r.destructiveStatements.length, 1);
+  assert.match(r.destructiveStatements[0], /drop table public\.commission_rows/);
+});
+
+test('code sharing a line with a body opener is still scanned', async () => {
+  const { scan } = await loadScanner();
+  const r = scan('truncate public.installation_payments; create function f() as $fn$ select 1 $fn$;');
+  assert.equal(r.safe, false, 'the truncate before the body opener was skipped');
+});
+
+test('destruction after a $$ body is still caught', async () => {
+  const { scan } = await loadScanner();
+  const sql = [
+    'create function public.g() returns void language sql as $$ select 1 $$;',
+    'drop schema public cascade;',
+  ].join('\n');
+  assert.equal(scan(sql).safe, false);
+});

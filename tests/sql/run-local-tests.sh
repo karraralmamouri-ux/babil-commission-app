@@ -135,6 +135,15 @@ fi
 echo "$out14" | grep -E "^ {6,8}(ok|==) " || true
 passed=$((passed + $(echo "$out14" | grep -c "       ok ")))
 
+echo "== cycle window =="
+out15=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/cycle-window.sql 2>&1)
+if echo "$out15" | grep -qE "FAILED|ERROR"; then
+  echo "$out15" | grep -E "FAILED|ERROR" || true
+  echo "CYCLE WINDOW TESTS FAILED" >&2; exit 1
+fi
+echo "$out15" | grep -E "^ {7,9}(ok|==) " || true
+passed=$((passed + $(echo "$out15" | grep -c "        ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh

@@ -134,8 +134,21 @@
   const SOURCE_UTC_OFFSET = '+03:00';
   const HAS_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 
+  // خليّة التاريخ في Excel تصل كائنَ Date لأن القراءة تجري بـcellDates:true،
+  // وSheetJS يبنيه بساعة الحائط في منطقة الجهاز. فـtoISOString تُعيد إسقاطه
+  // بإزاحة الجهاز — وهو بعينه الاعتماد الذي أُلغي أعلاه في فرع النص. تُقرأ
+  // المكوّنات كما كُتبت في الملف ثم تُنسَب إلى منطقة المصدر، فيخرج الملف
+  // الواحد باللحظة نفسها من أي جهاز استُورد.
+  function wallClock(value) {
+    const p = (n) => String(n).padStart(2, '0');
+    return `${value.getFullYear()}-${p(value.getMonth() + 1)}-${p(value.getDate())}`
+      + `T${p(value.getHours())}:${p(value.getMinutes())}:${p(value.getSeconds())}`;
+  }
+
   function timestamp(value) {
-    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : timestamp(wallClock(value));
+    }
     const raw = text(value);
     if (raw === null) return null;
 

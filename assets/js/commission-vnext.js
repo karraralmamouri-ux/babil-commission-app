@@ -129,15 +129,74 @@
     return EXCEPTION_LABELS[code] || code;
   }
 
+  // السبب وحده لا يُحرِّك أحداً. الطابور يصير عملاً حين يحمل كل صف: من يملك
+  // حسمه، وما الفعل المطلوب، وأين يقع في النظام. و«راجع المطوّر» ليس فعلاً —
+  // هو اعتراف بأن المنتج ناقص.
+  //
+  // الكابينة المجهولة بالذات لها فعل قائم منذ إدخال الكابينات: تُصنَّف هنا
+  // ثم يُعاد الحساب. فلا يُقال عنها إنها تحتاج تدخّلاً هندسياً.
+  const EXCEPTION_PLAYBOOK = {
+    UNKNOWN_FDT: {
+      owner: 'إدارة البيانات الرئيسية',
+      action: 'صنِّف الكابينة قديمة أو جديدة ثم أعد حساب الدورة',
+      target: 'fdtOnboarding',
+    },
+    UNKNOWN_AGENT: {
+      owner: 'إدارة البيانات الرئيسية',
+      action: 'اربط الاسم البديل بوكيل، أو عرِّفه حساباً مباشراً للشركة',
+      target: 'opsMasterAgents',
+    },
+    UNKNOWN_PACKAGE: {
+      owner: 'إدارة البيانات الرئيسية',
+      action: 'أضف الباقة وحدِّد صنفها: مدفوعة أم خدمة دين',
+      target: 'opsMasterPackages',
+    },
+    IDENTITY_CONFLICT: {
+      owner: 'مراجعة المشتركين',
+      action: 'احسم الهوية المتعارضة قبل أن يُبنى عليها مال',
+      target: null,
+    },
+    SOURCE_INCOMPLETE: {
+      owner: 'استيراد SaaS',
+      action: 'أثبت اكتمال الملف، أو استورد التغطية الناقصة',
+      target: 'opsBatchList',
+    },
+    EVENT_CONFLICT: {
+      owner: 'استيراد SaaS',
+      action: 'راجع الحدث المتعارض في مصدره',
+      target: 'opsBatchList',
+    },
+    ATTRIBUTION_REVIEW: {
+      owner: 'مراجعة المشتركين',
+      action: 'أكِّد عائدية المشترك أو صحِّحها',
+      target: null,
+    },
+    MISSING_PERIOD: {
+      owner: 'إدارة الدورات',
+      action: 'أنشئ الفترة الناقصة أو صحِّح حدود الدورة',
+      target: null,
+    },
+  };
+
+  /** ماذا يُفعَل، ومن يفعله. غير المعروف يُقال عنه ذلك، ولا يُخترَع له مالك. */
+  function exceptionPlaybook(code) {
+    return EXCEPTION_PLAYBOOK[code]
+      || { owner: '—', action: 'راجع تفصيل الاستثناء', target: null };
+  }
+
   /** ما يحجب الاعتماد أولاً؛ فالمستخدم يحتاج أن يعرف ما يوقفه لا ما يزعجه. */
   function groupExceptions(rows) {
     const open = (rows || []).filter((row) => row.status === 'OPEN');
     const blocking = open.filter((row) => row.blocks_finalization);
     const counts = new Map();
     open.forEach((row) => {
-      const entry = counts.get(row.reason_code) || { code: row.reason_code, open: 0, blocking: 0 };
+      const entry = counts.get(row.reason_code)
+        || { code: row.reason_code, open: 0, blocking: 0, subscribers: new Set() };
       entry.open += 1;
       if (row.blocks_finalization) entry.blocking += 1;
+      // المشترك هو وحدة القرار البشري، لا الحدث. سببٌ بألف حدث على مئة مشترك
+      // هو مئة قرار، وعرضه ألفاً يجعل الطابور يبدو مستحيلاً وهو ليس كذلك.
+      if (row.subscriber_key) entry.subscribers.add(row.subscriber_key);
       counts.set(row.reason_code, entry);
     });
     return {
@@ -145,7 +204,14 @@
       blocking: blocking.length,
       canFinalize: blocking.length === 0,
       reasons: [...counts.values()]
-        .map((entry) => Object.assign(entry, { label: describeException(entry.code) }))
+        .map((entry) => ({
+          code: entry.code,
+          open: entry.open,
+          blocking: entry.blocking,
+          subscribers: entry.subscribers.size,
+          label: describeException(entry.code),
+          ...exceptionPlaybook(entry.code),
+        }))
         .sort((a, b) => b.blocking - a.blocking || b.open - a.open),
     };
   }
@@ -185,7 +251,7 @@
   return {
     METRICS, ZONE_LABELS, SCOPE_LABELS, EXCEPTION_LABELS,
     readSnapshot, snapshotMode, describeScope, summarizeCycle, packageRows,
-    describeException, groupExceptions,
+    describeException, groupExceptions, exceptionPlaybook, EXCEPTION_PLAYBOOK,
     orderedTiers, describeTierBand, isEditableVersion, tierForSubscribers,
   };
 });
