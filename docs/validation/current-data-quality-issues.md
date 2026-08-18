@@ -81,3 +81,47 @@ pattern is recognised if it recurs:
 
 **Action:** none required — both are parsed. But if a future export produces a
 non-zero `unparsedDates`, do not import it until the format is understood.
+
+---
+
+## 6. The two 18-8 workbooks are user snapshots, not activations — BLOCKING
+
+`active 18-8.xlsx` and `all data 18-8.xlsx` were supplied as the current
+activations source. Measured from content, neither is one.
+
+| | `active 18-8.xlsx` | `all data 18-8.xlsx` |
+|---|---|---|
+| sha256 | `ba17d2925b887ac9…` | `80a2d6d133752ad0…` |
+| Rows | 20,860 | 32,481 |
+| `id` column | present, 20,860 distinct | **absent** |
+| `activations_count` | absent | absent |
+| event `parent` | absent (`parent_name` only) | absent |
+| `enabled` | 1 × 20,860 (active subset) | 1 × 32,454 · 0 × 27 |
+| `created_at` range | 2022-12-10 … **2026-08-05** | 2022-12-10 … **2026-08-15** |
+| Parser verdict | USERS_SNAPSHOT | **REJECTED** — no `id` |
+
+`created_at` here is the **user registration date**, not an activation timestamp.
+Neither file contains a single 2026-08-16…18 activation event, so the expected
+"cutoff around noon on 18/8" is not present in either.
+
+`all data 18-8.xlsx` also cannot be imported even as a snapshot: without `id`
+there is no stable identity anchor, and using `username` instead would breach the
+approved identity rule and hide any id→username change.
+
+**Action:** export the **activations** report for 2026-08-16 → 18 (the report
+carrying `id`, `created_at`, `activations_count`, `parent`), and re-export
+`all data` with the `id` column included.
+
+## 7. Subscriber identity pipeline was never built — BLOCKING
+
+Root cause established: `subscriber_identities` is referenced only by
+migrations — the table, its constraints and readers. **No RPC inserts into it and
+no client code writes it.** The pure matching function exists in
+`assets/js/saas-import.js` but nothing calls it against Production and persists
+the result. Production ingestion loaded only batches, events and snapshots.
+
+So this is a **missing pipeline, not a defect and not a permissions problem**.
+Nothing is broken; a step was never written.
+
+**Action:** build the identity population path. `active 18-8.xlsx` is suitable
+input — it carries 20,860 stable ids.
