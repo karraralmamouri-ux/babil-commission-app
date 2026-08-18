@@ -114,16 +114,33 @@ July projection depends on an unconfirmed zone assignment.
 
 ---
 
-## 6. Engine hardening — required, not yet done
+## 6. Engine hardening and onboarding — done
 
-The engine must stop treating an unregistered cabinet as old zone. The correct
-behaviour is a **blocking review exception** so that missing master data halts a
-cycle instead of quietly re-pricing it.
+The engine no longer treats an unregistered cabinet as old zone: it yields an
+undecided zone, earns nothing, and raises a blocking exception scoped to the
+affected records only. A cabinet that is simply absent stays old zone, which is
+the legitimate case.
 
-This change was **not** made in this pass: applying it now would move 2,977 July
-events into a blocked state and invalidate the 37,059,000 projection before the
-zone question is answered. Fixing the engine and answering the business question
-belong in the same change, so the corrected figure can be produced once rather
-than twice.
+Onboarding is now an admin action, not a code change:
 
-**Status: BLOCKING — engine hardening plus cabinet register, together.**
+| Capability | Surface |
+|---|---|
+| See unregistered cabinets with event, subscriber and parent evidence | `unregistered_fdt_candidates` |
+| Register one cabinet with an explicit zone | `register_fdt` |
+| Register up to 500 at once, all-or-nothing | `register_fdt_bulk` |
+| Recalculate the affected cycle | `recalculate_cycle_after_master_change` |
+
+All four require `fdt.manage`, are audited, and are idempotent by request id.
+Zone is never inferred from the cabinet number — the 94–117 range came from a
+legacy import configuration, not a network register, so inferring from it would
+be guessing. Re-classifying an already-classified cabinet needs explicit
+confirmation, because it re-prices money that was already computed.
+
+Exceptions are not resolved manually: recalculation rebuilds them, so a cabinet
+that is still unregistered comes back and one that was classified disappears.
+"Resolved" therefore means the calculation actually succeeded.
+
+A finalized or paid cycle cannot be recalculated by a master-data change at all;
+correction and reversal remain the only path there.
+
+**Status: PRODUCT READY. The 119 codes are DATA REQUIRING BUSINESS CLASSIFICATION.**
