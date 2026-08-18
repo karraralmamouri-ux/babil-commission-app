@@ -126,6 +126,15 @@ fi
 echo "$out13" | grep -E "^ {5,7}(ok|==) " || true
 passed=$((passed + $(echo "$out13" | grep -c "      ok ")))
 
+echo "== fdt onboarding =="
+out14=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/fdt-onboarding.sql 2>&1)
+if echo "$out14" | grep -qE "FAILED|ERROR"; then
+  echo "$out14" | grep -E "FAILED|ERROR" || true
+  echo "FDT ONBOARDING TESTS FAILED" >&2; exit 1
+fi
+echo "$out14" | grep -E "^ {6,8}(ok|==) " || true
+passed=$((passed + $(echo "$out14" | grep -c "       ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh

@@ -343,6 +343,24 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 
   <div id="ops-master" class="ops-panel">
    <div id="opsMasterUnknown" style="overflow:auto"></div>
+   <div id="fdtOnboarding" class="box" style="margin-top:12px">
+    <h3 style="font-size:12px">🗄️ كابينات غير مسجَّلة — بانتظار التصنيف</h3>
+    <p class="muted" style="font-size:11px">الكابينة غير المسجَّلة تحجب سجلاتها المالية وحدها ولا تُعامَل منطقةً قديمة. تُصنَّف هنا ثم يُعاد الحساب.</p>
+    <div class="actions" style="margin-bottom:8px">
+     <button class="btn" onclick="loadUnregisteredFdts()">تحديث</button>
+     <select id="fdtCycleSelect" class="select"></select>
+     <button class="btn gold" onclick="recalcAfterFdt()">إعادة حساب الدورة</button>
+    </div>
+    <div id="fdtCandidates" style="overflow:auto"></div>
+    <details style="margin-top:10px">
+     <summary style="cursor:pointer;font-size:12px">تصنيف جماعي</summary>
+     <p class="muted" style="font-size:11px">سطر لكل كابينة: <code>الرمز,المنطقة</code> والمنطقة إما old أو new. لا تُشتق المنطقة من الرقم.</p>
+     <textarea id="fdtBulkInput" rows="6" style="width:100%;direction:ltr" placeholder="75,new&#10;77,old"></textarea>
+     <div class="actions" style="margin-top:6px">
+      <button class="btn" onclick="submitFdtBulk()">تسجيل الدفعة</button>
+     </div>
+    </details>
+   </div>
    <div id="opsMasterAgents" style="margin-top:12px;overflow:auto"></div>
    <div id="opsMasterPackages" style="margin-top:12px;overflow:auto"></div>
   </div>
@@ -1790,6 +1808,7 @@ async function initOperationsWorkspace(){
  await loadMyCapabilities();
  if(!opsCan("installation.view"))return;
  loadSchemes();loadImportBatches();loadMasterData();loadCorrections();
+ if(opsCan("fdt.manage"))loadUnregisteredFdts();
  if(opsCan("permission.manage"))loadPermissionWorkspace();
  initCommissionVNext();
  initReporting();}
@@ -2116,6 +2135,75 @@ function initReporting(){
  if(auditTab)auditTab.style.display=opsCan("audit.view")?"":"none";
  loadExecutiveOverview();loadReportCycles();loadAgentStatementList();
  loadInstallationReport();loadExceptionWorkspace();loadAuditReport();loadPayoutBatches();}
+
+/* ---- إدخال الكابينات ---------------------------------------------------- */
+/* الاكتشاف والتصنيف وإعادة الحساب. المنطقة تُملى صراحةً ولا تُشتق من رقم. */
+let fdtCandidates=[];
+
+async function loadUnregisteredFdts(){
+ const host=document.getElementById("fdtCandidates");if(!host)return;
+ if(!opsCan("fdt.manage")){host.innerHTML="<div class='muted'>لا صلاحية لإدارة الكابينات.</div>";return}
+ host.innerHTML="<div class='muted'>جارٍ التحميل…</div>";
+ try{
+  const rows=await sbRequest("/rest/v1/unregistered_fdt_candidates?select=*&order=event_count.desc&limit=300");
+  fdtCandidates=rows||[];
+  const sel=document.getElementById("fdtCycleSelect");
+  if(sel&&!sel.options.length){
+   const cycles=await sbRequest("/rest/v1/commission_cycles?select=id,name,status&order=period_start.desc");
+   sel.innerHTML=(cycles||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.name)} — ${esc(Reporting.statusLabel(c.status))}</option>`).join("");}
+  if(!fdtCandidates.length){host.innerHTML="<div class='muted'>لا كابينات تنتظر التصنيف.</div>";return}
+  host.innerHTML=`<div class="muted" style="font-size:11px">${fmt(fdtCandidates.length)} كابينة تنتظر قراراً</div>`+
+   `<table class="raw-config-table"><thead><tr><th>الكابينة</th><th>أحداث</th><th>مشتركون</th><th>آباء مرصودون</th><th>أول ظهور</th><th>المنطقة</th><th></th></tr></thead><tbody>`+
+   fdtCandidates.map(r=>`<tr><td><b>${esc(r.fdt_code)}</b></td><td>${fmt(r.event_count)}</td><td>${fmt(r.subscriber_count)}</td>`+
+    `<td style="font-size:10px">${esc((r.observed_parents||[]).join("، ")||"—")}</td>`+
+    `<td>${esc((r.first_seen||"").slice(0,10))}</td>`+
+    `<td>${fdtZoneSelect(r.fdt_code)}</td>`+
+    `<td><button class="smallbtn" onclick="submitFdt(&quot;${esc(r.fdt_code)}&quot;)">تسجيل</button></td></tr>`).join("")+"</tbody></table>";
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+/* لا قيمة مبدئية: المنطقة قرار يُتخذ، لا افتراض يُقبَل بالصمت. */
+function fdtZoneSelect(code){
+ const id="fdtzone-"+encodeURIComponent(code);
+ return `<select class="select" id="${id}"><option value="">— اختر —</option>`+
+  `<option value="old">قديمة (بالوكيل)</option><option value="new">جديدة (بالكابينة)</option></select>`}
+
+async function submitFdt(code){
+ const sel=document.getElementById("fdtzone-"+encodeURIComponent(code));
+ const zone=sel?sel.value:"";
+ if(!zone){alert("اختر المنطقة أولاً. لا تُشتق من رقم الكابينة.");return}
+ if(!confirm(`تسجيل الكابينة ${code} في المنطقة ${zone==="new"?"الجديدة":"القديمة"}؟`))return;
+ try{
+  await sbRequest("/rest/v1/rpc/register_fdt",{method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({p_code:code,p_zone:zone,p_request_id:createRequestId()})});
+  toast("سُجِّلت الكابينة — يلزم إعادة حساب الدورة");loadUnregisteredFdts()}
+ catch(error){alert(error?.message||"تعذّر التسجيل")}}
+
+async function submitFdtBulk(){
+ const box=document.getElementById("fdtBulkInput");if(!box)return;
+ const rows=box.value.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{
+  const [code,zone]=l.split(",").map(s=>(s||"").trim());return {code,zone}});
+ if(!rows.length){alert("لا أسطر");return}
+ const bad=rows.filter(r=>!r.code||!["old","new"].includes(r.zone));
+ if(bad.length){alert(`${bad.length} سطراً بلا منطقة صالحة. المنطقة إما old أو new.`);return}
+ if(!confirm(`تسجيل ${rows.length} كابينة؟`))return;
+ try{
+  const res=await sbRequest("/rest/v1/rpc/register_fdt_bulk",{method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({p_rows:rows,p_request_id:createRequestId()})});
+  toast(`سُجِّلت ${res?.registered??0} · أُعيد تصنيف ${res?.reclassified??0}`);
+  box.value="";loadUnregisteredFdts()}
+ catch(error){alert(error?.message||"تعذّر التسجيل الجماعي")}}
+
+async function recalcAfterFdt(){
+ const sel=document.getElementById("fdtCycleSelect");
+ if(!sel?.value){alert("اختر دورة");return}
+ if(!confirm("إعادة حساب الدورة بعد تغيير البيانات الرئيسية؟"))return;
+ try{
+  const res=await sbRequest("/rest/v1/rpc/recalculate_cycle_after_master_change",{method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({p_cycle_id:sel.value,p_request_id:createRequestId()})});
+  toast(`الإجمالي ${fmt(res?.gross_before??0)} ← ${fmt(res?.gross_after??0)} · المحجوب ${fmt(res?.blocking_before??0)} ← ${fmt(res?.blocking_after??0)}`);
+  loadUnregisteredFdts();if(typeof loadCommissionCycle==="function")loadCommissionCycle()}
+ catch(error){alert(error?.message||"تعذّرت إعادة الحساب")}}
 
 function switchTab(z){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.zone===z));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+z))}
 function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'0')+'/'+date.getFullYear()}

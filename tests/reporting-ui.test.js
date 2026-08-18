@@ -83,3 +83,26 @@ test('status vocabulary comes from one place', () => {
     html.indexOf('function switchTab(z)'));
   assert.ok(!/["']معتمدة["']/.test(block), 'a status label is hardcoded in the page');
 });
+
+test('the FDT onboarding surface exists and never infers a zone', () => {
+  assert.ok(html.includes('id="fdtOnboarding"'), 'onboarding panel missing');
+  assert.ok(html.includes('/rest/v1/rpc/register_fdt'), 'individual registration RPC missing');
+  assert.ok(html.includes('/rest/v1/rpc/register_fdt_bulk'), 'bulk registration RPC missing');
+  assert.ok(html.includes('/rest/v1/rpc/recalculate_cycle_after_master_change'),
+    'recalculation RPC missing');
+  assert.ok(html.includes('unregistered_fdt_candidates'), 'discovery view not read');
+
+  // المنطقة تُختار، ولا تُقترح مبدئياً ولا تُشتق من رقم الكابينة.
+  const block = html.slice(html.indexOf('/* ---- إدخال الكابينات'),
+    html.indexOf('function switchTab(z)'));
+  assert.ok(block.length > 400, 'fdt block not found');
+  assert.ok(!/zone\s*=\s*["'](old|new)["']/.test(block),
+    'the page defaults a zone instead of requiring a choice');
+  assert.ok(!/parseInt|Number\([^)]*fdt|>=\s*94|<=\s*117/.test(block),
+    'the page infers zone from the cabinet number');
+  assert.ok(/if\(!zone\)/.test(block), 'registration proceeds without a zone');
+});
+
+test('FDT onboarding is gated on the master-data capability', () => {
+  assert.ok(html.includes('opsCan("fdt.manage")'), 'onboarding is not capability-gated');
+});
