@@ -72,6 +72,7 @@ export function scan(sql, name = '<input>') {
   const lines = sql.split('\n').map((line) => line.replace(/\r$/, ''));
 
   let inBody = false;
+  let openTag = '';
   let inBlockComment = false;
 
   lines.forEach((line, index) => {
@@ -91,10 +92,34 @@ export function scan(sql, name = '<input>') {
       inBlockComment = true;
     }
 
-    const dollars = (text.match(/\$\$/g) || []).length;
-    const code = text.replace(/--.*$/, '').trim();
+    // Dollar quoting, by Postgres's actual rule: a body opens with $tag$ and
+    // closes only with the SAME tag. Counting bare `$$` missed `$fn$`
+    // entirely, so a body written with a named tag was read as top-level code
+    // and its ordinary `drop table if exists tmp_...` and `insert into
+    // audit_logs` were reported as destruction. A guard that cries wolf on a
+    // correct migration gets switched off, and a guard nobody runs protects
+    // nothing — so this has to be right, not merely loud.
+    let rest = text;
+    let code = '';
+    while (rest !== '') {
+      if (inBody) {
+        const close = rest.indexOf(openTag);
+        if (close === -1) { rest = ''; break; }
+        rest = rest.slice(close + openTag.length);
+        inBody = false;
+        continue;
+      }
+      const open = rest.match(/\$\$|\$[A-Za-z_][A-Za-z0-9_]*\$/);
+      if (!open) { code += rest; rest = ''; break; }
+      code += rest.slice(0, open.index);
+      openTag = open[0];
+      rest = rest.slice(open.index + openTag.length);
+      inBody = true;
+    }
 
-    if (code && !inBody) {
+    code = code.replace(/--.*$/, '').trim();
+
+    if (code) {
       if (TOP_LEVEL_DML.test(code)) {
         findings.topLevelWritesToLiveTables.push(`${lineNo}: ${code.slice(0, 90)}`);
       }
@@ -104,8 +129,6 @@ export function scan(sql, name = '<input>') {
         findings.destructiveStatements.push(`${lineNo}: ${code.slice(0, 90)}`);
       }
     }
-
-    if (dollars % 2 === 1) inBody = !inBody;
   });
 
   findings.safe =

@@ -1872,13 +1872,29 @@ async function loadCommissionExceptions(){
  try{
   const rows=await sbRequest(`/rest/v1/commission_exceptions?select=id,activation_event_id,subscriber_key,reason_code,detail,blocks_finalization,status&cycle_id=eq.${encodeURIComponent(cxCurrentCycle.id)}&order=created_at.desc&limit=300`);
   const g=CommissionVNext.groupExceptions(rows||[]);
+  /* الأثر المالي يأتي من الخادم: لا تُسعَّر الأحداث في المتصفح. */
+  const cxImpact=new Map();
+  try{
+   const impact=await sbRequest("/rest/v1/rpc/report_commission_exception_impact",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({p_cycle_id:cxCurrentCycle.id})});
+   (impact||[]).forEach(row=>cxImpact.set(row.reason_code,Number(row.indicative_amount)||0));
+  }catch(_){/* الأثر تعذّر، والطابور يبقى مقروءاً بدونه */}
   host.innerHTML=`<div class="muted" style="font-size:11px">${fmt(g.open)} مفتوح · ${fmt(g.blocking)} يحجب الاعتماد — ${g.canFinalize?"لا مانع من الاعتماد":"الاعتماد محجوب"}</div>`+
-   (g.reasons.length?`<table class="raw-config-table"><thead><tr><th>السبب</th><th>مفتوح</th><th>حاجب</th></tr></thead><tbody>`+
-    g.reasons.map(r=>`<tr><td>${esc(r.label)}</td><td>${fmt(r.open)}</td><td>${fmt(r.blocking)}</td></tr>`).join("")+"</tbody></table>":"")+
+   (g.reasons.length?`<table class="raw-config-table"><thead><tr><th>السبب</th><th>أحداث</th><th>مشتركون</th><th>حاجب</th><th>أثر مالي مؤشِّر</th><th>الجهة</th><th>الإجراء</th><th></th></tr></thead><tbody>`+
+    g.reasons.map(r=>`<tr><td>${esc(r.label)}</td><td>${fmt(r.open)}</td><td>${fmt(r.subscribers)}</td><td>${fmt(r.blocking)}</td><td>${fmt(cxImpact.get(r.code)||0)}</td><td style="font-size:11px">${esc(r.owner)}</td><td style="font-size:11px">${esc(r.action)}</td><td>${r.target?`<button class="smallbtn" onclick="jumpToExceptionAction('${esc(r.target)}')">افتح</button>`:""}</td></tr>`).join("")+"</tbody></table>":"")+
    `<table class="raw-config-table" style="margin-top:8px"><thead><tr><th>الحدث</th><th>السبب</th><th>الحالة</th><th></th></tr></thead><tbody>`+
    (rows||[]).filter(r=>r.status==="OPEN").slice(0,100).map(r=>`<tr><td>${esc(r.activation_event_id||"—")}</td><td>${esc(CommissionVNext.describeException(r.reason_code))}</td><td>${r.blocks_finalization?"حاجب":"للمراجعة"}</td>`+
     `<td><button class="smallbtn" onclick="resolveCxException('${esc(r.id)}')">حسم</button></td></tr>`).join("")+"</tbody></table>";
  }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+/* الاستثناء يقود إلى مكان حسمه. بلا هذا يبقى السبب معروفاً والفعل مجهولاً. */
+function jumpToExceptionAction(target){
+ const el=document.getElementById(target);
+ if(!el){toast("الشاشة غير متاحة بصلاحيتك");return}
+ const panel=el.closest(".panel");
+ if(panel&&panel.id.startsWith("panel-")&&typeof switchTab==="function")switchTab(panel.id.slice(6));
+ el.scrollIntoView({behavior:"smooth",block:"center"})}
 
 async function resolveCxException(id){
  const note=prompt("سبب الحسم (يُسجَّل في التدقيق):");if(!note)return;

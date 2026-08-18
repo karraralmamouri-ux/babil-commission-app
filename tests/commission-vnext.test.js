@@ -108,6 +108,55 @@ test('السبب المجهول يُعرض كما ورد بدل أن يُبتل�
   assert.equal(C.describeException('SOMETHING_NEW'), 'SOMETHING_NEW');
 });
 
+test('كل سبب خادمي يحمل جهةً وإجراءً، لا سبباً مجرَّداً', () => {
+  // «كابينة غير معروفة» تصف حالة ولا تُملي فعلاً. الطابور يصير عملاً حين
+  // يحمل الصف من يملك حسمه وما يفعله.
+  const server = ['UNKNOWN_AGENT','UNKNOWN_FDT','UNKNOWN_PACKAGE','IDENTITY_CONFLICT',
+    'SOURCE_INCOMPLETE','EVENT_CONFLICT','ATTRIBUTION_REVIEW','MISSING_PERIOD'];
+  server.forEach((code) => {
+    const play = C.exceptionPlaybook(code);
+    assert.ok(play.owner && play.owner !== '—', `${code} بلا جهة مسؤولة`);
+    assert.ok(play.action && play.action.length > 8, `${code} بلا إجراء مطلوب`);
+  });
+});
+
+test('لا استثناء يُحيل إلى المطوّر بينما له مسار إداري', () => {
+  // هذا هو المعيار الحقيقي: وجود شاشة يُحسم فيها الاستثناء بيد المستخدم.
+  const withAdminPath = ['UNKNOWN_FDT', 'UNKNOWN_AGENT', 'UNKNOWN_PACKAGE', 'SOURCE_INCOMPLETE'];
+  withAdminPath.forEach((code) => {
+    assert.ok(C.exceptionPlaybook(code).target,
+      `${code} بلا شاشة يُحسم فيها — يبقى تدخّلاً هندسياً`);
+  });
+
+  const forbidden = /مطوّر|المطور|developer|engineer|راجع الفريق التقني/i;
+  Object.entries(C.EXCEPTION_PLAYBOOK).forEach(([code, play]) => {
+    assert.ok(!forbidden.test(play.action), `${code} يطلب تدخّلاً هندسياً`);
+    assert.ok(!forbidden.test(play.owner), `${code} يُحمّل المسؤولية للهندسة`);
+  });
+});
+
+test('الكابينة المجهولة تقود إلى شاشة تصنيف الكابينات بعينها', () => {
+  assert.equal(C.exceptionPlaybook('UNKNOWN_FDT').target, 'fdtOnboarding');
+});
+
+test('التجميع يعدّ المشتركين لا الأحداث وحدها', () => {
+  // سببٌ بألف حدث على مئة مشترك هو مئة قرار بشري لا ألفاً. عرضه ألفاً يجعل
+  // الطابور يبدو مستحيلاً وهو ليس كذلك.
+  const g = C.groupExceptions([
+    { reason_code: 'UNKNOWN_FDT', status: 'OPEN', blocks_finalization: true, subscriber_key: 's1' },
+    { reason_code: 'UNKNOWN_FDT', status: 'OPEN', blocks_finalization: true, subscriber_key: 's1' },
+    { reason_code: 'UNKNOWN_FDT', status: 'OPEN', blocks_finalization: true, subscriber_key: 's2' },
+  ]);
+  assert.equal(g.reasons[0].open, 3);
+  assert.equal(g.reasons[0].subscribers, 2);
+});
+
+test('السبب المجهول لا يُخترَع له مالك', () => {
+  const play = C.exceptionPlaybook('SOMETHING_NEW');
+  assert.equal(play.owner, '—');
+  assert.equal(play.target, null);
+});
+
 // التهيئة — بقيم V1 الحقيقية.
 const tiers = [
   { sequence: 2, code: 't2', min_subscribers: 201, max_subscribers: 400 },
