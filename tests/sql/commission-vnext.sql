@@ -300,6 +300,44 @@ select pg_temp.ok(
    where table_name='commission_event_entitlements' and column_name like '%tier_basis%') = 0,
   'الاستحقاق لا يحمل أساساً مُرسَلاً من العميل');
 
+-- الشركة المباشرة ليست أباً مجهولاً — مُكتشَف من بيانات تموز الحقيقية،
+-- حيث كانت 18,484 حركة شركة مباشرة تُطلق UNKNOWN_AGENT حاجباً، فتُغرق
+-- 52 أباً مجهولاً حقيقياً في ضجيج يمنع الاعتماد إلى الأبد.
+insert into public.agent_aliases (agent_id, alias, resolution)
+values (null, 'DIRECT_CO_TEST', 'direct_company')
+on conflict (alias_key) do nothing;
+
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, canceled, raw_parent, event_created_at)
+values ('b1111111-1111-1111-1111-111111111111','EV-DIRECT2','u-direct2','P-35000',false,
+        'DIRECT_CO_TEST','2026-08-06')
+on conflict do nothing;
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'c1111111-1111-1111-1111-111111111111';
+select public.calculate_commission_cycle('d1111111-1111-1111-1111-111111111111') is not null
+  as recalculated;
+reset role;
+
+select pg_temp.ok(
+  not exists (select 1 from public.commission_exceptions
+              where cycle_id='d1111111-1111-1111-1111-111111111111'
+                and activation_event_id='EV-DIRECT2' and reason_code='UNKNOWN_AGENT'),
+  'الشركة المباشرة لا تُعَدّ أباً مجهولاً');
+
+select pg_temp.ok(
+  not exists (select 1 from public.commission_event_entitlements
+              where cycle_id='d1111111-1111-1111-1111-111111111111'
+                and activation_event_id='EV-DIRECT2'),
+  'الشركة المباشرة تبقى مستبعَدة من العمولة');
+
+select pg_temp.ok(
+  not exists (select 1 from public.commission_exceptions e
+              join public.saas_activation_events s on s.saas_event_id=e.activation_event_id
+              where e.cycle_id='d1111111-1111-1111-1111-111111111111'
+                and e.reason_code='UNKNOWN_FDT' and s.fdt_code is null),
+  'المنطقة القديمة لا تُطالَب بكابينة');
+
 -- ===========================================================================
 -- 42. الاعتماد واللقطة
 -- ===========================================================================
