@@ -9,6 +9,7 @@
 <script src="./assets/js/installation-fees.js"></script>
 <script src="./assets/js/saas-import.js"></script>
 <script src="./assets/js/operations.js"></script>
+<script src="./assets/js/commission-vnext.js"></script>
 <style>
 :root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
@@ -32,7 +33,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}.app-layout{grid-template-columns:210px minmax(0,1fr)}}@media(max-width:820px){.app-layout{display:block;padding:10px}.mobile-menu{display:flex;position:fixed;top:12px;right:12px;z-index:45;width:44px;height:44px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--text);font-size:20px}.sidebar{position:fixed;top:0;right:0;width:min(320px,88vw);height:100vh;border-radius:0;transform:translateX(105%);transition:transform .2s ease;margin:0}.sidebar.open{transform:translateX(0)}.sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}.sidebar-overlay.show{opacity:1;pointer-events:auto}.main-content{padding:58px 0 30px}.mast{padding:14px}.side-btn{font-size:13px}.smallbtn{min-height:36px;padding:7px 10px}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls,.month-controls{width:100%}.btn{padding:9px 10px;min-height:40px}.card{min-height:84px}}
 .lang-en .side-btn,.lang-en .name{text-align:left}.lang-en td:first-child,.lang-en th:first-child{text-align:left}.lang-en .toast{left:auto;right:20px}
 #passwordModal label{display:block;color:var(--muted);font-size:11px;margin-bottom:10px}#passwordModal .input{display:block;width:100%;margin-top:4px}
-.ops-panel{display:none}.ops-panel.active{display:block}
+.cx-panel{display:none}.cx-panel.active{display:block}.ops-panel{display:none}.ops-panel.active{display:block}
 </style>
 </head>
 <body>
@@ -202,6 +203,51 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 <section id="operationalSection" class="grid2 section-anchor">
  <div class="box"><h3>✦ جاهزية الشهر</h3><div id="readinessInsights" class="insight-list"></div></div>
  <div class="box"><h3>⚑ تنبيهات تشغيلية</h3><div id="operationalAlerts" class="insight-list"></div></div>
+</section>
+<section id="commissionVNextSection" class="section-anchor" style="margin-top:16px">
+ <div class="box">
+  <h3>📊 محرّك العمولة — الإصدار الجديد</h3>
+  <p class="muted" style="font-size:11px">الشريحة تُحدَّد بعدد المشتركين المميّزين الذين جرى لهم تفعيل مؤهِّل في الدورة، لا بعدد أحداث التفعيل. الحساب كله على الخادم.</p>
+  <div id="commissionTabs" class="tabs">
+   <button class="tab active" data-cx="cycle" onclick="switchCxTab('cycle')">🗓️ الدورة</button>
+   <button class="tab" data-cx="scopes" onclick="switchCxTab('scopes')">🎯 النطاقات</button>
+   <button class="tab" data-cx="exceptions" onclick="switchCxTab('exceptions')">⚠️ الاستثناءات</button>
+   <button class="tab" data-cx="config" onclick="switchCxTab('config')">⚙️ التهيئة</button>
+   <button class="tab" data-cx="agent" onclick="switchCxTab('agent')">👤 الملف المالي للوكيل</button>
+  </div>
+
+  <div id="cx-cycle" class="cx-panel active">
+   <div class="actions" style="margin-bottom:8px">
+    <select id="cxCycleSelect" class="select" onchange="loadCommissionCycle()"></select>
+    <button class="btn" onclick="recalculateCommissionCycle()">إعادة الحساب المتوقَّع</button>
+    <button class="btn gold" onclick="finalizeCommissionCycle()">اعتماد الدورة</button>
+    <button class="btn danger" onclick="reopenCommissionCycle()">إعادة الفتح</button>
+   </div>
+   <div id="cxCycleSummary" class="grid2"></div>
+   <div id="cxCycleMeta" class="muted" style="font-size:11px;margin-top:8px"></div>
+  </div>
+
+  <div id="cx-scopes" class="cx-panel">
+   <div id="cxScopeTable" style="overflow:auto"></div>
+   <div id="cxScopeDetail" style="margin-top:10px;overflow:auto"></div>
+  </div>
+
+  <div id="cx-exceptions" class="cx-panel">
+   <div id="cxExceptions" style="overflow:auto"></div>
+  </div>
+
+  <div id="cx-config" class="cx-panel">
+   <p class="muted" style="font-size:11px">الإصدار المنشور غير قابل للتعديل. تغيير الحدود أو المبالغ يتم بإصدار جديد، بلا نشر كود.</p>
+   <div id="cxConfig" style="overflow:auto"></div>
+  </div>
+
+  <div id="cx-agent" class="cx-panel">
+   <div class="actions" style="margin-bottom:8px">
+    <select id="cxAgentSelect" class="select" onchange="loadAgentProfile()"></select>
+   </div>
+   <div id="cxAgentProfile"></div>
+  </div>
+ </div>
 </section>
 <section id="operationsSection" class="section-anchor" style="margin-top:16px">
  <div class="box">
@@ -747,6 +793,22 @@ function oldAccountLabel(agent,account,accountIndex){
 function calculateRawImport(rows,config){
  validateRawImportConfig(config);const profiles=new Set(config.profiles.map(normalizeRawProfile)),accounts=new Map(),agents=new Map(config.agents.map(agent=>[agent.id,agent]));
  config.agents.forEach((agent,agentOrder)=>(agent.accounts||[]).forEach((account,accountOrder)=>accounts.set(rawText(account).toLowerCase(),{agent,account:rawText(account),agentOrder,accountOrder,label:oldAccountLabel(agent,account,accountOrder)})));
+ /* ═══ مسار قديم — للتوافق التاريخي فقط ═══
+    LEGACY / COMPATIBILITY ONLY. لا يجوز أن يُنتج هذا المسار دورة vNext.
+    محرّك العمولة المعتمد صار على الخادم: calculate_commission_cycle.
+
+    ما هو صحيح هنا: seenIds يُزيل التكرار بمعرّف الحدث (عمود id في الملف
+    الخام)، وهو المستوى الصحيح — لا بمستوى المشترك. تفعيلان لمشترك واحد
+    يبقيان حدثين، وهذا موافق للقاعدة المعتمدة.
+
+    ما هو مخالف هنا: أساس الشريحة. هذا المسار يختار الشريحة من
+    p35+p45+p65 — أي من عدد الأحداث. والقاعدة المعتمدة (D-03) تختارها من
+    عدد المشتركين المميّزين. لذلك تبقى نتائج هذا المسار صالحة للعرض
+    التاريخي فقط، ولا تُعتمد لدورة جديدة.
+
+    الإزالة المؤجَّلة: calculateRawImport وsyncTierGroupBasis وpooledTierQuantity
+    وcalc تُحذف حين يُنقل النشر بالكامل إلى دورات vNext. تُترك الآن لأن
+    الشهور القائمة تُقرأ بها. */
  const seenIds=new Set(),oldBuckets=new Map(),newBuckets=new Map(),exceptions=[];let duplicateIds=0,ignoredProfiles=0,ignoredAccounts=0;
  const emptyCounts=()=>({p35:0,p45:0,p65:0});
  /* يُحلّ حساب parent إلى الوكيل الحقيقي المرتبط به في الإعدادات؛ الحساب غير المعرّف يبقى بلا وكيل ويظهر كحالة تحتاج ربطًا. */
@@ -1669,7 +1731,162 @@ async function initOperationsWorkspace(){
  await loadMyCapabilities();
  if(!opsCan("installation.view"))return;
  loadSchemes();loadImportBatches();loadMasterData();loadCorrections();
- if(opsCan("permission.manage"))loadPermissionWorkspace();}
+ if(opsCan("permission.manage"))loadPermissionWorkspace();
+ initCommissionVNext();}
+
+/* ---- العمولة vNext ------------------------------------------------------ */
+/* لا حساب مالي هنا. الشريحة والمبالغ وأساسها من الخادم؛ وهذا عرضٌ فقط. */
+let cxCycles=[],cxSnapshots=[],cxCurrentCycle=null,cxAgents=[];
+function switchCxTab(k){document.querySelectorAll("#commissionTabs .tab").forEach(b=>b.classList.toggle("active",b.dataset.cx===k));document.querySelectorAll(".cx-panel").forEach(p=>p.classList.toggle("active",p.id==="cx-"+k))}
+
+async function loadCommissionCycles(){
+ const select=document.getElementById("cxCycleSelect");if(!select)return;
+ try{
+  const rows=await sbRequest("/rest/v1/commission_cycles?select=id,name,period_start,period_end,status,engine_version,finalized_at&order=period_start.desc");
+  cxCycles=rows||[];
+  select.innerHTML=cxCycles.length?cxCycles.map(c=>`<option value="${esc(c.id)}">${esc(c.name)} — ${esc(c.status)}</option>`).join(""):"<option value=''>لا دورات بعد</option>";
+  if(cxCycles.length)loadCommissionCycle()}
+ catch(error){if(error?.status!==404)console.warn("commission cycles:",error)}}
+
+async function loadCommissionCycle(){
+ const select=document.getElementById("cxCycleSelect"),host=document.getElementById("cxCycleSummary");
+ if(!select?.value||!host)return;
+ cxCurrentCycle=cxCycles.find(c=>c.id===select.value)||null;
+ host.innerHTML="<div class='muted'>جارٍ التحميل…</div>";
+ try{
+  const snaps=await sbRequest(`/rest/v1/commission_cycle_snapshots?select=*&cycle_id=eq.${encodeURIComponent(select.value)}`);
+  cxSnapshots=snaps||[];
+  const sum=CommissionVNext.summarizeCycle(cxSnapshots);
+  const mode=cxCurrentCycle?.finalized_at?"نهائي":"متوقَّع";
+  const card=(label,value,hint)=>`<div class="box"><h3 style="font-size:12px">${esc(label)}</h3><div style="font-size:20px;font-weight:700">${fmt(value)}</div><div class="muted" style="font-size:10px">${esc(hint||"")}</div></div>`;
+  host.innerHTML=card(CommissionVNext.METRICS.tierBasis.label,sum.subscribersByScope,CommissionVNext.METRICS.tierBasis.hint)
+   +card(CommissionVNext.METRICS.billable.label,sum.qualifyingEvents,CommissionVNext.METRICS.billable.hint)
+   +card("إجمالي العمولة",sum.gross,"د.ع — "+mode)
+   +card("النطاقات",sum.scopes,`${sum.finalizedScopes} منها معتمدة`);
+  const meta=document.getElementById("cxCycleMeta");
+  if(meta)meta.innerHTML=sum.byZone.map(z=>`${esc(z.label)}: ${fmt(z.scopes)} نطاق · ${fmt(z.subscribers)} مشترك · ${fmt(z.events)} حدث · ${fmt(z.gross)} د.ع`).join("<br>")
+   +`<br>المحرّك: ${esc(cxCurrentCycle?.engine_version||"—")} · الحالة: ${esc(cxCurrentCycle?.status||"—")}`;
+  renderCommissionScopes();loadCommissionExceptions();
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+function renderCommissionScopes(){
+ const host=document.getElementById("cxScopeTable");if(!host)return;
+ if(!cxSnapshots.length){host.innerHTML="<div class='muted'>لا نطاقات محسوبة.</div>";return}
+ host.innerHTML=`<table class="raw-config-table"><thead><tr><th>النطاق</th><th>المنطقة</th><th>${esc(CommissionVNext.METRICS.tierBasis.label)}</th><th>${esc(CommissionVNext.METRICS.billable.label)}</th><th>الشريحة</th><th>العمولة</th><th>الحالة</th><th></th></tr></thead><tbody>`+
+  cxSnapshots.map(row=>{const s=CommissionVNext.readSnapshot(row);
+   return `<tr><td>${esc(s.scopeLabel)}</td><td>${esc(CommissionVNext.describeScope(s))}</td><td>${fmt(s.uniqueActivatedSubscribers)}</td><td>${fmt(s.qualifyingEvents)}</td><td>${esc(s.tier||"—")}</td><td>${fmt(s.gross)}</td><td>${esc(CommissionVNext.snapshotMode(s).label)}</td>`+
+    `<td><button class="smallbtn" onclick="showScopeEvents('${esc(s.scopeType)}','${esc(s.scopeId)}')">تفصيل</button></td></tr>`}).join("")+"</tbody></table>"}
+
+async function showScopeEvents(scopeType,scopeId){
+ const host=document.getElementById("cxScopeDetail");if(!host||!cxCurrentCycle)return;
+ host.innerHTML="<div class='muted'>جارٍ التحميل…</div>";
+ try{
+  const rows=await sbRequest(`/rest/v1/commission_event_entitlements?select=activation_event_id,subscriber_key,package_code,tier_code,amount,event_at,status&cycle_id=eq.${encodeURIComponent(cxCurrentCycle.id)}&scope_type=eq.${encodeURIComponent(scopeType)}&scope_id=eq.${encodeURIComponent(scopeId)}&order=event_at.asc&limit=500`);
+  const distinct=new Set((rows||[]).map(r=>r.subscriber_key)).size;
+  host.innerHTML=`<div class="muted" style="font-size:11px">${fmt((rows||[]).length)} حدث · ${fmt(distinct)} مشترك مميّز — الفرق بينهما هو جوهر القاعدة.</div>`+
+   `<table class="raw-config-table"><thead><tr><th>الحدث</th><th>الباقة</th><th>الشريحة</th><th>المبلغ</th><th>التاريخ</th></tr></thead><tbody>`+
+   (rows||[]).map(r=>`<tr><td>${esc(r.activation_event_id)}</td><td>${esc(r.package_code||"")}</td><td>${esc(r.tier_code||"")}</td><td>${fmt(r.amount)}</td><td>${esc((r.event_at||"").slice(0,10))}</td></tr>`).join("")+"</tbody></table>";
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function loadCommissionExceptions(){
+ const host=document.getElementById("cxExceptions");if(!host||!cxCurrentCycle)return;
+ try{
+  const rows=await sbRequest(`/rest/v1/commission_exceptions?select=id,activation_event_id,subscriber_key,reason_code,detail,blocks_finalization,status&cycle_id=eq.${encodeURIComponent(cxCurrentCycle.id)}&order=created_at.desc&limit=300`);
+  const g=CommissionVNext.groupExceptions(rows||[]);
+  host.innerHTML=`<div class="muted" style="font-size:11px">${fmt(g.open)} مفتوح · ${fmt(g.blocking)} يحجب الاعتماد — ${g.canFinalize?"لا مانع من الاعتماد":"الاعتماد محجوب"}</div>`+
+   (g.reasons.length?`<table class="raw-config-table"><thead><tr><th>السبب</th><th>مفتوح</th><th>حاجب</th></tr></thead><tbody>`+
+    g.reasons.map(r=>`<tr><td>${esc(r.label)}</td><td>${fmt(r.open)}</td><td>${fmt(r.blocking)}</td></tr>`).join("")+"</tbody></table>":"")+
+   `<table class="raw-config-table" style="margin-top:8px"><thead><tr><th>الحدث</th><th>السبب</th><th>الحالة</th><th></th></tr></thead><tbody>`+
+   (rows||[]).filter(r=>r.status==="OPEN").slice(0,100).map(r=>`<tr><td>${esc(r.activation_event_id||"—")}</td><td>${esc(CommissionVNext.describeException(r.reason_code))}</td><td>${r.blocks_finalization?"حاجب":"للمراجعة"}</td>`+
+    `<td><button class="smallbtn" onclick="resolveCxException('${esc(r.id)}')">حسم</button></td></tr>`).join("")+"</tbody></table>";
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function resolveCxException(id){
+ const note=prompt("سبب الحسم (يُسجَّل في التدقيق):");if(!note)return;
+ try{await sbRequest("/rest/v1/rpc/resolve_commission_exception",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({p_exception_id:id,p_status:"WAIVED",p_note:note,p_request_id:createRequestId()})});
+  toast("تم حسم الاستثناء");loadCommissionExceptions()}
+ catch(error){alert(error?.message||"تعذّر الحسم")}}
+
+async function recalculateCommissionCycle(){
+ if(!cxCurrentCycle)return;
+ try{const res=await sbRequest("/rest/v1/rpc/calculate_commission_cycle",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({p_cycle_id:cxCurrentCycle.id,p_finalize:false})});
+  toast(`حساب متوقَّع: ${res?.unique_activated_subscribers??0} مشترك · ${res?.qualifying_events??0} حدث`);
+  loadCommissionCycle()}
+ catch(error){alert(error?.message||"تعذّر الحساب")}}
+
+async function finalizeCommissionCycle(){
+ if(!cxCurrentCycle)return;
+ if(!confirm(`اعتماد «${cxCurrentCycle.name}» نهائياً؟ النتيجة تُحفظ ولا يُعاد حسابها.`))return;
+ try{const res=await sbRequest("/rest/v1/rpc/calculate_commission_cycle",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({p_cycle_id:cxCurrentCycle.id,p_finalize:true,p_request_id:createRequestId()})});
+  toast(`اعتُمدت الدورة: ${res?.gross_commission??0} د.ع`);loadCommissionCycles()}
+ catch(error){alert(error?.message||"تعذّر الاعتماد")}}
+
+async function reopenCommissionCycle(){
+ if(!cxCurrentCycle)return;
+ const reason=prompt("سبب إعادة الفتح (يُسجَّل في التدقيق):");if(!reason)return;
+ try{await sbRequest("/rest/v1/rpc/reopen_commission_cycle",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({p_cycle_id:cxCurrentCycle.id,p_reason:reason,p_request_id:createRequestId()})});
+  toast("أُعيد فتح الدورة");loadCommissionCycles()}
+ catch(error){alert(error?.message||"تعذّرت إعادة الفتح")}}
+
+async function loadCommissionConfig(){
+ const host=document.getElementById("cxConfig");if(!host)return;
+ try{
+  const versions=await sbRequest("/rest/v1/commission_scheme_versions?select=id,version,status,tier_basis,old_zone_scope,new_zone_scope,effective_from&order=version.asc");
+  const tiers=await sbRequest("/rest/v1/commission_tier_definitions?select=id,scheme_version_id,sequence,code,label_ar,min_subscribers,max_subscribers&order=sequence.asc");
+  const rates=await sbRequest("/rest/v1/commission_package_rates?select=tier_definition_id,package_code,amount,qualifies");
+  host.innerHTML=(versions||[]).map(v=>{
+   const mine=CommissionVNext.orderedTiers((tiers||[]).filter(t=>t.scheme_version_id===v.id));
+   const locked=!CommissionVNext.isEditableVersion(v);
+   const packages=[...new Set((rates||[]).map(r=>r.package_code))].sort();
+   return `<div class="box" style="margin-bottom:8px"><h3 style="font-size:12px">الإصدار ${fmt(v.version)} — ${esc(v.status)} ${locked?"🔒":"✏️"}</h3>`+
+    `<div class="muted" style="font-size:10px">أساس الشريحة: ${esc(v.tier_basis)} · القديمة بـ${esc(v.old_zone_scope)} · الجديدة بـ${esc(v.new_zone_scope)} · يسري من ${esc(v.effective_from||"— (بلا حد بدء)")}</div>`+
+    `<table class="raw-config-table"><thead><tr><th>الشريحة</th><th>المشتركون</th>${packages.map(p=>`<th>${esc(p)}</th>`).join("")}</tr></thead><tbody>`+
+    mine.map(t=>{const mineRates=(rates||[]).filter(r=>r.tier_definition_id===t.id);
+     return `<tr><td>${esc(t.label_ar)}</td><td>${esc(CommissionVNext.describeTierBand(t))}</td>`+
+      packages.map(p=>{const r=mineRates.find(x=>x.package_code===p);return `<td>${r?(r.qualifies?fmt(r.amount):"لا يؤهِّل"):"—"}</td>`}).join("")+"</tr>"}).join("")+"</tbody></table>"+
+    (locked?"<div class='muted' style='font-size:10px'>إصدار منشور — التغيير بإصدار جديد.</div>":"")+"</div>"}).join("");
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function loadAgentList(){
+ const select=document.getElementById("cxAgentSelect");if(!select)return;
+ try{const rows=await sbRequest("/rest/v1/agents?select=id,code,official_name&order=official_name.asc&limit=300");
+  cxAgents=rows||[];
+  select.innerHTML=cxAgents.map(a=>`<option value="${esc(a.id)}">${esc(a.official_name)}</option>`).join("");
+  if(cxAgents.length)loadAgentProfile()}
+ catch(error){if(error?.status!==404)console.warn("agents:",error)}}
+
+async function loadAgentProfile(){
+ const select=document.getElementById("cxAgentSelect"),host=document.getElementById("cxAgentProfile");
+ if(!select?.value||!host)return;
+ host.innerHTML="<div class='muted'>جارٍ التحميل…</div>";
+ try{
+  const p=await sbRequest("/rest/v1/rpc/agent_financial_profile",{method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({p_agent_id:select.value})});
+  const inst=p?.installation||{},stages=inst.stage_distribution||{};
+  host.innerHTML=`<div class="grid2">`+
+   `<div class="box"><h3 style="font-size:12px">العمولات</h3>`+
+   ((p?.commission_cycles||[]).length?`<table class="raw-config-table"><thead><tr><th>الدورة</th><th>النطاق</th><th>مشتركون</th><th>أحداث</th><th>الشريحة</th><th>العمولة</th></tr></thead><tbody>`+
+    p.commission_cycles.map(c=>`<tr><td>${esc(c.cycle)}</td><td>${esc(c.scope_id)}</td><td>${fmt(c.unique_activated_subscribers)}</td><td>${fmt(c.qualifying_events)}</td><td>${esc(c.tier||"—")}</td><td>${fmt(c.gross_commission)}</td></tr>`).join("")+"</tbody></table>":"<div class='muted'>لا دورات محسوبة بعد.</div>")+"</div>"+
+   `<div class="box"><h3 style="font-size:12px">أجور التنصيب</h3>`+
+   `<div>المشتركون: <b>${fmt(inst.subscribers||0)}</b></div>`+
+   `<table class="raw-config-table"><thead><tr><th>المرحلة</th><th>العدد</th></tr></thead><tbody>`+
+   Object.keys(stages).sort().map(k=>`<tr><td>${esc(k)}</td><td>${fmt(stages[k])}</td></tr>`).join("")+"</tbody></table></div></div>"+
+   `<div class="box" style="margin-top:8px"><h3 style="font-size:12px">الأسماء البديلة والكابينات</h3>`+
+   `<div class="muted" style="font-size:11px">الأسماء: ${esc((p?.aliases||[]).join("، ")||"—")}<br>الكابينات: ${esc((p?.fdts||[]).join("، ")||"—")}</div></div>`;
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function initCommissionVNext(){
+ if(typeof CommissionVNext==="undefined")return;
+ const section=document.getElementById("commissionVNextSection");
+ if(section)section.style.display=opsCan("commission.view")?"":"none";
+ if(!opsCan("commission.view"))return;
+ const show=(sel,cap)=>{const el=document.querySelector(sel);if(el)el.style.display=opsCan(cap)?"":"none"};
+ show("#commissionTabs [data-cx=config]","commission.configure");
+ loadCommissionCycles();loadCommissionConfig();loadAgentList();}
 
 function switchTab(z){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.zone===z));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+z))}
 function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'0')+'/'+date.getFullYear()}
@@ -1700,7 +1917,10 @@ async function saveCurrentMonth(){
   renderMonths();
   toast('تم حفظ جميع التعديلات للشهر مع الأسعار الحالية');
 }
-/* tier_basis_qty هنا LEGACY UNVERIFIED CLIENT INPUT.
+/* tier_basis_qty هنا LEGACY UNVERIFIED CLIENT INPUT، ومتقاعد لدورات vNext:
+   الخادم يحسب أساس الشريحة من الأحداث المحفوظة والهويات القانونية، ولا يقرأ
+   هذا الحقل إطلاقاً. يبقى للتوافق مع الشهور القائمة وحدها.
+   الأصل: 
    الخادم يتحقق أن التير المطبَّق يوافق هذا الأساس، وأن الأساس ليس أقل من كمية
    الصف نفسه — لكنه لا يشتقه بنفسه. الأساس المعتمد مستقبلاً هو «المستخدمون
    الفريدون النشطون»، ويحتاج حالة مستخدم SaaS محفوظة لا يخزّنها النظام بعد.
