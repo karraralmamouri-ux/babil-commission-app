@@ -211,11 +211,36 @@ Execute is granted to no application role — it is a deployment operation.
 
 ## 9. Personal data
 
-`phone` and `national_id` are stored on snapshots for authorized review but are
-not exposed through `saas_user_current`, the view intended for broad reads.
 `gps_lat`/`gps_lng`, `mac`, `address`, `street` and `email` are parsed by the
-alias map but are **not** persisted by this migration — no demonstrated need
-yet, and the cheapest data to protect is data not held.
+alias map but are **not** persisted — no demonstrated need yet, and the cheapest
+data to protect is data not held.
+
+`phone`, `national_id`, `card`, `card_owner` and `comment` are retained for
+authorized review, and reaching them requires the admin role.
+
+**A gap found after the first deployment and closed in
+`20260819140000_restrict_raw_saas_pii.sql`:** the original grants gave
+`authenticated` a `using (true)` select policy on all ten tables. That is
+harmless for the eight reference tables, but the two raw-history tables carry
+identity fields — so any signed-in user could have pulled `phone` and
+`national_id` in a single PostgREST request. No data was exposed: both tables
+were and are empty in production, and no raw ingestion has run. The hole was
+structural and is closed before any first insert, not after.
+
+The fix restricts both raw tables to the admin role and serves everyone else
+through two views that omit the identity columns entirely:
+
+| Reader | `saas_user_snapshots` / `saas_activation_events` | `saas_user_current` / `saas_activation_events_safe` |
+|---|---|---|
+| admin | read | read |
+| any other signed-in role | **no rows** | read, without identity fields |
+
+The views run with owner rights, so operational reads keep working without the
+base table being granted. The gate is the column set, not the row filter.
+
+Proven by test under a real non-admin session rather than by reading the policy:
+a `viewer` selecting from either raw table gets zero rows while the safe view
+still returns data, and no view exposes an identity column.
 
 ---
 

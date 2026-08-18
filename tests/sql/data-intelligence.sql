@@ -208,7 +208,47 @@ select case when (select count(*) from public.agent_aliases
   then 'ok    الحساب الفرعي يتبع وكيله'
   else 'FAIL  الأسماء البديلة' end;
 
--- 15. لا عمود لكلمة السر في أي جدول.
+-- 15. حقول الهوية الحسّاسة لا تُقرأ بقراءة عامة.
+-- الجدولان الخامّان يحملان phone وnational_id وcard_owner، وكانا مفتوحين لكل
+-- مستخدم مسجَّل عبر PostgREST. الاختبار يُثبت الإغلاق بدور غير مدير حقيقي.
+insert into auth.users (id, email) values
+  ('33333333-3333-3333-3333-333333333333', 'viewer@fixture.invalid')
+on conflict do nothing;
+insert into public.profiles (id, full_name, email, role, is_active)
+values ('33333333-3333-3333-3333-333333333333', 'V', 'viewer@fixture.invalid', 'viewer', true)
+on conflict (id) do update set role = 'viewer', is_active = true;
+
+insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, phone, national_id)
+select id, now(), 'S-PII', 'u-pii', '000', '111' from public.saas_import_batches
+where source_checksum = 'checksum-fixture-1';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333"}';
+
+select case when count(*) = 0 then 'ok    غير المدير لا يقرأ لقطات المستخدمين الخام'
+  else 'FAIL  اللقطات الخام مقروءة لغير المدير' end
+from public.saas_user_snapshots;
+
+select case when count(*) = 0 then 'ok    غير المدير لا يقرأ الأحداث الخام'
+  else 'FAIL  الأحداث الخام مقروءة لغير المدير' end
+from public.saas_activation_events;
+
+-- الرؤية الآمنة تبقى عاملة، وبلا حقول هوية.
+select case when count(*) >= 1 then 'ok    الرؤية الآمنة تعمل لغير المدير'
+  else 'FAIL  الرؤية الآمنة محجوبة' end
+from public.saas_user_current;
+
+reset role;
+
+select case when count(*) = 0
+  then 'ok    الرؤى لا تحمل حقول هوية حسّاسة'
+  else 'FAIL  حقل هوية معروض: ' || string_agg(table_name || '.' || column_name, ', ') end
+from information_schema.columns
+where table_schema = 'public'
+  and table_name in ('saas_user_current', 'saas_activation_events_safe')
+  and column_name in ('phone', 'national_id', 'card', 'card_owner', 'comment');
+
+-- 16. لا عمود لكلمة السر في أي جدول.
 select case when count(*) = 0 then 'ok    لا عمود كلمة سر في المخطط'
   else 'FAIL  عمود سر موجود: ' || string_agg(table_name || '.' || column_name, ', ') end
 from information_schema.columns
