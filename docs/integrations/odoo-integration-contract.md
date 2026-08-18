@@ -1,6 +1,18 @@
 # Odoo Integration Contract
 
-**Status: connector ready, integration disabled by default, discovery partially blocked.**
+**Status: connector ready and deployed · integration disabled by default ·
+remaining live discovery DEFERRED by product decision.**
+
+> **Deferred, not failed.** Live discovery of the field layout, the test
+> subscriber and the invoice model is postponed to a later development axis. The
+> reasons are product ones, not technical: the first go-live does not need Odoo,
+> the priority is validating the SaaS Excel workflow and financial accuracy, and
+> the current Odoo user may lack Accounting/Invoice read permissions — in which
+> case discovering now would produce an incomplete picture that looks complete.
+>
+> Everything built for Odoo stays in place: connector, Edge Function (deployed
+> and ACTIVE), secrets, schema, permissions, this contract, and the tests.
+> Nothing was rolled back. The work resumes at §11 whenever it is wanted.
 
 Every fact in §1–§3 was measured live against `https://znr.ejaferp.com` on
 2026-08-23 using unauthenticated read-only endpoints. No credential was used, no
@@ -313,7 +325,11 @@ operational decision, never a side effect of deployment.
 
 ---
 
-## 12. Unresolved
+## 12. Deferred — open questions for the next axis
+
+These are **deferred**, not blocked and not failed. The secrets are configured in
+the remote Edge Function runtime and the function is deployed; what remains is a
+product decision about when to spend the time.
 
 - Which `res.partner` field holds `030270029`, and whether it is unique.
 - Whether custom/Studio fields exist on `res.partner` or `account.move`.
@@ -322,7 +338,26 @@ operational decision, never a side effect of deployment.
 - Whether a stable SaaS↔Odoo key exists, or whether operational data will need a
   reconciliation pass first.
 
-All five need only the two secrets and the calls in §11.
+**The fourth question is the reason the others wait.** If the configured Odoo
+user lacks Accounting read rights, a discovery run would return a partial field
+list and an empty invoice set — which reads exactly like "this installation has
+no custom fields and no invoices for that subscriber." Answering that permission
+question first is cheaper than acting on a confident-looking wrong answer.
+
+Resuming needs no new build: run the six calls in §11 with any authenticated
+Babil user holding `odoo.read`.
+
+### State at deferral
+
+| | |
+|---|---|
+| `odoo-lookup` Edge Function | deployed, ACTIVE, v1 |
+| Unauthenticated call | correctly rejected — `401 UNAUTHENTICATED` |
+| Odoo writes performed | **none** |
+| `integration_settings.odoo.enabled` | `false` |
+| `odoo_verification_mode()` | `OFF` |
+| `odoo_verification_required()` | `false` |
+| Operational source | **SaaS Excel, unchanged** |
 
 ---
 
