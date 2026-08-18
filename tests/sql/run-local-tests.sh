@@ -90,6 +90,15 @@ fi
 echo "$out9" | grep -E "^  (ok|==) " || true
 passed=$((passed + $(echo "$out9" | grep -c "  ok   ")))
 
+echo "== commission engine vNext =="
+out10=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/commission-vnext.sql 2>&1)
+if echo "$out10" | grep -qE "FAILED|ERROR"; then
+  echo "$out10" | grep -E "FAILED|ERROR" || true
+  echo "COMMISSION VNEXT TESTS FAILED" >&2; exit 1
+fi
+echo "$out10" | grep -E "^   (ok|==) " || true
+passed=$((passed + $(echo "$out10" | grep -c "ok   ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
