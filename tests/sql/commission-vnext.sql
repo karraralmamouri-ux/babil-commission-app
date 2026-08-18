@@ -338,6 +338,61 @@ select pg_temp.ok(
                 and e.reason_code='UNKNOWN_FDT' and s.fdt_code is null),
   'المنطقة القديمة لا تُطالَب بكابينة');
 
+-- الكابينة غير المسجَّلة لا تسقط إلى المنطقة القديمة — القياس على تموز أظهر
+-- 2,977 حدثاً على 92 كابينة غير مسجَّلة تحمل 40.8% من الإجمالي، كلها مُسعَّرة
+-- بنطاق الوكيل بناءً على افتراض لم يخترْه أحد.
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, canceled, raw_parent,
+   event_created_at, fdt_code)
+values ('b1111111-1111-1111-1111-111111111111','EV-UNREG','u-unreg','P-35000',false,
+        'r.old','2026-08-07','99999')
+on conflict do nothing;
+
+insert into public.subscriber_identities
+  (username, identity_status, match_method, source_classification, effective_agent_id)
+values ('u-unreg','MATCHED','EXACT_USERNAME','RESELLER',
+        'a1111111-1111-1111-1111-111111111111')
+on conflict do nothing;
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'c1111111-1111-1111-1111-111111111111';
+select public.calculate_commission_cycle('d1111111-1111-1111-1111-111111111111') is not null
+  as recalc_unreg;
+reset role;
+
+select pg_temp.ok(
+  (select zone from public.commission_qualifying_events
+   where saas_event_id='EV-UNREG') = 'unresolved',
+  'كابينة غير مسجَّلة تُعطي منطقة غير محسومة لا قديمة');
+
+select pg_temp.ok(
+  not exists (select 1 from public.commission_event_entitlements
+              where cycle_id='d1111111-1111-1111-1111-111111111111'
+                and activation_event_id='EV-UNREG'),
+  'الكابينة غير المحسومة لا تُنتج عمولة');
+
+select pg_temp.ok(
+  exists (select 1 from public.commission_exceptions
+          where cycle_id='d1111111-1111-1111-1111-111111111111'
+            and activation_event_id='EV-UNREG' and reason_code='UNKNOWN_FDT'
+            and blocks_finalization),
+  'الكابينة غير المحسومة تُنتج استثناءً حاجباً');
+
+select pg_temp.ok(
+  (select count(*) from public.commission_qualifying_events
+   where fdt_code is null and zone = 'old') > 0,
+  'غياب الكابينة يبقى منطقةً قديمة مشروعة');
+
+-- يُحسَم قبل خطوة الاعتماد لاحقاً، تماماً كما تُحسَم الباقة المجهولة.
+set local role authenticated;
+set local request.jwt.claim.sub = 'c1111111-1111-1111-1111-111111111111';
+select public.resolve_commission_exception(
+  (select id from public.commission_exceptions
+   where cycle_id='d1111111-1111-1111-1111-111111111111'
+     and reason_code='UNKNOWN_FDT' and status='OPEN' limit 1),
+  'WAIVED', 'كابينة تجربة خارج السجل', gen_random_uuid()) is not null as waived_fdt;
+reset role;
+
 -- ===========================================================================
 -- 42. الاعتماد واللقطة
 -- ===========================================================================
