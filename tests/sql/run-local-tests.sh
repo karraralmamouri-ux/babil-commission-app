@@ -144,6 +144,15 @@ fi
 echo "$out15" | grep -E "^ {7,9}(ok|==) " || true
 passed=$((passed + $(echo "$out15" | grep -c "        ok ")))
 
+echo "== rls capability scope =="
+out16=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/rls-capability-scope.sql 2>&1)
+if echo "$out16" | grep -qE "FAILED|ERROR"; then
+  echo "$out16" | grep -E "FAILED|ERROR" || true
+  echo "RLS CAPABILITY TESTS FAILED" >&2; exit 1
+fi
+echo "$out16" | grep -E "^ {8,10}(ok|==) " || true
+passed=$((passed + $(echo "$out16" | grep -c "         ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
