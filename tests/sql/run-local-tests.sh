@@ -108,6 +108,15 @@ fi
 echo "$out11" | grep -E "^ {3,5}(ok|==) " || true
 passed=$((passed + $(echo "$out11" | grep -c "    ok ")))
 
+echo "== odoo integration readiness =="
+out12=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/odoo-integration.sql 2>&1)
+if echo "$out12" | grep -qE "FAILED|ERROR"; then
+  echo "$out12" | grep -E "FAILED|ERROR" || true
+  echo "ODOO INTEGRATION TESTS FAILED" >&2; exit 1
+fi
+echo "$out12" | grep -E "^ {4,6}(ok|==) " || true
+passed=$((passed + $(echo "$out12" | grep -c "     ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
