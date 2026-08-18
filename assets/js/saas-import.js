@@ -124,15 +124,28 @@
   // يُعلنه — أي صفرٌ صامت بدل خطأ ظاهر. لذلك تُقرأ الصيغة صراحةً.
   const COMPACT_TIME = /^(\d{4}-\d{2}-\d{2})[ T](\d{2})(\d{2})(\d{2})$/;
 
+  // الطابع الزمني في التصدير بلا منطقة زمنية، وقراءتُه بالتوقيت المحلي للجهاز
+  // تجعل الملف الواحد يُنتج لحظات UTC مختلفة باختلاف من استورده — وحدثٌ قرب
+  // حدّ الشهر قد يقع عندها في دورة أخرى. لذلك تُثبَّت المنطقة صراحةً.
+  //
+  // و+03:00 ليست اختياراً: بيانات تموز في الإنتاج مخزَّنة بها فعلاً (أقصى حدث
+  // 2026-07-31T20:58:30Z أي 23:58:30 بتوقيت بغداد)، وبغداد بلا توقيت صيفي منذ
+  // 2015. فتثبيتها يطابق المخزَّن ويمنع اختلاف النتيجة بين جهاز وآخر.
+  const SOURCE_UTC_OFFSET = '+03:00';
+  const HAS_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
   function timestamp(value) {
     if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
     const raw = text(value);
     if (raw === null) return null;
 
     const compact = raw.match(COMPACT_TIME);
-    const normalized = compact
+    let normalized = compact
       ? `${compact[1]}T${compact[2]}:${compact[3]}:${compact[4]}`
-      : raw;
+      : raw.replace(' ', 'T');
+
+    // ما حمل منطقةً يُحترم كما هو؛ وما خلا منها يُنسب إلى منطقة المصدر.
+    if (!HAS_ZONE.test(normalized)) normalized += SOURCE_UTC_OFFSET;
 
     const parsed = new Date(normalized);
     return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
