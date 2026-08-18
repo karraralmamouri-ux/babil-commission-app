@@ -3,7 +3,7 @@
 <html lang="ar" dir="rtl"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>لوحة عمولات الوكلاء — HRINS</title>
+<title>BABIL FLOW — Reseller Financial Operations</title>
 <meta name="theme-color" content="#12161c">
 <script src="./assets/vendor/xlsx.full.min.js"></script>
 <script src="./assets/js/installation-fees.js"></script>
@@ -11,39 +11,42 @@
 <script src="./assets/js/operations.js"></script>
 <script src="./assets/js/commission-vnext.js"></script>
 <script src="./assets/js/reporting.js"></script>
-<style>
-:root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
-button,select,input{font:inherit}.wrap{max-width:1450px;margin:auto;padding:22px 16px 60px}.mast{display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:18px}.eyebrow{color:var(--gold);font-size:11px;font-weight:800;letter-spacing:2px}.mast h1{margin:3px 0;font-size:25px}.controls,.toolbar,.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.btn,.select,.input{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 12px}.btn{cursor:pointer;font-size:12px;font-weight:700}.btn:hover{border-color:var(--gold);color:var(--gold)}.btn:disabled{opacity:.45;cursor:not-allowed}.gold{background:rgba(212,162,78,.13);border-color:var(--gold);color:var(--gold)}.danger{background:rgba(212,99,78,.12);border-color:var(--red);color:var(--red)}.green{border-color:var(--green);color:var(--green)}.muted{color:var(--muted)}
-.toolbar{margin-bottom:15px}.search{flex:1;min-width:240px;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:11px 14px;border-radius:9px;outline:0}.search:focus{border-color:var(--gold)}
-.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:15px}.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:var(--radius);padding:13px 15px;min-height:92px}.card .label{font-size:11px;color:var(--muted)}.card .value{font-size:20px;font-weight:800;font-family:Consolas,monospace;margin-top:4px}.card .sub{font-size:10px;color:var(--muted);margin-top:3px}.card.goldline{border-top:3px solid var(--gold)}.card.greenline{border-top:3px solid var(--green)}.card.blueline{border-top:3px solid var(--blue)}.card.redline{border-top:3px solid var(--red)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:15px}.box{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:15px}.box h3{font-size:14px;margin:0 0 12px}.minirow{display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.05);padding:8px 0;font-size:12px}.minirow:last-child{border-bottom:0}.badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:800}.bpaid{background:rgba(78,161,160,.15);color:var(--green)}.bpartial{background:rgba(214,180,76,.15);color:var(--yellow)}.bpending{background:rgba(212,99,78,.15);color:var(--red)}
-details{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:15px;padding:0 15px}summary{cursor:pointer;color:var(--gold);font-weight:800;font-size:12px;padding:12px 0}.settings{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding-bottom:14px}.setting{font-size:11px;color:var(--muted)}.setting input{width:100%;margin-top:4px}
-.tabs{display:flex;gap:5px}.tab{border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:10px 20px;border-radius:9px 9px 0 0;cursor:pointer;font-weight:800;font-size:12px}.tab.active{background:var(--panel2);color:var(--text);border-bottom-color:var(--panel2)}.panel{display:none;background:var(--panel2);border:1px solid var(--line);border-radius:0 10px 10px 10px;padding:12px;overflow:auto}.panel.active{display:block}
-table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{color:var(--muted);font-size:10px;padding:9px 5px;border-bottom:1px solid var(--line);white-space:nowrap}td{padding:6px 5px;text-align:center;border-bottom:1px solid rgba(255,255,255,.045);vertical-align:middle}td:first-child,th:first-child{text-align:right}.name{background:transparent;border:1px solid transparent;color:var(--text);padding:6px;width:100%;border-radius:6px;text-align:right}.name:focus,.name:hover{background:var(--panel);border-color:var(--line);outline:0}.qty{width:55px;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:5px;border-radius:5px;text-align:center}.step{width:24px;height:25px;padding:0;background:var(--panel);color:var(--muted);border:1px solid var(--line);border-radius:4px;cursor:pointer}.qwrap{display:inline-flex;align-items:center;gap:2px}.tier{background:var(--panel);color:var(--text);border:1px solid var(--line);padding:5px;border-radius:6px;font-size:10px}.money{color:var(--gold);font-family:Consolas,monospace;font-weight:800}.smallbtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:5px;padding:4px 7px;cursor:pointer;font-size:10px}.smallbtn:hover{color:var(--gold);border-color:var(--gold)}tfoot td{border-top:2px solid var(--line);font-weight:800;padding:11px}.zoneActions{display:flex;justify-content:space-between;gap:8px;margin-top:12px;flex-wrap:wrap}
-.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:20;align-items:center;justify-content:center;padding:15px}.modal.open{display:flex}.modalbox{width:min(850px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}.modalhead{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px}.modalhead h2{margin:0;font-size:18px}.close{background:transparent;border:0;color:var(--muted);font-size:22px;cursor:pointer}.detailgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.detailcard{background:var(--panel2);padding:10px;border-radius:8px}.detailcard b{display:block;font-size:16px}.formgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.formgrid label{font-size:11px;color:var(--muted)}.formgrid input,.formgrid select{width:100%;margin-top:4px}.field-error{min-height:16px;color:var(--red);font-size:10px;margin-top:5px}.filter-summary{color:var(--muted);font-size:10px;white-space:nowrap}
-.toast{position:fixed;bottom:20px;left:20px;background:var(--panel2);border:1px solid var(--gold);color:var(--text);padding:10px 14px;border-radius:8px;display:none;z-index:50;font-size:12px}.toast.show{display:block}
-.login-screen{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:#0f141a}.login-card{width:min(430px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.35)}.login-card h1{font-size:24px;text-align:center;margin:8px 0}.login-card .sub{text-align:center;color:var(--muted);font-size:12px;margin-bottom:22px}.login-card label{display:block;color:var(--muted);font-size:12px;margin:0 0 6px}.login-card input{width:100%;margin-bottom:13px}.login-error{display:none;background:rgba(212,99,78,.12);border:1px solid var(--red);color:var(--red);border-radius:8px;padding:9px 11px;font-size:12px;margin-bottom:12px}.session-user{display:flex;align-items:center;gap:7px;font-size:11px}.role-pill{background:rgba(212,162,78,.13);color:var(--gold);border:1px solid rgba(212,162,78,.35);border-radius:20px;padding:3px 8px;font-size:10px;font-weight:800}
-.no-permission{padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
-.users-table{min-width:780px}.users-table td{padding:9px 6px}.user-actions{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}.status-active{color:var(--green)}.status-disabled{color:var(--red)}
-.unsaved{display:none;color:var(--yellow);font-size:10px;font-weight:800}.unsaved.show{display:inline-block}
-.mode-banner{display:none;background:rgba(78,127,212,.12);border:1px solid var(--blue);color:var(--text);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:11px}.mode-banner.show{display:block}.mode-banner b{color:#8eb2ef}
-.raw-config-note{font-size:11px;color:var(--muted);margin:-2px 0 12px}.raw-config-table{min-width:900px}.raw-config-table input,.raw-config-table select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px}.raw-config-table .accounts-input{min-width:430px;text-align:left;direction:ltr}.raw-config-actions{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px 0}.import-report{display:none;background:rgba(78,161,160,.1);border:1px solid var(--green);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:11px}.import-report.show{display:block}
-.app-layout{width:min(1680px,100%);margin:auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:18px;padding:16px}.sidebar{position:sticky;top:16px;height:calc(100vh - 32px);background:linear-gradient(180deg,#17212b,#111922);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px;overflow:auto;z-index:41}.side-brand{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--line)}.brand-mark{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--gold),#9b6921);color:#111;font-weight:900}.side-brand h2{font-size:14px;margin:0}.side-brand small{color:var(--muted);font-size:9px}.central-status{display:flex;align-items:center;gap:9px;background:rgba(78,161,160,.1);border:1px solid rgba(78,161,160,.35);border-radius:10px;padding:10px;font-size:11px}.central-status b,.central-status small{display:block}.central-status small{color:var(--muted);font-size:9px;margin-top:1px}.status-dot{width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}.side-section{padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.055)}.side-label{font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.6px;margin:0 4px 6px}.side-nav,.side-actions{display:grid;gap:5px}.side-btn{width:100%;display:flex;align-items:center;gap:9px;text-align:right;background:transparent;border:1px solid transparent;color:var(--muted);border-radius:9px;padding:10px;min-height:40px;cursor:pointer;font-size:11px;font-weight:700}.side-btn:hover,.side-btn.active{background:var(--panel2);border-color:var(--line);color:var(--text)}.side-btn.accent{color:var(--gold);border-color:rgba(212,162,78,.45);background:rgba(212,162,78,.09);margin-bottom:5px}.side-btn.danger{color:var(--red)}.side-bottom{margin-top:auto;display:grid;gap:8px}.side-user{background:var(--panel2);border-radius:10px;padding:10px}.side-user .session-user{margin-bottom:4px}.main-content{min-width:0;padding:6px 0 44px}.wrap{max-width:none;margin:0;padding:0}.mast{background:rgba(24,32,42,.72);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;backdrop-filter:blur(8px)}.mast h1{font-size:22px}.month-controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.toolbar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}.section-anchor{scroll-margin-top:18px}.preparation-note{color:var(--yellow)}#loadingState,#emptyState{display:none}.loading-state,.empty-state{min-height:310px;background:var(--panel);border:1px solid var(--line);border-radius:16px;place-items:center;text-align:center;padding:30px}.loading-state .spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}@keyframes spin{to{transform:rotate(360deg)}}#appShell.workspace-loading #loadingState{display:grid}#appShell.workspace-loading #workspaceContent{display:none}#appShell.workspace-empty #emptyState{display:grid}#appShell.workspace-empty #workspaceContent>:not(#emptyState){display:none!important}#appShell.workspace-empty #comparisonSection{display:none}.workspace-loading .side-actions [data-permission],.workspace-unavailable .side-actions [data-permission]{display:none!important}.central-error{display:none;background:rgba(212,99,78,.1);border:1px solid var(--red);border-radius:12px;padding:22px;text-align:center;margin-top:14px}.workspace-unavailable .central-error{display:block}.workspace-central .central-only{display:flex}.workspace-preparation .central-only,.workspace-loading .central-only,.workspace-unavailable .central-only{display:none}.insight-list{display:grid;gap:8px}.insight{display:flex;align-items:flex-start;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}.insight-dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex:0 0 9px}.insight.good .insight-dot{background:var(--green)}.insight.warn .insight-dot{background:var(--yellow)}.insight.danger .insight-dot{background:var(--red)}.insight b,.insight small{display:block}.insight small{color:var(--muted);font-size:10px}.mobile-menu,.sidebar-overlay{display:none}.user-row-busy{opacity:.55;pointer-events:none}.sticky-table{overflow:auto}.sticky-table th:first-child,.sticky-table td:first-child{position:sticky;right:0;background:var(--panel2);z-index:2}.lang-en .sticky-table th:first-child,.lang-en .sticky-table td:first-child{right:auto;left:0}
-@media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}.app-layout{grid-template-columns:210px minmax(0,1fr)}}@media(max-width:820px){.app-layout{display:block;padding:10px}.mobile-menu{display:flex;position:fixed;top:12px;right:12px;z-index:45;width:44px;height:44px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--text);font-size:20px}.sidebar{position:fixed;top:0;right:0;width:min(320px,88vw);height:100vh;border-radius:0;transform:translateX(105%);transition:transform .2s ease;margin:0}.sidebar.open{transform:translateX(0)}.sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}.sidebar-overlay.show{opacity:1;pointer-events:auto}.main-content{padding:58px 0 30px}.mast{padding:14px}.side-btn{font-size:13px}.smallbtn{min-height:36px;padding:7px 10px}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls,.month-controls{width:100%}.btn{padding:9px 10px;min-height:40px}.card{min-height:84px}}
-.lang-en .side-btn,.lang-en .name{text-align:left}.lang-en td:first-child,.lang-en th:first-child{text-align:left}.lang-en .toast{left:auto;right:20px}
-#passwordModal label{display:block;color:var(--muted);font-size:11px;margin-bottom:10px}#passwordModal .input{display:block;width:100%;margin-top:4px}
-.rp-panel{display:none}.rp-panel.active{display:block}.cx-panel{display:none}.cx-panel.active{display:block}.ops-panel{display:none}.ops-panel.active{display:block}
-</style>
+<link rel="stylesheet" href="./assets/css/babil-flow.css">
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+ <defs>
+  <linearGradient id="bfGold" x1="0" y1="0" x2="1" y2="1">
+   <stop offset="0" stop-color="#E3B75A"/><stop offset="1" stop-color="#A87C1E"/>
+  </linearGradient>
+  <symbol id="bfMark" viewBox="0 0 48 48">
+   <rect width="48" height="48" rx="12" fill="#0B1930"/>
+   <path d="M14 12h11.5a7.5 7.5 0 0 1 0 15H14z" fill="none" stroke="url(#bfGold)" stroke-width="3.4" stroke-linejoin="round"/>
+   <path d="M14 27h13a7.5 7.5 0 0 1 0 15H14z" fill="none" stroke="url(#bfGold)" stroke-width="3.4" stroke-linejoin="round"/>
+   <path d="M27 19.5c6.5 0 9.5-4 12.5-7.5" fill="none" stroke="#F8FAFC" stroke-width="2.6" stroke-linecap="round" opacity=".92"/>
+   <circle cx="39.5" cy="12" r="2.6" fill="#F8FAFC"/>
+  </symbol>
+  <symbol id="bfMarkLight" viewBox="0 0 48 48">
+   <rect width="48" height="48" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+   <path d="M14 12h11.5a7.5 7.5 0 0 1 0 15H14z" fill="none" stroke="url(#bfGold)" stroke-width="3.4" stroke-linejoin="round"/>
+   <path d="M14 27h13a7.5 7.5 0 0 1 0 15H14z" fill="none" stroke="url(#bfGold)" stroke-width="3.4" stroke-linejoin="round"/>
+   <path d="M27 19.5c6.5 0 9.5-4 12.5-7.5" fill="none" stroke="#0B1930" stroke-width="2.6" stroke-linecap="round"/>
+   <circle cx="39.5" cy="12" r="2.6" fill="#0B1930"/>
+  </symbol>
+ </defs>
+</svg>
 
 <div id="loginScreen" class="login-screen" style="display: flex;">
   <div class="login-card">
-    <div class="eyebrow" style="text-align:center">HRINS • RESELLER FINANCE</div>
-    <h1>لوحة عمولات الوكلاء</h1>
-    <div class="sub">تسجيل الدخول إلى النظام</div>
+    <div class="login-brand bf-on-light">
+     <svg width="52" height="52" role="img" aria-label="BABIL FLOW"><use href="#bfMarkLight"/></svg>
+     <div style="text-align:center">
+      <div class="bf-logo-name" style="font-size:19px">BABIL FLOW</div>
+      <div class="bf-logo-desc">Reseller Financial Operations</div>
+     </div>
+    </div>
+    <h1>تسجيل الدخول</h1>
+    <div class="sub">منصة إدارة العمليات المالية للوكلاء</div>
     <label>البريد الإلكتروني</label>
     <input id="loginEmail" class="input" type="email" autocomplete="username" placeholder="name@example.com">
     <label>كلمة المرور</label>
@@ -56,7 +59,13 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 
 <div id="resetPasswordScreen" class="login-screen" style="display:none">
   <div class="login-card">
-    <div class="eyebrow" style="text-align:center">HRINS • RESELLER FINANCE</div>
+    <div class="login-brand bf-on-light">
+     <svg width="52" height="52" role="img" aria-label="BABIL FLOW"><use href="#bfMarkLight"/></svg>
+     <div style="text-align:center">
+      <div class="bf-logo-name" style="font-size:19px">BABIL FLOW</div>
+      <div class="bf-logo-desc">Reseller Financial Operations</div>
+     </div>
+    </div>
     <h1>تعيين كلمة مرور جديدة</h1>
     <div class="sub">أدخل كلمة مرور جديدة لحسابك للمتابعة</div>
     <label>كلمة المرور الجديدة</label>
@@ -73,60 +82,130 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleMobileMenu(false)"></div>
 <div class="app-layout">
 <aside class="sidebar" aria-label="القائمة الرئيسية">
- <div class="side-brand"><div class="brand-mark">HR</div><div><h2>عمولات الوكلاء</h2><small>HRINS • RESELLER FINANCE</small></div></div>
+ <div class="side-brand">
+  <svg width="34" height="34" role="img" aria-label="BABIL FLOW"><use href="#bfMark"/></svg>
+  <div class="bf-logo-text">
+   <span class="bf-logo-name">BABIL FLOW</span>
+   <span class="bf-logo-desc">Reseller Financial Ops</span>
+  </div>
+  <button type="button" id="sidebarToggle" class="sidebar-toggle" onclick="toggleSidebarCollapsed()"
+   aria-label="طيّ القائمة الجانبية" title="طيّ القائمة الجانبية">⟨</button>
+ </div>
  <div id="centralStatus" class="central-status"><span class="status-dot"></span><span><b>جاري الاتصال</b><small>تحميل البيانات المركزية...</small></span></div>
  <div class="side-section">
-  <div class="side-label">العرض والمتابعة</div>
   <nav class="side-nav">
-   <button class="side-btn active" data-nav-target="dashboardSection" onclick="scrollToSection('dashboardSection',this)">▦ ملخص العمولات</button>
-   <button class="side-btn" data-nav-target="agentsSection" onclick="scrollToSection('agentsSection',this)">♟ تفاصيل الوكلاء والكابينات</button>
-   <button class="side-btn" onclick="openAuditLog()">▤ سجل العمليات</button>
-   <button class="side-btn" data-nav-target="installationSection" onclick="scrollToSection('installationSection',this)">🔧 أجور التنصيب</button>
+   <button class="side-btn active" data-nav-target="dashboardSection" onclick="scrollToSection('dashboardSection',this)"><span class="ico" aria-hidden="true">▦</span><span class="txt">الرئيسية</span></button>
   </nav>
  </div>
- <div class="side-section">
-  <div class="side-label">التقارير</div>
-  <div class="side-actions">
-   <button class="side-btn" onclick="exportAll()">⇩ تصدير تقرير العمولات</button>
-   <button class="side-btn" onclick="exportExcelReport()">▦ تقرير Excel متكامل</button>
-   <button class="side-btn" onclick="scrollToSection('comparisonSection')">↕ مقارنة الأشهر</button>
+  <div class="side-group" data-group="commission" data-open="true">
+   <button type="button" class="side-group-head" onclick="toggleNavGroup('commission')" aria-expanded="true">
+    <span>عمولات الوكلاء</span><span class="chev" aria-hidden="true">▾</span></button>
+   <nav class="side-nav">
+   <button class="side-btn" data-nav-target="commissionVNextSection" onclick="scrollToSection('commissionVNextSection',this);switchCxTab('cycle')"><span class="ico" aria-hidden="true">◎</span><span class="txt">نظرة عامة</span></button>
+   <button class="side-btn" data-nav-target="agentsSection" onclick="scrollToSection('agentsSection',this)"><span class="ico" aria-hidden="true">♟</span><span class="txt">الوكلاء والكابينات</span></button>
+   <button class="side-btn" onclick="scrollToSection('commissionVNextSection',this);switchCxTab('scopes')"><span class="ico" aria-hidden="true">▤</span><span class="txt">الاستحقاقات</span></button>
+   <button class="side-btn" data-permission="edit" onclick="scrollToSection('executiveSection',this);switchRpTab('payout')"><span class="ico" aria-hidden="true">◈</span><span class="txt">الصرف</span></button>
+   <button class="side-btn" data-role-permission="edit" onclick="openArchiveManager()"><span class="ico" aria-hidden="true">🗄</span><span class="txt">الأرشيف</span></button>
+   </nav>
   </div>
- </div>
+  <div class="side-group" data-group="installation" data-open="false">
+   <button type="button" class="side-group-head" onclick="toggleNavGroup('installation')" aria-expanded="false">
+    <span>أجور التنصيب</span><span class="chev" aria-hidden="true">▾</span></button>
+   <nav class="side-nav">
+   <button class="side-btn" data-nav-target="installationSection" onclick="scrollToSection('installationSection',this)"><span class="ico" aria-hidden="true">⚙</span><span class="txt">مركز التحكم</span></button>
+   <button class="side-btn" onclick="scrollToSection('installationSection',this)"><span class="ico" aria-hidden="true">👥</span><span class="txt">المشتركون</span></button>
+   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('queues')"><span class="ico" aria-hidden="true">🗓</span><span class="txt">دورة الشهر</span></button>
+   <button class="side-btn" onclick="scrollToSection('executiveSection',this);switchRpTab('installation')"><span class="ico" aria-hidden="true">⚖</span><span class="txt">المطابقة والتدقيق</span></button>
+   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('queues')"><span class="ico" aria-hidden="true">🧾</span><span class="txt">الفواتير</span></button>
+   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('queues')"><span class="ico" aria-hidden="true">✓</span><span class="txt">جاهز للصرف</span></button>
+   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('queues')"><span class="ico" aria-hidden="true">⏸</span><span class="txt">الموقوفون</span></button>
+   <button class="side-btn" data-permission="edit" onclick="scrollToSection('operationsSection',this);switchOpsTab('queues')"><span class="ico" aria-hidden="true">◈</span><span class="txt">الدفعات</span></button>
+   <button class="side-btn" data-permission="edit" onclick="scrollToSection('operationsSection',this);switchOpsTab('import')"><span class="ico" aria-hidden="true">📥</span><span class="txt">الاستيراد / المزامنة</span></button>
+   </nav>
+  </div>
+  <div class="side-group" data-group="master" data-open="false">
+   <button type="button" class="side-group-head" onclick="toggleNavGroup('master')" aria-expanded="false">
+    <span>البيانات الرئيسية</span><span class="chev" aria-hidden="true">▾</span></button>
+   <nav class="side-nav">
+   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('master')"><span class="ico" aria-hidden="true">♟</span><span class="txt">الوكلاء</span></button>
+   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('master');focusFdtOnboarding()"><span class="ico" aria-hidden="true">▥</span><span class="txt">الكابينات FDT</span></button>
+   <button class="side-btn" data-permission="rates" onclick="scrollToSection('operationsSection',this);switchOpsTab('schemes')"><span class="ico" aria-hidden="true">⚖</span><span class="txt">الباقات والإعدادات</span></button>
+   </nav>
+  </div>
+  <div class="side-group" data-group="reports" data-open="false">
+   <button type="button" class="side-group-head" onclick="toggleNavGroup('reports')" aria-expanded="false">
+    <span>التقارير</span><span class="chev" aria-hidden="true">▾</span></button>
+   <nav class="side-nav">
+   <button class="side-btn" data-nav-target="executiveSection" onclick="scrollToSection('executiveSection',this)"><span class="ico" aria-hidden="true">▦</span><span class="txt">مركز التقارير</span></button>
+   <button class="side-btn" onclick="exportAll()"><span class="ico" aria-hidden="true">⇩</span><span class="txt">تصدير تقرير العمولات</span></button>
+   <button class="side-btn" onclick="exportExcelReport()"><span class="ico" aria-hidden="true">▤</span><span class="txt">تقرير Excel متكامل</span></button>
+   <button class="side-btn" onclick="scrollToSection('comparisonSection',this)"><span class="ico" aria-hidden="true">↕</span><span class="txt">مقارنة الأشهر</span></button>
+   </nav>
+  </div>
+  <div class="side-group" data-group="system" data-open="false">
+   <button type="button" class="side-group-head" onclick="toggleNavGroup('system')" aria-expanded="false">
+    <span>النظام</span><span class="chev" aria-hidden="true">▾</span></button>
+   <nav class="side-nav">
+   <button class="side-btn" data-role-permission="users" onclick="openUserManagement()"><span class="ico" aria-hidden="true">👥</span><span class="txt">المستخدمون والصلاحيات</span></button>
+   <button class="side-btn" onclick="openAuditLog()"><span class="ico" aria-hidden="true">▤</span><span class="txt">سجل التدقيق</span></button>
+   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('permissions')"><span class="ico" aria-hidden="true">🔐</span><span class="txt">الصلاحيات الفعّالة</span></button>
+   <button id="refreshCentralSidebarButton" class="side-btn central-only" onclick="refreshCentralData()"><span class="ico" aria-hidden="true">↻</span><span class="txt">تحديث البيانات المركزية</span></button>
+   <button class="side-btn" data-permission="backup" onclick="exportBackup()"><span class="ico" aria-hidden="true">🛡</span><span class="txt">نسخة احتياطية</span></button>
+   </nav>
+  </div>
  <div class="side-section" data-role-permission="edit">
   <div class="side-label">تجهيز الشهر</div>
   <div class="side-actions">
-   <button id="centralPreviewButton" class="side-btn accent" onclick="toggleCentralPreview()">⚙ فتح وضع تجهيز الشهر</button>
-   <button class="side-btn" data-permission="edit" onclick="document.getElementById('fileInput').click()">📥 استيراد ملف التفعيلات الخام</button>
+   <button id="centralPreviewButton" class="side-btn accent" onclick="toggleCentralPreview()"><span class="ico" aria-hidden="true">⚙</span><span class="txt">فتح وضع تجهيز الشهر</span></button>
    <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden onchange="importFile(event)">
-   <button class="side-btn" data-permission="edit" onclick="saveCurrentMonth()">💾 حفظ بيانات الشهر</button>
-   <button class="side-btn gold" data-permission="edit" onclick="publishCurrentMonth()">✓ اعتماد الشهر مركزياً</button>
-   <button class="side-btn" data-permission="edit" onclick="focusMonthPicker()">🗓 اختيار أو تعديل شهر محفوظ</button>
-   <button class="side-btn" data-permission="edit" onclick="startNewMonth()">✨ إنشاء الشهر التالي</button>
-   <button class="side-btn" data-permission="rates" onclick="openSettingsSection('ratesDetails')">⚖ أسعار العمولات والتير</button>
-   <button class="side-btn" data-permission="rates" onclick="openSettingsSection('rawImportSettingsDetails')">🔗 ربط الوكلاء والكابينات</button>
+   <button class="side-btn" data-permission="edit" onclick="document.getElementById('fileInput').click()"><span class="ico" aria-hidden="true">📥</span><span class="txt">استيراد ملف التفعيلات</span></button>
+   <button class="side-btn" data-permission="edit" onclick="saveCurrentMonth()"><span class="ico" aria-hidden="true">💾</span><span class="txt">حفظ بيانات الشهر</span></button>
+   <button class="side-btn gold" data-permission="edit" onclick="publishCurrentMonth()"><span class="ico" aria-hidden="true">✓</span><span class="txt">اعتماد الشهر مركزياً</span></button>
+   <button class="side-btn" data-permission="edit" onclick="focusMonthPicker()"><span class="ico" aria-hidden="true">🗓</span><span class="txt">اختيار شهر محفوظ</span></button>
+   <button class="side-btn" data-permission="edit" onclick="startNewMonth()"><span class="ico" aria-hidden="true">✨</span><span class="txt">إنشاء الشهر التالي</span></button>
+   <button class="side-btn" data-permission="rates" onclick="openSettingsSection('ratesDetails')"><span class="ico" aria-hidden="true">⚖</span><span class="txt">أسعار العمولات والتير</span></button>
+   <button class="side-btn" data-permission="rates" onclick="openSettingsSection('rawImportSettingsDetails')"><span class="ico" aria-hidden="true">🔗</span><span class="txt">ربط الوكلاء والكابينات</span></button>
   </div>
  </div>
  <div class="side-section">
-  <div class="side-label">إدارة النظام</div>
   <div class="side-actions">
-   <button id="refreshCentralSidebarButton" class="side-btn central-only" onclick="refreshCentralData()">↻ تحديث البيانات المركزية</button>
-   <button class="side-btn" data-role-permission="edit" onclick="openArchiveManager()">🗄 إدارة الأرشيف</button>
-   <button class="side-btn" data-role-permission="users" onclick="openUserManagement()">👥 المستخدمون والصلاحيات</button>
-   <button class="side-btn" data-permission="backup" onclick="exportBackup()">🛡 تنزيل نسخة احتياطية</button>
-   <button id="languageButton" class="side-btn" onclick="toggleLanguage()">EN English</button>
+   <button id="languageButton" class="side-btn" onclick="toggleLanguage()"><span class="ico" aria-hidden="true">EN</span><span class="txt">English</span></button>
   </div>
  </div>
  <div class="side-bottom">
-  <div class="side-user"><div class="session-user">👤 <b id="loggedUserName"></b></div><span id="loggedUserRole" class="role-pill"></span></div>
-  <button id="logoutButton" class="side-btn danger">تسجيل الخروج</button>
+  <div class="side-user"><div class="session-user">👤 <b id="sideUserName"></b></div><span id="sideUserRole" class="role-pill"></span></div>
  </div>
 </aside>
-<main class="main-content">
+<main class="main-content" id="mainContent">
+<a href="#monthSection" class="skip-link">تخطَّ إلى المحتوى</a>
+<header class="workspace-header" role="banner">
+ <div class="wh-context">
+  <h1 class="wh-title">BABIL FLOW</h1>
+  <span class="wh-divider" aria-hidden="true"></span>
+  <div>
+   <div class="wh-sub" id="whCycleName">—</div>
+   <div id="whCycleStatus"></div>
+  </div>
+ </div>
+ <div class="cycle-track" id="whCycleTrack" aria-label="مراحل الدورة"></div>
+ <div class="wh-spacer"></div>
+ <div class="wh-actions">
+  <span class="wh-sub" id="whSourceStatus"></span>
+  <button type="button" class="wh-attention" id="whAttention" onclick="jumpToAttention()" aria-label="ما يحتاج انتباهاً" title="ما يحتاج انتباهاً">⚠<span class="count" id="whAttentionCount" hidden>0</span></button>
+  <span class="wh-divider" aria-hidden="true"></span>
+  <div class="wh-user">
+   <span class="wh-avatar" id="whAvatar" aria-hidden="true">؟</span>
+   <span class="session-user" style="color:var(--navy)"><b id="loggedUserName"></b></span>
+   <span id="loggedUserRole" class="role-pill chip-brand"></span>
+  </div>
+  <button id="logoutButton" class="btn" title="تسجيل الخروج" aria-label="تسجيل الخروج">↩</button>
+ </div>
+</header>
 <div class="wrap">
 <header id="monthSection" class="mast section-anchor">
  <div>
-  <div class="eyebrow">HRINS • RESELLER FINANCE</div>
-  <h1>لوحة عمولات الوكلاء</h1>
+  <div class="eyebrow">BABIL FLOW • RESELLER FINANCIAL OPERATIONS</div>
+  <h1>النظرة التنفيذية</h1>
   <div class="muted" style="font-size:11px">متابعة العمولات والصرف والأداء الشهري من مصدر مركزي واحد</div>
  </div>
  <div class="month-controls">
@@ -152,13 +231,36 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 </div>
 <div id="rawImportReport" class="import-report" role="status"></div>
 
-<section id="dashboardSection" class="cards section-anchor">
- <div class="card goldline"><div class="label">إجمالي العمولات</div><div class="value" id="grandTotal">0</div><div class="sub">د.ع</div></div>
- <div class="card blueline"><div class="label">OLD ZONE</div><div class="value" id="oldTotal">0</div><div class="sub" id="oldCount">0 حساب</div></div>
- <div class="card greenline"><div class="label">NEW ZONE</div><div class="value" id="newTotal">0</div><div class="sub" id="newCount">0 كابينة</div></div>
- <div class="card"><div class="label">إجمالي المدفوع</div><div class="value" id="paidTotal">0</div><div class="sub">د.ع</div></div>
- <div class="card"><div class="label">المتبقي</div><div class="value" id="remainingTotal">0</div><div class="sub">د.ع</div></div>
- <div class="card redline"><div class="label">عدد السجلات</div><div class="value" id="agentCount">0</div><div class="sub" id="statusSummary">—</div></div>
+<section id="dashboardSection" class="section-anchor" style="margin-bottom:16px">
+ <div class="cards cards-4">
+  <div class="card kpi-primary"><div class="label">إجمالي المستحق</div><div class="value" id="grandTotal">0</div><div class="sub">د.ع — عمولات وأجور تنصيب</div></div>
+  <div class="card greenline"><div class="label">المدفوع</div><div class="value" id="paidTotal">0</div><div class="sub">د.ع</div></div>
+  <div class="card blueline"><div class="label">المتبقي</div><div class="value" id="remainingTotal">0</div><div class="sub">د.ع</div></div>
+  <div class="card redline"><div class="label">الموقوف / قيد المراجعة</div><div class="value" id="blockedTotal">—</div><div class="sub" id="blockedHint">د.ع — لا يُصرف قبل الحسم</div></div>
+ </div>
+
+ <div class="grid2" style="margin-bottom:0">
+  <div class="box">
+   <h3>◎ عمولات الوكلاء</h3>
+   <div class="split-money">
+    <div class="part released"><span class="k">محسوب</span><span class="value v" id="oldTotal">0</span></div>
+    <div class="part blocked"><span class="k">موقوف</span><span class="value v" id="commissionBlocked">—</span></div>
+    <div class="part exposure"><span class="k">النطاقات</span><span class="value v" id="newTotal">0</span></div>
+   </div>
+   <div class="minirow" style="margin-top:10px"><span class="muted">المنطقة القديمة (بالوكيل)</span><b id="oldCount">0 حساب</b></div>
+   <div class="minirow"><span class="muted">المنطقة الجديدة (بالكابينة)</span><b id="newCount">0 كابينة</b></div>
+  </div>
+  <div class="box">
+   <h3>⚙ أجور التنصيب</h3>
+   <div class="split-money">
+    <div class="part released"><span class="k">مستحق</span><span class="value v" id="installDue">—</span></div>
+    <div class="part blocked"><span class="k">موقوف</span><span class="value v" id="installHeld">—</span></div>
+    <div class="part exposure"><span class="k">مدفوع تاريخياً</span><span class="value v" id="installPaid">—</span></div>
+   </div>
+   <div class="minirow" style="margin-top:10px"><span class="muted">عدد السجلات</span><b id="agentCount">0</b></div>
+   <div class="minirow"><span class="muted">الحالة</span><b id="statusSummary">—</b></div>
+  </div>
+ </div>
 </section>
 
 <div class="grid2">
@@ -595,6 +697,7 @@ function showApp(){
  setWorkspaceMode('loading');
  document.getElementById('loggedUserName').textContent=authProfile?.full_name||authUser?.email||'مستخدم';
  document.getElementById('loggedUserRole').textContent=ROLE_LABELS[authProfile?.role]||authProfile?.role||'';
+ renderHeaderUser();restoreShellPreferences();
  applyPermissions();
  initOperationsWorkspace();
  updateCentralPreviewUI();
@@ -621,6 +724,149 @@ function setWorkspaceMode(mode){
  shell.classList.remove('workspace-loading','workspace-central','workspace-preparation','workspace-unavailable');
  shell.classList.add(`workspace-${mode}`);
 }
+
+/* ---- النظرة التنفيذية ---------------------------------------------------- */
+/* تُقرأ من report_management_summary: رقم الخادم هو الرقم. لا تسعير ولا جمع
+   في المتصفح — الواجهة تعرض ما حسبه المحرّك لا ما استنتجته هي. */
+
+let execSummary=null;
+
+async function loadExecutiveOverview(){
+ const cycleId=document.getElementById("cxCycleSelect")?.value||cxCurrentCycle?.id;
+ if(!cycleId)return;
+ try{
+  const res=await sbRequest("/rest/v1/rpc/report_management_summary",{method:"POST",
+   headers:{"Content-Type":"application/json"},body:JSON.stringify({p_cycle_id:cycleId})});
+  execSummary=res||null;
+  renderExecutiveOverview();
+ }catch(error){
+  /* التقرير تعذّر: تُترك الشرطة ولا يُكتب صفر يُقرأ حقيقةً. */
+  console.error("Management summary:",error);
+  setExecUnavailable();}}
+
+function setExecUnavailable(){
+ ["blockedTotal","commissionBlocked","installDue","installHeld","installPaid"]
+  .forEach(id=>{const el=document.getElementById(id);if(el)el.textContent="—"});
+ const hint=document.getElementById("blockedHint");
+ if(hint)hint.textContent="تعذّر تحميل ملخّص الخادم";}
+
+function renderExecutiveOverview(){
+ if(!execSummary)return;
+ const c=execSummary.commission||{},i=execSummary.installation||{},g=execSummary.global||{};
+ const t=c.totals||{},x=c.exceptions||{};
+ const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=fmt(v||0)};
+
+ /* المستحق يجمع النطاقين، وقواعد محاسبتهما تبقى منفصلة في العرض تحته. */
+ set("grandTotal",g.total_obligations);
+ set("paidTotal",g.total_paid);
+ set("remainingTotal",g.total_remaining);
+
+ set("oldTotal",t.gross);
+ set("newTotal",t.scopes);
+ set("installDue",i.due);
+ set("installHeld",i.held);
+ set("installPaid",i.historical_paid);
+
+ /* المبلغ الموقوف مؤشِّر حجم لا التزام، ويُقال ذلك في العنوان الفرعي. */
+ const blocked=Number(execSummary.blocked_indicative||0);
+ const blockedEl=document.getElementById("blockedTotal");
+ const cblockedEl=document.getElementById("commissionBlocked");
+ if(blockedEl)blockedEl.textContent=blocked?fmt(blocked):"—";
+ if(cblockedEl)cblockedEl.textContent=blocked?fmt(blocked):"—";
+ const hint=document.getElementById("blockedHint");
+ if(hint)hint.textContent=x.blocking?`${fmt(x.blocking)} استثناء حاجب — مبلغ مؤشِّر`:"د.ع — لا يُصرف قبل الحسم";
+
+ renderCycleHeader(c.cycle||cxCurrentCycle,{blocking:x.blocking,
+  sourceLabel:g.current_cycle_status?`الحالة: ${Reporting.statusLabel(g.current_cycle_status)}`:""});}
+
+/* الأثر المالي للحجب يأتي من تقريره الخاص، ويُدمج في الملخّص عند وصوله. */
+async function loadBlockedExposure(){
+ const cycleId=document.getElementById("cxCycleSelect")?.value||cxCurrentCycle?.id;
+ if(!cycleId)return;
+ try{
+  const rows=await sbRequest("/rest/v1/rpc/report_commission_exception_impact",{method:"POST",
+   headers:{"Content-Type":"application/json"},body:JSON.stringify({p_cycle_id:cycleId})});
+  const total=(rows||[]).reduce((a,r)=>a+(Number(r.indicative_amount)||0),0);
+  if(execSummary){execSummary.blocked_indicative=total;renderExecutiveOverview()}
+ }catch(error){console.error("Exception impact:",error)}}
+
+/* ---- هيكل BABIL FLOW ---------------------------------------------------- */
+/* الطيّ وتجميع الملاحة ورأس الدورة. عرضٌ فقط: الخادم يبقى مرجع الصلاحية. */
+
+const BF_NAV_KEY="bf.nav.groups",BF_SIDEBAR_KEY="bf.sidebar.collapsed";
+
+/* التفضيل يُقرأ بحذر: تخزين معطوب أو ممتلئ لا يجوز أن يمنع تشغيل التطبيق. */
+function bfRead(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:JSON.parse(v)}catch(_){return fallback}}
+function bfWrite(key,value){try{localStorage.setItem(key,JSON.stringify(value))}catch(_){/* التخزين ليس شرطاً للعمل */}}
+
+function toggleSidebarCollapsed(force){
+ const next=force===undefined?!document.body.classList.contains("sidebar-collapsed"):!!force;
+ document.body.classList.toggle("sidebar-collapsed",next);
+ const btn=document.getElementById("sidebarToggle");
+ if(btn){btn.textContent=next?"⟩":"⟨";btn.setAttribute("aria-label",next?"توسيع القائمة الجانبية":"طيّ القائمة الجانبية");btn.title=btn.getAttribute("aria-label")}
+ bfWrite(BF_SIDEBAR_KEY,next);}
+
+function toggleNavGroup(key,force){
+ const group=document.querySelector(`.side-group[data-group="${key}"]`);if(!group)return;
+ const next=force===undefined?group.dataset.open!=="true":!!force;
+ group.dataset.open=next?"true":"false";
+ group.querySelector(".side-group-head")?.setAttribute("aria-expanded",String(next));
+ const state=bfRead(BF_NAV_KEY,{});state[key]=next;bfWrite(BF_NAV_KEY,state);}
+
+function restoreShellPreferences(){
+ if(bfRead(BF_SIDEBAR_KEY,false)===true)toggleSidebarCollapsed(true);
+ const state=bfRead(BF_NAV_KEY,{});
+ Object.keys(state).forEach(k=>toggleNavGroup(k,state[k]));}
+
+/* الكابينة غير المسجَّلة: من الاستثناء إلى الشاشة التي يُحسم فيها. */
+function focusFdtOnboarding(){
+ setTimeout(()=>{const el=document.getElementById("fdtOnboarding");
+  if(!el){toast("شاشة الكابينات غير متاحة بصلاحيتك");return}
+  el.scrollIntoView({behavior:"smooth",block:"center"});
+  if(typeof loadUnregisteredFdts==="function")loadUnregisteredFdts()},250)}
+
+/* ما يحتاج انتباهاً يقود إلى طابور الاستثناءات لا إلى رسالة عامة. */
+function jumpToAttention(){
+ scrollToSection("commissionVNextSection");
+ if(typeof switchCxTab==="function")switchCxTab("exceptions");}
+
+/* ---- رأس الدورة --------------------------------------------------------- */
+/* الحالة معروضة دائماً، والرقم غير المعتمد موسوم تقديرياً حيثما ظهر. */
+
+function renderCycleHeader(cycle,extra){
+ const nameEl=document.getElementById("whCycleName"),
+  statusEl=document.getElementById("whCycleStatus"),
+  trackEl=document.getElementById("whCycleTrack");
+ if(!nameEl||!statusEl||!trackEl)return;
+ if(!cycle){nameEl.textContent="لا دورة محدَّدة";statusEl.innerHTML="";trackEl.innerHTML="";return}
+ nameEl.textContent=cycle.name||"—";
+ const stage=Reporting.cycleStage(cycle.status);
+ const projected=Reporting.isProjected(cycle.status);
+ statusEl.innerHTML=stage
+  ? `<span class="cycle-chip ${stage.css}"><span class="dot" aria-hidden="true"></span>${esc(stage.statusLabel)}</span>`
+    +(projected?` <span class="projected-tag">تقديري</span>`:"")
+  : `<span class="cycle-chip cycle-draft"><span class="dot"></span>${esc(Reporting.statusLabel(cycle.status))}</span>`;
+ trackEl.innerHTML=Reporting.CYCLE_STAGES.map((s,i)=>{
+  const cls=stage&&i<stage.index?"done":stage&&i===stage.index?"current":"";
+  const mark=stage&&i<stage.index?"✓":String(i+1);
+  return `<span class="cycle-step ${cls}"><span class="n" aria-hidden="true">${mark}</span>${esc(s.label)}</span>`;
+ }).join(`<span class="cycle-sep" aria-hidden="true"></span>`);
+ const src=document.getElementById("whSourceStatus");
+ if(src&&extra&&extra.sourceLabel)src.textContent=extra.sourceLabel;
+ const count=document.getElementById("whAttentionCount");
+ if(count&&extra&&Number.isFinite(extra.blocking)){
+  count.textContent=fmt(extra.blocking);
+  count.hidden=extra.blocking<=0;}}
+
+/* الحرف الأول للمستخدم: تعريف بصري بلا صورة ولا بيانات إضافية. */
+function renderHeaderUser(){
+ const name=document.getElementById("loggedUserName")?.textContent||"";
+ const av=document.getElementById("whAvatar");
+ if(av)av.textContent=(name.trim()[0]||"؟").toUpperCase();
+ const sideName=document.getElementById("sideUserName"),sideRole=document.getElementById("sideUserRole");
+ if(sideName)sideName.textContent=name;
+ if(sideRole)sideRole.textContent=document.getElementById("loggedUserRole")?.textContent||"";}
+
 function toggleMobileMenu(force){const sidebar=document.querySelector('.sidebar'),overlay=document.getElementById('sidebarOverlay'),button=document.getElementById('mobileMenuButton'),open=force===undefined?!sidebar.classList.contains('open'):!!force;sidebar.classList.toggle('open',open);overlay.classList.toggle('show',open);button.setAttribute('aria-expanded',String(open))}
 function scrollToSection(id,button){document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});toggleMobileMenu(false);if(button){document.querySelectorAll('[data-nav-target]').forEach(item=>item.classList.toggle('active',item===button))}}
 function openSettingsSection(id){const section=document.getElementById(id);if(!section)return;section.open=true;section.scrollIntoView({behavior:'smooth',block:'start'})}
@@ -1831,6 +2077,8 @@ async function loadCommissionCycle(){
  const select=document.getElementById("cxCycleSelect"),host=document.getElementById("cxCycleSummary");
  if(!select?.value||!host)return;
  cxCurrentCycle=cxCycles.find(c=>c.id===select.value)||null;
+ renderCycleHeader(cxCurrentCycle);
+ loadExecutiveOverview().then(loadBlockedExposure);
  host.innerHTML="<div class='muted'>جارٍ التحميل…</div>";
  try{
   const snaps=await sbRequest(`/rest/v1/commission_cycle_snapshots?select=*&cycle_id=eq.${encodeURIComponent(select.value)}`);
