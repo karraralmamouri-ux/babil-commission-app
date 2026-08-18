@@ -223,7 +223,7 @@ select id, now(), 'S-PII', 'u-pii', '000', '111' from public.saas_import_batches
 where source_checksum = 'checksum-fixture-1';
 
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333"}';
+set local request.jwt.claim.sub = '33333333-3333-3333-3333-333333333333';
 
 select case when count(*) = 0 then 'ok    غير المدير لا يقرأ لقطات المستخدمين الخام'
   else 'FAIL  اللقطات الخام مقروءة لغير المدير' end

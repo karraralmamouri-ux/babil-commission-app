@@ -81,6 +81,15 @@ fi
 echo "$out8" | grep -E "^ ok " || true
 passed=$((passed + $(echo "$out8" | grep -c "^ ok ")))
 
+echo "== financial operations engine =="
+out9=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/financial-operations.sql 2>&1)
+if echo "$out9" | grep -qE "FAILED|ERROR"; then
+  echo "$out9" | grep -E "FAILED|ERROR" || true
+  echo "FINANCIAL OPERATIONS TESTS FAILED" >&2; exit 1
+fi
+echo "$out9" | grep -E "^  (ok|==) " || true
+passed=$((passed + $(echo "$out9" | grep -c "  ok   ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
