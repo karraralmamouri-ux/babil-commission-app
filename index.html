@@ -7,6 +7,8 @@
 <meta name="theme-color" content="#12161c">
 <script src="./assets/vendor/xlsx.full.min.js"></script>
 <script src="./assets/js/installation-fees.js"></script>
+<script src="./assets/js/saas-import.js"></script>
+<script src="./assets/js/operations.js"></script>
 <style>
 :root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
@@ -30,6 +32,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}.app-layout{grid-template-columns:210px minmax(0,1fr)}}@media(max-width:820px){.app-layout{display:block;padding:10px}.mobile-menu{display:flex;position:fixed;top:12px;right:12px;z-index:45;width:44px;height:44px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--text);font-size:20px}.sidebar{position:fixed;top:0;right:0;width:min(320px,88vw);height:100vh;border-radius:0;transform:translateX(105%);transition:transform .2s ease;margin:0}.sidebar.open{transform:translateX(0)}.sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}.sidebar-overlay.show{opacity:1;pointer-events:auto}.main-content{padding:58px 0 30px}.mast{padding:14px}.side-btn{font-size:13px}.smallbtn{min-height:36px;padding:7px 10px}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls,.month-controls{width:100%}.btn{padding:9px 10px;min-height:40px}.card{min-height:84px}}
 .lang-en .side-btn,.lang-en .name{text-align:left}.lang-en td:first-child,.lang-en th:first-child{text-align:left}.lang-en .toast{left:auto;right:20px}
 #passwordModal label{display:block;color:var(--muted);font-size:11px;margin-bottom:10px}#passwordModal .input{display:block;width:100%;margin-top:4px}
+.ops-panel{display:none}.ops-panel.active{display:block}
 </style>
 </head>
 <body>
@@ -199,6 +202,59 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 <section id="operationalSection" class="grid2 section-anchor">
  <div class="box"><h3>✦ جاهزية الشهر</h3><div id="readinessInsights" class="insight-list"></div></div>
  <div class="box"><h3>⚑ تنبيهات تشغيلية</h3><div id="operationalAlerts" class="insight-list"></div></div>
+</section>
+<section id="operationsSection" class="section-anchor" style="margin-top:16px">
+ <div class="box">
+  <h3>⚙️ العمليات المالية — أجور التنصيب</h3>
+  <div id="operationsTabs" class="tabs">
+   <button class="tab active" data-ops="queues" onclick="switchOpsTab('queues')">📋 جاهزية الدفع</button>
+   <button class="tab" data-ops="import" onclick="switchOpsTab('import')">📥 مركز الاستيراد</button>
+   <button class="tab" data-ops="schemes" onclick="switchOpsTab('schemes')">🧮 مخططات الأجور</button>
+   <button class="tab" data-ops="master" onclick="switchOpsTab('master')">🗂️ البيانات الرئيسية</button>
+   <button class="tab" data-ops="permissions" onclick="switchOpsTab('permissions')">🔐 الصلاحيات</button>
+   <button class="tab" data-ops="corrections" onclick="switchOpsTab('corrections')">↩️ التصحيح المالي</button>
+  </div>
+
+  <div id="ops-queues" class="ops-panel active">
+   <div class="actions" style="margin-bottom:8px">
+    <button class="btn" onclick="refreshOperationQueues()">تحديث الطوابير</button>
+    <span id="opsReadyTotal" class="muted" style="font-size:11px"></span>
+   </div>
+   <div id="opsQueueCards" class="grid2"></div>
+   <div id="opsQueueDetail" style="margin-top:10px;overflow:auto"></div>
+  </div>
+
+  <div id="ops-import" class="ops-panel">
+   <p class="muted" style="font-size:11px">الاستيراد يقرأ الملف في المتصفح ويعرض ما وجده قبل أي كتابة. كلمة السر تُسقَط عند التحليل ولا تُخزَّن.</p>
+   <input type="file" id="opsImportFile" accept=".xlsx" onchange="previewSaasImport(this)">
+   <div id="opsImportPreview" style="margin-top:10px"></div>
+   <div id="opsBatchList" style="margin-top:12px;overflow:auto"></div>
+  </div>
+
+  <div id="ops-schemes" class="ops-panel">
+   <p class="muted" style="font-size:11px">الإصدار المنشور غير قابل للتعديل. التغيير يتم بإصدار جديد.</p>
+   <div id="opsSchemeList" style="overflow:auto"></div>
+  </div>
+
+  <div id="ops-master" class="ops-panel">
+   <div id="opsMasterUnknown" style="overflow:auto"></div>
+   <div id="opsMasterAgents" style="margin-top:12px;overflow:auto"></div>
+   <div id="opsMasterPackages" style="margin-top:12px;overflow:auto"></div>
+  </div>
+
+  <div id="ops-permissions" class="ops-panel">
+   <div class="actions" style="margin-bottom:8px">
+    <select id="opsPermUser" onchange="renderPermissionWorkspace()"></select>
+    <button class="btn" onclick="loadPermissionWorkspace()">تحميل</button>
+   </div>
+   <div id="opsPermMatrix" style="overflow:auto"></div>
+  </div>
+
+  <div id="ops-corrections" class="ops-panel">
+   <p class="muted" style="font-size:11px">التصحيح لا يعدّل حركة مُرحَّلة، بل يضيف قيداً مقابلاً. النتيجة الصافية تظهر قبل التأكيد.</p>
+   <div id="opsCorrectionList" style="overflow:auto"></div>
+  </div>
+ </div>
 </section>
 <section id="installationSection" class="section-anchor" style="margin-top:16px">
  <div class="box">
@@ -417,6 +473,7 @@ function showApp(){
  document.getElementById('loggedUserName').textContent=authProfile?.full_name||authUser?.email||'مستخدم';
  document.getElementById('loggedUserRole').textContent=ROLE_LABELS[authProfile?.role]||authProfile?.role||'';
  applyPermissions();
+ initOperationsWorkspace();
  updateCentralPreviewUI();
  loadRawImportConfig().then(renderRawImportSettings).catch(error=>console.error('Raw import config:',error));
  applyLanguage();
@@ -1464,7 +1521,156 @@ async function savePayment(z,i){
 function details(z,i){const r=state.data[z][i],c=calc(r),prev=getPreviousRow(z,r.name);openModal(`📋 ${r.name}`,`<div class="detailgrid"><div class="detailcard">المنطقة<b>${z==='old'?'OLD':'NEW'}</b></div><div class="detailcard">الفئة<b>${c.t?c.t.label:'-'}</b></div><div class="detailcard">إجمالي الكمية<b>${fmt(c.qty)}</b></div><div class="detailcard">المستحق<b class="money">${fmt(c.total)}</b></div><div class="detailcard">المدفوع<b>${fmt(c.paid)}</b></div><div class="detailcard">المتبقي<b class="money">${fmt(c.remaining)}</b></div><div class="detailcard">P35<b>${fmt(c.p35)}</b></div><div class="detailcard">P45 / P65<b>${fmt(c.p45)} / ${fmt(c.p65)}</b></div></div><div style="margin-top:14px" class="box"><h3>📈 مقارنة سريعة</h3>${prev?`<div class="minirow"><span>الشهر السابق</span><b>${fmt(prev.total)} د.ع</b></div><div class="minirow"><span>التغيير</span><b>${fmt(c.total-prev.total)} د.ع</b></div>`:'<span class="muted">لا توجد بيانات للشهر السابق</span>'}</div>`)}
 function getPreviousRow(z,name){const current=monthOrder(state.month),key=Object.keys(state.archive).filter(k=>monthOrder(k)<current).sort(compareMonthKeys).pop();if(!key)return null;const snap=state.archive[key],r=(snap.data?.[z]||[]).find(x=>x.name===name);if(!r)return null;const backup=state.tiers;state.tiers=snap.tiers||state.tiers;const c=calc(r);state.tiers=backup;return c}
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.add('open')}
-function closeModal(){document.getElementById('modal').classList.remove('open')}
+function closeModal(){document.getElementById('modal').classList.remove('open')}
+/* ---- العمليات المالية -------------------------------------------------- */
+/* القدرة تُفحص على الخادم قبل كل RPC. ما هنا إخفاءُ ما لا فائدة من عرضه. */
+let opsCapabilities=new Map(),opsQueues=[],opsSchemes=[],opsUsers=[],opsPermTarget=null;
+function opsCan(key){return typeof Operations!=="undefined"&&Operations.can(opsCapabilities,key)}
+function switchOpsTab(k){document.querySelectorAll("#operationsTabs .tab").forEach(b=>b.classList.toggle("active",b.dataset.ops===k));document.querySelectorAll(".ops-panel").forEach(p=>p.classList.toggle("active",p.id==="ops-"+k))}
+async function loadMyCapabilities(){
+ try{const rows=await sbRequest("/rest/v1/rpc/my_capabilities",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+  opsCapabilities=Operations.indexCapabilities(Array.isArray(rows)?rows:[]);applyCapabilityVisibility()}
+ catch(error){if(error?.status!==404)console.warn("capabilities:",error)}}
+function applyCapabilityVisibility(){
+ const show=(id,cap)=>{const el=document.querySelector(id);if(el)el.style.display=opsCan(cap)?"":"none"};
+ show("#operationsTabs [data-ops=import]","saas.import");
+ show("#operationsTabs [data-ops=schemes]","scheme.manage");
+ show("#operationsTabs [data-ops=master]","agent.manage");
+ show("#operationsTabs [data-ops=permissions]","permission.manage");
+ show("#operationsTabs [data-ops=corrections]","payment.correct");
+ const section=document.getElementById("operationsSection");
+ if(section)section.style.display=opsCan("installation.view")?"":"none"}
+
+async function refreshOperationQueues(){
+ const host=document.getElementById("opsQueueCards");if(!host)return;
+ host.innerHTML="<div class='muted'>جارٍ التقييم على الخادم…</div>";
+ try{
+  const ents=await sbRequest("/rest/v1/installation_entitlements?select=id&limit=500");
+  const evals=[];
+  for(const row of (ents||[])){
+   const res=await sbRequest("/rest/v1/rpc/installation_entitlement_eligibility",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p_entitlement_id:row.id})});
+   if(res)evals.push(res)}
+  opsQueues=Operations.buildQueues(evals);
+  host.innerHTML=opsQueues.map(q=>`<div class="box" style="cursor:pointer" onclick="showQueue('${q.key}')"><h3 style="font-size:12px">${esc(q.label)}</h3><div style="font-size:20px;font-weight:700">${fmt(q.count)}</div></div>`).join("");
+  const total=document.getElementById("opsReadyTotal");
+  if(total)total.textContent=`مجموع الجاهز: ${fmt(Operations.readyTotal(evals))} د.ع`;
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+function showQueue(key){
+ const q=opsQueues.find(item=>item.key===key),host=document.getElementById("opsQueueDetail");if(!q||!host)return;
+ if(!q.items.length){host.innerHTML=`<div class="muted">لا سجلات في «${esc(q.label)}»</div>`;return}
+ host.innerHTML=`<table class="raw-config-table"><thead><tr><th>المشترك</th><th>المرحلة</th><th>المبلغ</th><th>الأسباب</th></tr></thead><tbody>`+
+  q.items.map(item=>`<tr><td>${esc(item.subscriber_id||"")}</td><td>${esc(item.stage||"")}</td><td>${fmt(item.amount||0)}</td><td>${esc(Operations.describeBlockers(item.blockers).join("، ")||"—")}</td></tr>`).join("")+"</tbody></table>"}
+
+async function previewSaasImport(input){
+ const host=document.getElementById("opsImportPreview"),file=input?.files?.[0];if(!host||!file)return;
+ host.innerHTML="<div class='muted'>جارٍ القراءة…</div>";
+ try{
+  const buffer=await file.arrayBuffer();
+  const wb=XLSX.read(buffer,{type:"array",cellDates:true});
+  const sheets=wb.SheetNames.map(name=>({name,rows:XLSX.utils.sheet_to_json(wb.Sheets[name],{defval:null,raw:true})}));
+  const parsed=SaasImport.parseWorkbook(sheets);
+  host.innerHTML=`<div class="muted" style="font-size:11px">أعمدة سرية أُسقطت: ${parsed.secretsDropped} — لا تُخزَّن ولا تُسجَّل.</div>`+
+   `<table class="raw-config-table"><thead><tr><th>الشيت</th><th>الصفوف</th><th>النوع</th><th>مقبول</th><th>مكرر</th></tr></thead><tbody>`+
+   parsed.sheetResults.map(r=>`<tr><td>${esc(r.sheet)}</td><td>${fmt(r.rows)}</td><td>${esc(r.kind)}${r.reason?" — "+esc(r.reason):""}</td><td>${fmt(r.imported||0)}</td><td>${fmt(r.duplicates||0)}</td></tr>`).join("")+"</tbody></table>"+
+   `<div class="muted" style="font-size:11px;margin-top:6px">أحداث: ${fmt(parsed.events.length)} · مستخدمون: ${fmt(parsed.users.length)} · مكرر: ${fmt(parsed.duplicateCount)}<br>التغطية المرصودة: ${esc(parsed.observedMinCreatedAt||"—")} … ${esc(parsed.observedMaxCreatedAt||"—")}<br>الاكتمال: ${esc(parsed.completenessStatus)} — الحدود المرصودة لا تُثبت التغطية.</div>`;
+ }catch(error){host.innerHTML=`<div class="muted">تعذّرت القراءة: ${esc(error?.message||"خطأ")}</div>`}}
+async function loadImportBatches(){
+ const host=document.getElementById("opsBatchList");if(!host)return;
+ try{const rows=await sbRequest("/rest/v1/saas_import_batches?select=id,source_filename,source_kind,completeness_status,imported_row_count,imported_at&order=imported_at.desc&limit=25");
+  host.innerHTML=(rows||[]).length?`<table class="raw-config-table"><thead><tr><th>الملف</th><th>النوع</th><th>الصفوف</th><th>الاكتمال</th></tr></thead><tbody>`+
+   rows.map(r=>`<tr><td>${esc(r.source_filename)}</td><td>${esc(r.source_kind)}</td><td>${fmt(r.imported_row_count||0)}</td><td>${esc(r.completeness_status)}</td></tr>`).join("")+"</tbody></table>":"<div class='muted'>لا دفعات مستوردة بعد.</div>"}
+ catch(error){if(error?.status!==404)host.innerHTML=""}}
+
+async function loadSchemes(){
+ const host=document.getElementById("opsSchemeList");if(!host)return;
+ try{
+  const versions=await sbRequest("/rest/v1/installation_scheme_versions?select=id,version,status,total_amount,effective_from&order=version.asc");
+  const stages=await sbRequest("/rest/v1/installation_stage_definitions?select=scheme_version_id,sequence,code,display_name_ar,amount,expected_remaining&order=sequence.asc");
+  opsSchemes=versions||[];
+  host.innerHTML=(versions||[]).map(v=>{
+   const mine=Operations.orderedStages((stages||[]).filter(s=>s.scheme_version_id===v.id));
+   const locked=!Operations.isEditableVersion(v);
+   return `<div class="box" style="margin-bottom:8px"><h3 style="font-size:12px">الإصدار ${fmt(v.version)} — ${esc(v.status)} ${locked?"🔒":"✏️"} · المجموع ${fmt(Operations.schemeTotal(mine))} د.ع</h3>`+
+    `<table class="raw-config-table"><thead><tr><th>#</th><th>الرمز</th><th>الاسم</th><th>المبلغ</th><th>المتبقي المتوقع</th></tr></thead><tbody>`+
+    mine.map(s=>`<tr><td>${fmt(s.sequence)}</td><td>${esc(s.code)}</td><td>${esc(s.display_name_ar)}</td><td>${fmt(s.amount)}</td><td>${s.expected_remaining==null?"—":fmt(s.expected_remaining)}</td></tr>`).join("")+"</tbody></table>"+
+    (locked?"<div class='muted' style='font-size:10px'>إصدار منشور — التعديل يتم بإصدار جديد.</div>":"")+"</div>"}).join("");
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function loadMasterData(){
+ const unknown=document.getElementById("opsMasterUnknown"),agents=document.getElementById("opsMasterAgents"),packages=document.getElementById("opsMasterPackages");
+ try{
+  const aliases=await sbRequest("/rest/v1/agent_aliases?select=id,alias,resolution,agent_id&order=alias.asc&limit=300");
+  const review=(aliases||[]).filter(a=>a.resolution==="needs_review");
+  if(unknown)unknown.innerHTML=`<div class="box"><h3 style="font-size:12px">أسماء تحتاج مراجعة (${fmt(review.length)})</h3>`+
+   (review.length?`<table class="raw-config-table"><thead><tr><th>الاسم الوارد</th><th>الحالة</th></tr></thead><tbody>`+
+    review.map(a=>`<tr><td>${esc(a.alias)}</td><td>${esc(a.resolution)}</td></tr>`).join("")+"</tbody></table>":"<div class='muted'>لا شيء ينتظر المراجعة.</div>")+"</div>";
+  const agentRows=await sbRequest("/rest/v1/agents?select=id,code,official_name,status&order=code.asc&limit=200");
+  if(agents)agents.innerHTML=`<div class="box"><h3 style="font-size:12px">الوكلاء (${fmt((agentRows||[]).length)})</h3>`+
+   `<table class="raw-config-table"><thead><tr><th>الرمز</th><th>الاسم</th><th>الحالة</th></tr></thead><tbody>`+
+   (agentRows||[]).map(a=>`<tr><td>${esc(a.code)}</td><td>${esc(a.official_name)}</td><td>${esc(a.status)}</td></tr>`).join("")+"</tbody></table></div>";
+  const pkgRows=await sbRequest("/rest/v1/packages?select=code,name,semantic_category&order=code.asc");
+  if(packages)packages.innerHTML=`<div class="box"><h3 style="font-size:12px">الباقات والخدمات</h3>`+
+   `<table class="raw-config-table"><thead><tr><th>الرمز</th><th>الدلالة</th></tr></thead><tbody>`+
+   (pkgRows||[]).map(p=>`<tr><td>${esc(p.code)}</td><td>${esc(p.semantic_category)}</td></tr>`).join("")+"</tbody></table>"+
+   "<div class='muted' style='font-size:10px'>الدلالة ليست أهلية مالية: الأهلية تأتي من تهيئة المخطط.</div></div>";
+ }catch(error){if(unknown)unknown.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function loadPermissionWorkspace(){
+ const select=document.getElementById("opsPermUser");if(!select)return;
+ try{
+  const rows=await sbRequest("/rest/v1/profiles?select=id,full_name,email,role,is_active&order=full_name.asc");
+  opsUsers=(rows||[]).filter(u=>u.is_active);
+  select.innerHTML=opsUsers.map(u=>`<option value="${esc(u.id)}">${esc(u.full_name||u.email)} — ${esc(u.role)}</option>`).join("");
+  renderPermissionWorkspace()}
+ catch(error){select.innerHTML="";}}
+async function renderPermissionWorkspace(){
+ const host=document.getElementById("opsPermMatrix"),select=document.getElementById("opsPermUser");
+ if(!host||!select?.value)return;
+ opsPermTarget=select.value;
+ host.innerHTML="<div class='muted'>جارٍ الحساب…</div>";
+ try{
+  const caps=await sbRequest("/rest/v1/permission_capabilities?select=key,domain,label_ar,is_sensitive&order=domain.asc,key.asc");
+  const overrides=await sbRequest(`/rest/v1/user_permission_overrides?select=capability_key,effect,scope_type,scope_id,reason&user_id=eq.${encodeURIComponent(opsPermTarget)}`);
+  const templates=await sbRequest("/rest/v1/role_template_capabilities?select=role_key,capability_key");
+  const user=opsUsers.find(u=>u.id===opsPermTarget);
+  const inherited=new Set((templates||[]).filter(t=>t.role_key===user?.role).map(t=>t.capability_key));
+  const byCap=new Map((overrides||[]).map(o=>[o.capability_key,o]));
+  host.innerHTML=`<table class="raw-config-table"><thead><tr><th>القدرة</th><th>القالب</th><th>التجاوز</th><th>النتيجة</th><th></th></tr></thead><tbody>`+
+   (caps||[]).map(c=>{
+    const ov=byCap.get(c.key),inh=inherited.has(c.key);
+    const effective=ov?ov.effect==="GRANT":inh;
+    return `<tr><td>${esc(c.label_ar)}<div class="muted" style="font-size:10px">${esc(c.key)}${c.is_sensitive?" · حسّاسة":""}</div></td>`+
+     `<td>${inh?"موروثة":"—"}</td><td>${ov?esc(ov.effect):"وراثة"}</td>`+
+     `<td style="font-weight:700">${effective?"مسموح":"ممنوع"}</td>`+
+     `<td><button class="smallbtn" onclick="setPermission('${esc(c.key)}','GRANT')">منح</button> `+
+     `<button class="smallbtn" onclick="setPermission('${esc(c.key)}','DENY')">منع</button> `+
+     `<button class="smallbtn" onclick="setPermission('${esc(c.key)}','INHERIT')">وراثة</button></td></tr>`}).join("")+"</tbody></table>";
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+async function setPermission(capability,effect){
+ if(!opsPermTarget)return;
+ if(!confirm(`تأكيد تغيير «${capability}» إلى ${effect}؟`))return;
+ try{
+  await sbRequest("/rest/v1/rpc/set_user_permission",{method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({p_user_id:opsPermTarget,p_capability:capability,p_effect:effect,p_scope_type:"GLOBAL",p_scope_id:null,p_reason:"تغيير من واجهة الإدارة",p_request_id:createRequestId()})});
+  toast("تم تحديث الصلاحية");renderPermissionWorkspace()}
+ catch(error){alert(error?.message||"تعذّر التغيير")}}
+
+async function loadCorrections(){
+ const host=document.getElementById("opsCorrectionList");if(!host)return;
+ try{
+  const rows=await sbRequest("/rest/v1/financial_ledger?select=id,domain,txn_type,agent_name,month_key,amount,direction,reason,created_at&order=created_at.desc&limit=50");
+  host.innerHTML=(rows||[]).length?`<table class="raw-config-table"><thead><tr><th>المجال</th><th>النوع</th><th>الوكيل</th><th>المبلغ</th><th>الاتجاه</th><th>السبب</th></tr></thead><tbody>`+
+   rows.map(r=>`<tr><td>${esc(r.domain)}</td><td>${esc(r.txn_type)}</td><td>${esc(r.agent_name||"—")}</td><td>${fmt(r.amount)}</td><td>${r.direction>0?"إضافة":"عكس"}</td><td>${esc(r.reason||"—")}</td></tr>`).join("")+"</tbody></table>":
+   "<div class='muted'>لا حركات في الدفتر بعد. التصحيح يظهر هنا فور وقوعه.</div>";
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function initOperationsWorkspace(){
+ if(typeof Operations==="undefined")return;
+ await loadMyCapabilities();
+ if(!opsCan("installation.view"))return;
+ loadSchemes();loadImportBatches();loadMasterData();loadCorrections();
+ if(opsCan("permission.manage"))loadPermissionWorkspace();}
+
 function switchTab(z){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.zone===z));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+z))}
 function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'0')+'/'+date.getFullYear()}
 function monthOrder(key){const m=String(key||'').match(/^(0[1-9]|1[0-2])\/(\d{4})$/);if(!m)return NaN;return Number(m[2])*12+Number(m[1])-1}
