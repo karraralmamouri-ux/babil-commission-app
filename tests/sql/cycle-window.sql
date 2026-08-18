@@ -300,4 +300,36 @@ select pg_temp.ok(
 
 reset role;
 
+
+-- ---------------------------------------------------------------------------
+-- التسعير بالانضمام يُعطي الرقم نفسه الذي كان يُعطيه النداء لكل صف
+--
+-- التسريع الذي يُغيّر الرقم ليس تسريعاً بل عيباً جديداً. يُقارَن الناتج هنا
+-- بالحساب المرجعي المبني على commission_rate_for مباشرةً.
+-- ---------------------------------------------------------------------------
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'c0000000-0000-0000-0000-0000000000c1';
+
+select pg_temp.ok(
+  (public.fdt_blocked_amount('c0000000-0000-0000-0000-0000000000c4','CW-UNREG')
+     ->> 'indicative_amount')::bigint
+  = (select coalesce(sum(coalesce(public.commission_rate_for(
+       public.commission_version_for_cycle('c0000000-0000-0000-0000-0000000000c4'),
+       'new', 1, e.profile_name), 0)), 0)
+     from public.saas_activation_events e
+     left join public.fdts f on f.code = e.fdt_code
+     where e.fdt_code = 'CW-UNREG' and f.code is null
+       and coalesce(e.canceled,false) = false
+       and e.event_created_at >= public.cycle_window_start(date '2026-07-01')
+       and e.event_created_at < public.cycle_window_end(date '2026-07-31')),
+  'التسعير بالانضمام يطابق التسعير المرجعي');
+
+select pg_temp.ok(
+  (select count(*) from public.indicative_rates('c0000000-0000-0000-0000-0000000000c4')
+   where rate > 0) >= 1,
+  'جدول السعر المؤشِّر يحمل سعراً حقيقياً');
+
+reset role;
+
 rollback;
