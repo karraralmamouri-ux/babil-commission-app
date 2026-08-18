@@ -1,5 +1,13 @@
 # SaaS Import and Matching Contract
 
+> **Measured against the real workbooks on 2026-08-18.** Several assumptions in
+> this document are now confirmed or corrected by evidence — see
+> [saas-source-empirical-findings.md](saas-source-empirical-findings.md).
+> Notably: event-level deduplication is proven necessary (29% of July events
+> share a username with another event), the corrupted May headers are real, both
+> `TTH_Users` and `FTTH_Users` spellings occur, and `users all.xlsx` carries a
+> `ct_password` column that must never be persisted.
+
 ---
 
 ## 1. How import works today
