@@ -152,10 +152,13 @@ also personal data and need a deliberate retention decision before ingestion.
 
 ## 8. Open before ingestion
 
-1. **May `Sheet1` / `Sheet2`** — one raw-shaped row each. Strays, or real events
-   excluded from `Worksheet`? Importing both sheets and the worksheet risks a
-   duplicate; importing only `Worksheet` risks losing two events. The event `id`
-   would resolve it, but the decision is a business one.
+1. ~~**May `Sheet1` / `Sheet2`**~~ — **resolved by measurement.** Both rows are
+   duplicates of rows already inside `Worksheet`. Importing all three sheets and
+   deduplicating on the event `id` yields exactly 28,233 unique events: the
+   `Worksheet` pass reports `dupes=2`, which are those same two events arriving
+   a second time. Nothing is lost and nothing is double-counted, so both feared
+   outcomes are avoided by one rule. See
+   `data-intelligence-foundation-as-built.md` §2.
 2. **`Diamond` package** — one user in the snapshot. Semantic class unknown;
    defaults to `UNKNOWN`, never to a paid package.
 3. **`office.1`** and other non-`r.` non-direct-company parents — review, never
@@ -164,4 +167,14 @@ also personal data and need a deliberate retention decision before ingestion.
    explicitly; `created_at` ranges must be measured before a completeness flag
    can honestly be set, and the New/Existing rule depends on that flag.
 
-None of these block schema design. All of them block **ingestion**.
+Items 2–4 are settled by approved default rather than by evidence: `Diamond`
+stays `UNKNOWN`, `office.1` goes to review, and completeness stays `UNKNOWN` so
+`NEW` is unreachable until a source declares its coverage. Item 1 is settled by
+measurement. Schema and ingestion are both unblocked; what remains blocked is
+any rule that needs a *complete* source — by design.
+
+One further gap was found while building and is recorded in
+`data-intelligence-foundation-as-built.md` §5: **May carries no topology at
+all.** Its `lastnam` column holds none, so the parser extracts 0 FDT codes from
+28,233 events where July yields 29,282. Confirmed by scanning every column of
+the sheet, so the zero is a property of the file, not a parser defect.

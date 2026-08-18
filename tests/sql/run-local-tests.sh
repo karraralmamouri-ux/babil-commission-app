@@ -71,6 +71,16 @@ fi
 echo "$out7" | grep -E "| (pass|FAIL)" || true
 passed=$((passed + $(echo "$out7" | grep -c "| pass")))
 
+echo "== data intelligence foundation =="
+out8=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q \
+        < tests/sql/data-intelligence.sql 2>&1)
+if echo "$out8" | grep -qE "FAIL|ERROR"; then
+  echo "$out8" | grep -E "FAIL|ERROR" || true
+  echo "DATA INTELLIGENCE TESTS FAILED" >&2; exit 1
+fi
+echo "$out8" | grep -E "^ ok " || true
+passed=$((passed + $(echo "$out8" | grep -c "^ ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
