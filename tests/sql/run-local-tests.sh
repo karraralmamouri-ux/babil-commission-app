@@ -99,6 +99,15 @@ fi
 echo "$out10" | grep -E "^   (ok|==) " || true
 passed=$((passed + $(echo "$out10" | grep -c "ok   ")))
 
+echo "== commission payout and reporting =="
+out11=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/commission-payout.sql 2>&1)
+if echo "$out11" | grep -qE "FAILED|ERROR"; then
+  echo "$out11" | grep -E "FAILED|ERROR" || true
+  echo "COMMISSION PAYOUT TESTS FAILED" >&2; exit 1
+fi
+echo "$out11" | grep -E "^ {3,5}(ok|==) " || true
+passed=$((passed + $(echo "$out11" | grep -c "    ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh

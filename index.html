@@ -10,6 +10,7 @@
 <script src="./assets/js/saas-import.js"></script>
 <script src="./assets/js/operations.js"></script>
 <script src="./assets/js/commission-vnext.js"></script>
+<script src="./assets/js/reporting.js"></script>
 <style>
 :root{--bg:#0f141a;--panel:#18202a;--panel2:#202a36;--line:#2d3947;--text:#edf0f3;--muted:#9aa6b2;--gold:#d4a24e;--green:#4ea1a0;--blue:#4e7fd4;--purple:#b06ad4;--red:#d4634e;--yellow:#d6b44c;--radius:12px}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(1000px 500px at 80% -10%,rgba(212,162,78,.09),transparent 60%),var(--bg);color:var(--text);font-family:"Segoe UI",Tahoma,Arial,sans-serif;line-height:1.5}
@@ -33,7 +34,7 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 @media(max-width:1100px){.cards{grid-template-columns:repeat(3,1fr)}.app-layout{grid-template-columns:210px minmax(0,1fr)}}@media(max-width:820px){.app-layout{display:block;padding:10px}.mobile-menu{display:flex;position:fixed;top:12px;right:12px;z-index:45;width:44px;height:44px;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--text);font-size:20px}.sidebar{position:fixed;top:0;right:0;width:min(320px,88vw);height:100vh;border-radius:0;transform:translateX(105%);transition:transform .2s ease;margin:0}.sidebar.open{transform:translateX(0)}.sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}.sidebar-overlay.show{opacity:1;pointer-events:auto}.main-content{padding:58px 0 30px}.mast{padding:14px}.side-btn{font-size:13px}.smallbtn{min-height:36px;padding:7px 10px}}@media(max-width:720px){.cards,.grid2,.settings,.detailgrid,.formgrid{grid-template-columns:1fr}.mast{align-items:flex-start}.controls,.month-controls{width:100%}.btn{padding:9px 10px;min-height:40px}.card{min-height:84px}}
 .lang-en .side-btn,.lang-en .name{text-align:left}.lang-en td:first-child,.lang-en th:first-child{text-align:left}.lang-en .toast{left:auto;right:20px}
 #passwordModal label{display:block;color:var(--muted);font-size:11px;margin-bottom:10px}#passwordModal .input{display:block;width:100%;margin-top:4px}
-.cx-panel{display:none}.cx-panel.active{display:block}.ops-panel{display:none}.ops-panel.active{display:block}
+.rp-panel{display:none}.rp-panel.active{display:block}.cx-panel{display:none}.cx-panel.active{display:block}.ops-panel{display:none}.ops-panel.active{display:block}
 </style>
 </head>
 <body>
@@ -203,6 +204,64 @@ table{width:100%;border-collapse:collapse;min-width:1050px;font-size:12px}th{col
 <section id="operationalSection" class="grid2 section-anchor">
  <div class="box"><h3>✦ جاهزية الشهر</h3><div id="readinessInsights" class="insight-list"></div></div>
  <div class="box"><h3>⚑ تنبيهات تشغيلية</h3><div id="operationalAlerts" class="insight-list"></div></div>
+</section>
+<section id="executiveSection" class="section-anchor" style="margin-top:16px">
+ <div class="box">
+  <h3>🏛️ نظرة الإدارة</h3>
+  <div class="actions" style="margin-bottom:8px">
+   <button class="btn" onclick="loadExecutiveOverview()">تحديث</button>
+   <span id="execCycleTag" class="muted" style="font-size:11px"></span>
+  </div>
+  <div id="execCards" class="grid2"></div>
+  <div id="execReconcile" class="muted" style="font-size:11px;margin-top:8px"></div>
+ </div>
+
+ <div class="box" style="margin-top:12px">
+  <h3>📑 التقارير</h3>
+  <div id="reportTabs" class="tabs">
+   <button class="tab active" data-rp="cycle" onclick="switchRpTab('cycle')">تفصيل دورة العمولة</button>
+   <button class="tab" data-rp="agent" onclick="switchRpTab('agent')">كشف حساب وكيل</button>
+   <button class="tab" data-rp="installation" onclick="switchRpTab('installation')">أجور التنصيب</button>
+   <button class="tab" data-rp="exceptions" onclick="switchRpTab('exceptions')">الاستثناءات</button>
+   <button class="tab" data-rp="audit" onclick="switchRpTab('audit')">التدقيق والتصحيحات</button>
+   <button class="tab" data-rp="payout" onclick="switchRpTab('payout')">دفعات العمولة</button>
+  </div>
+
+  <div id="rp-cycle" class="rp-panel active">
+   <div class="actions" style="margin-bottom:8px">
+    <select id="rpCycleSelect" class="select" onchange="loadCycleReport()"></select>
+    <button class="btn" id="rpExportCycle" onclick="exportCycleReport()">تصدير CSV</button>
+   </div>
+   <div id="rpCycleTable" style="overflow:auto"></div>
+  </div>
+
+  <div id="rp-agent" class="rp-panel">
+   <div class="actions" style="margin-bottom:8px">
+    <select id="rpAgentSelect" class="select" onchange="loadAgentStatement()"></select>
+   </div>
+   <div id="rpAgentBody"></div>
+  </div>
+
+  <div id="rp-installation" class="rp-panel"><div id="rpInstallation"></div></div>
+
+  <div id="rp-exceptions" class="rp-panel">
+   <div class="actions" style="margin-bottom:8px">
+    <button class="btn" onclick="loadExceptionWorkspace()">تحديث</button>
+    <button class="btn" id="rpExportExceptions" onclick="exportExceptions()">تصدير CSV</button>
+   </div>
+   <div id="rpExceptions" style="overflow:auto"></div>
+  </div>
+
+  <div id="rp-audit" class="rp-panel"><div id="rpAudit" style="overflow:auto"></div></div>
+
+  <div id="rp-payout" class="rp-panel">
+   <p class="muted" style="font-size:11px">الدفع يقرأ الإجمالي من اللقطة المعتمدة والمدفوع من الدفتر. كل بند يُعاد التحقق منه لحظة الترحيل.</p>
+   <div class="actions" style="margin-bottom:8px">
+    <button class="btn" onclick="loadPayoutBatches()">تحديث</button>
+   </div>
+   <div id="rpPayout" style="overflow:auto"></div>
+  </div>
+ </div>
 </section>
 <section id="commissionVNextSection" class="section-anchor" style="margin-top:16px">
  <div class="box">
@@ -1732,7 +1791,8 @@ async function initOperationsWorkspace(){
  if(!opsCan("installation.view"))return;
  loadSchemes();loadImportBatches();loadMasterData();loadCorrections();
  if(opsCan("permission.manage"))loadPermissionWorkspace();
- initCommissionVNext();}
+ initCommissionVNext();
+ initReporting();}
 
 /* ---- العمولة vNext ------------------------------------------------------ */
 /* لا حساب مالي هنا. الشريحة والمبالغ وأساسها من الخادم؛ وهذا عرضٌ فقط. */
@@ -1887,6 +1947,175 @@ async function initCommissionVNext(){
  const show=(sel,cap)=>{const el=document.querySelector(sel);if(el)el.style.display=opsCan(cap)?"":"none"};
  show("#commissionTabs [data-cx=config]","commission.configure");
  loadCommissionCycles();loadCommissionConfig();loadAgentList();}
+
+/* ---- التقارير والدفع ---------------------------------------------------- */
+/* كل رقم من الخادم. المصالحة تُفحص قبل العرض حتى لا تتعارض شاشة مع نفسها. */
+let rpCycles=[],rpAgents=[],rpExceptionRows=[],rpCycleRows=[];
+function switchRpTab(k){document.querySelectorAll("#reportTabs .tab").forEach(b=>b.classList.toggle("active",b.dataset.rp===k));document.querySelectorAll(".rp-panel").forEach(p=>p.classList.toggle("active",p.id==="rp-"+k))}
+
+function downloadCsv(name,csv){
+ const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+ const url=URL.createObjectURL(blob),a=document.createElement("a");
+ a.href=url;a.download=name;document.body.appendChild(a);a.click();
+ document.body.removeChild(a);URL.revokeObjectURL(url)}
+
+async function loadExecutiveOverview(){
+ const host=document.getElementById("execCards");if(!host)return;
+ if(!opsCan("report.view")){host.innerHTML="<div class='muted'>لا صلاحية لعرض التقارير.</div>";return}
+ host.innerHTML="<div class='muted'>جارٍ التحميل…</div>";
+ try{
+  const p=await sbRequest("/rest/v1/rpc/report_management_summary",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({})});
+  const cards=Reporting.summaryCards(p);
+  if(!cards.length){host.innerHTML="<div class='muted'>لا بيانات بعد.</div>";return}
+  host.innerHTML=cards.map(c=>`<div class="box" style="cursor:pointer" onclick="switchRpTab('${c.drill==="exceptions"?"exceptions":c.drill==="installation"?"installation":"cycle"}')">`+
+   `<h3 style="font-size:12px">${esc(c.label)}</h3><div style="font-size:20px;font-weight:700">${fmt(c.value)}${c.unit?" <span style='font-size:11px'>"+esc(c.unit)+"</span>":""}</div></div>`).join("");
+  const tag=document.getElementById("execCycleTag");
+  if(tag)tag.textContent=`الدورة الحالية: ${p?.global?.current_cycle||"—"} — ${Reporting.statusLabel(p?.global?.current_cycle_status)}`;
+  const totals=p?.commission?.totals;
+  if(totals&&rpCycleRows.length){
+   const r=Reporting.reconcile(totals,rpCycleRows);
+   const el=document.getElementById("execReconcile");
+   if(el)el.textContent=r.ok?"الملخّص والتفصيل متطابقان.":`تعارض: ${r.diffs.map(d=>d.field).join("، ")}`}
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function loadReportCycles(){
+ const select=document.getElementById("rpCycleSelect");if(!select)return;
+ try{const rows=await sbRequest("/rest/v1/commission_cycles?select=id,name,status&order=period_start.desc");
+  rpCycles=rows||[];
+  select.innerHTML=rpCycles.length?rpCycles.map(c=>`<option value="${esc(c.id)}">${esc(c.name)} — ${esc(Reporting.statusLabel(c.status))}</option>`).join(""):"<option value=''>لا دورات</option>";
+  if(rpCycles.length)loadCycleReport()}
+ catch(error){if(error?.status!==404)console.warn("report cycles:",error)}}
+
+async function loadCycleReport(){
+ const select=document.getElementById("rpCycleSelect"),host=document.getElementById("rpCycleTable");
+ if(!select?.value||!host)return;
+ host.innerHTML="<div class='muted'>جارٍ التحميل…</div>";
+ try{
+  const rows=await sbRequest("/rest/v1/rpc/report_commission_cycle_detail",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p_cycle_id:select.value})});
+  rpCycleRows=rows||[];
+  if(!rpCycleRows.length){host.innerHTML="<div class='muted'>لا نطاقات في هذه الدورة.</div>";return}
+  host.innerHTML=`<table class="raw-config-table"><thead><tr>`+
+   Reporting.COMMISSION_EXPORT_COLUMNS.slice(0,13).map(c=>`<th>${esc(c.label)}</th>`).join("")+"</tr></thead><tbody>"+
+   rpCycleRows.map(r=>"<tr>"+Reporting.COMMISSION_EXPORT_COLUMNS.slice(0,13).map(c=>`<td>${esc(r[c.key]??"")}</td>`).join("")+"</tr>").join("")+"</tbody></table>";
+  loadExecutiveOverview();
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function exportCycleReport(){
+ const select=document.getElementById("rpCycleSelect");if(!select?.value)return;
+ try{
+  const res=await sbRequest("/rest/v1/rpc/export_commission_cycle",{method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({p_cycle_id:select.value,p_request_id:createRequestId()})});
+  downloadCsv("commission-cycle.csv",Reporting.toCsv(res?.rows||[],Reporting.COMMISSION_EXPORT_COLUMNS));
+  toast(`صُدِّر ${res?.row_count??0} صفاً`)}
+ catch(error){alert(error?.message||"تعذّر التصدير")}}
+
+async function loadAgentStatementList(){
+ const select=document.getElementById("rpAgentSelect");if(!select)return;
+ try{const rows=await sbRequest("/rest/v1/agents?select=id,official_name&order=official_name.asc&limit=300");
+  rpAgents=rows||[];
+  select.innerHTML=rpAgents.map(a=>`<option value="${esc(a.id)}">${esc(a.official_name)}</option>`).join("");
+  if(rpAgents.length)loadAgentStatement()}
+ catch(error){if(error?.status!==404)console.warn("agents:",error)}}
+
+async function loadAgentStatement(){
+ const select=document.getElementById("rpAgentSelect"),host=document.getElementById("rpAgentBody");
+ if(!select?.value||!host)return;
+ host.innerHTML="<div class='muted'>جارٍ التحميل…</div>";
+ try{
+  const p=await sbRequest("/rest/v1/rpc/report_agent_statement",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p_agent_id:select.value})});
+  const comm=p?.commission||[],inst=p?.installation||{},stages=inst.stage_distribution||{},tl=p?.timeline||[];
+  host.innerHTML=`<div class="box"><h3 style="font-size:12px">${esc(p?.agent?.name||"")}</h3>`+
+   `<div class="muted" style="font-size:11px">الأسماء: ${esc((p?.aliases||[]).join("، ")||"—")}<br>الكابينات: ${esc((p?.fdts||[]).join("، ")||"—")}</div></div>`+
+   `<div class="box" style="margin-top:8px"><h3 style="font-size:12px">العمولات</h3>`+
+   (comm.length?`<table class="raw-config-table"><thead><tr><th>الدورة</th><th>النطاق</th><th>الشريحة</th><th>مشتركون</th><th>أحداث</th><th>P35</th><th>P45</th><th>P65</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th></tr></thead><tbody>`+
+    comm.map(c=>`<tr><td>${esc(c.cycle)}</td><td>${esc(c.scope_id)}</td><td>${esc(c.tier||"—")}</td><td>${fmt(c.unique_activated_subscribers)}</td><td>${fmt(c.qualifying_events)}</td><td>${fmt(c.p35)}</td><td>${fmt(c.p45)}</td><td>${fmt(c.p65)}</td><td>${fmt(c.gross)}</td><td>${fmt(c.net_paid)}</td><td>${fmt(c.remaining)}</td></tr>`).join("")+"</tbody></table>":"<div class='muted'>لا دورات.</div>")+"</div>"+
+   `<div class="box" style="margin-top:8px"><h3 style="font-size:12px">أجور التنصيب</h3><div>المشتركون: <b>${fmt(inst.subscribers||0)}</b></div>`+
+   `<table class="raw-config-table"><thead><tr><th>المرحلة</th><th>العدد</th></tr></thead><tbody>`+
+   Object.keys(stages).sort().map(k=>`<tr><td>${esc(k)}</td><td>${fmt(stages[k])}</td></tr>`).join("")+"</tbody></table></div>"+
+   `<div class="box" style="margin-top:8px"><h3 style="font-size:12px">الخط الزمني المالي</h3>`+
+   (tl.length?`<table class="raw-config-table"><thead><tr><th>التاريخ</th><th>المجال</th><th>النوع</th><th>المبلغ</th><th>الاتجاه</th><th>السبب</th></tr></thead><tbody>`+
+    tl.slice(0,50).map(t=>`<tr><td>${esc((t.at||"").slice(0,10))}</td><td>${esc(t.domain)}</td><td>${esc(t.type)}</td><td>${fmt(t.amount)}</td><td>${t.direction>0?"إضافة":"عكس"}</td><td>${esc(t.reason||"—")}</td></tr>`).join("")+"</tbody></table>":"<div class='muted'>لا حركات.</div>")+"</div>";
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function loadInstallationReport(){
+ const host=document.getElementById("rpInstallation");if(!host)return;
+ try{
+  const p=await sbRequest("/rest/v1/rpc/installation_financials",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+  const stages=p?.stage_distribution||{};
+  host.innerHTML=`<div class="grid2">`+
+   [["المشتركون",p?.subscribers],["التسجيلات",p?.enrollments],["مستحق",p?.due],["مدفوع",p?.paid],
+    ["جاهز",p?.ready],["بانتظار فاتورة",p?.awaiting_invoice],["معلَّق",p?.held],["غير محسوم",p?.unresolved]]
+    .map(([l,v])=>`<div class="box"><h3 style="font-size:12px">${esc(l)}</h3><div style="font-size:18px;font-weight:700">${fmt(v||0)}</div></div>`).join("")+"</div>"+
+   `<div class="box" style="margin-top:8px"><h3 style="font-size:12px">توزيع المراحل</h3><table class="raw-config-table"><thead><tr><th>المرحلة</th><th>العدد</th></tr></thead><tbody>`+
+   Object.keys(stages).sort().map(k=>`<tr><td>${esc(k)}</td><td>${fmt(stages[k])}</td></tr>`).join("")+"</tbody></table></div>";
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function loadExceptionWorkspace(){
+ const host=document.getElementById("rpExceptions");if(!host)return;
+ host.innerHTML="<div class='muted'>جارٍ التحميل…</div>";
+ try{
+  const rows=await sbRequest("/rest/v1/rpc/report_open_exceptions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p_limit:300})});
+  rpExceptionRows=rows||[];
+  if(!rpExceptionRows.length){host.innerHTML="<div class='muted'>لا استثناءات مفتوحة.</div>";return}
+  const blocking=rpExceptionRows.filter(r=>r.blocking).length;
+  host.innerHTML=`<div class="muted" style="font-size:11px">${fmt(rpExceptionRows.length)} مفتوح · ${fmt(blocking)} يحجب</div>`+
+   `<table class="raw-config-table"><thead><tr><th>المجال</th><th>الموضوع</th><th>السبب</th><th>يحجب</th><th>التاريخ</th></tr></thead><tbody>`+
+   rpExceptionRows.map(r=>`<tr><td>${esc(r.domain)}</td><td>${esc(r.subject||"—")}</td><td>${esc(r.domain==="commission"?CommissionVNext.describeException(r.reason_code):Operations.describeBlocker(r.reason_code))}</td><td>${r.blocking?"نعم":"لا"}</td><td>${esc((r.created_at||"").slice(0,10))}</td></tr>`).join("")+"</tbody></table>";
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+function exportExceptions(){
+ if(!rpExceptionRows.length){toast("لا شيء للتصدير");return}
+ downloadCsv("exceptions.csv",Reporting.toCsv(rpExceptionRows,Reporting.EXCEPTION_EXPORT_COLUMNS))}
+
+async function loadAuditReport(){
+ const host=document.getElementById("rpAudit");if(!host)return;
+ try{
+  const rows=await sbRequest("/rest/v1/rpc/report_audit_trail",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p_limit:150})});
+  host.innerHTML=(rows||[]).length?`<table class="raw-config-table"><thead><tr><th>التاريخ</th><th>الفاعل</th><th>الإجراء</th><th>الحقل</th><th>قبل</th><th>بعد</th></tr></thead><tbody>`+
+   rows.map(r=>`<tr><td>${esc((r.at||"").slice(0,16).replace("T"," "))}</td><td>${esc(r.actor||"")}</td><td>${esc(r.action)}</td><td>${esc(r.field||"")}</td><td>${esc((r.old_value||"").slice(0,40))}</td><td>${esc((r.new_value||"").slice(0,40))}</td></tr>`).join("")+"</tbody></table>":"<div class='muted'>لا سجلات (يلزم إذن التدقيق).</div>";
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+async function loadPayoutBatches(){
+ const host=document.getElementById("rpPayout");if(!host)return;
+ try{
+  const batches=await sbRequest("/rest/v1/commission_payment_batches?select=id,name,status,total_amount,item_count,payment_reference,posted_at&order=prepared_at.desc&limit=50");
+  host.innerHTML=(batches||[]).length?`<table class="raw-config-table"><thead><tr><th>الدفعة</th><th>الحالة</th><th>البنود</th><th>المبلغ</th><th>المرجع</th><th></th></tr></thead><tbody>`+
+   batches.map(b=>`<tr><td>${esc(b.name)}</td><td>${esc(Reporting.statusLabel(b.status))}</td><td>${fmt(b.item_count)}</td><td>${fmt(b.total_amount)}</td><td>${esc(b.payment_reference||"—")}</td>`+
+    `<td>${b.status==="POSTED"?"":payoutButtons(b.id)}</td></tr>`).join("")+"</tbody></table>":"<div class='muted'>لا دفعات.</div>";
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+/* الأزرار في دالة مستقلة: بناؤها داخل قالب متداخل يجعل الاقتباسات هشّة. */
+function payoutButtons(id){
+ const safe=esc(id);
+ return `<button class="smallbtn" onclick="revalidatePayout(&quot;${safe}&quot;)">تحقق</button> `
+  +`<button class="smallbtn" onclick="postPayout(&quot;${safe}&quot;)">ترحيل</button>`}
+
+async function revalidatePayout(id){
+ try{const r=await sbRequest("/rest/v1/rpc/revalidate_commission_batch",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p_batch_id:id})});
+  toast(`قابل للدفع ${r?.payable??0} · محجوب ${r?.blocked??0}`);loadPayoutBatches()}
+ catch(error){alert(error?.message||"تعذّر التحقق")}}
+
+async function postPayout(id){
+ const ref=prompt("مرجع الدفع (اختياري):");
+ if(!confirm("ترحيل الدفعة؟ يُكتب قيد في الدفتر لكل بند."))return;
+ try{const r=await sbRequest("/rest/v1/rpc/post_commission_batch",{method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({p_batch_id:id,p_payment_reference:ref||null,p_request_id:createRequestId()})});
+  toast(`رُحِّل ${r?.paid_items??0} بند بمبلغ ${fmt(r?.total_amount??0)}`);loadPayoutBatches();loadExecutiveOverview()}
+ catch(error){alert(error?.message||"تعذّر الترحيل")}}
+
+function initReporting(){
+ if(typeof Reporting==="undefined")return;
+ const section=document.getElementById("executiveSection");
+ if(section)section.style.display=opsCan("report.view")?"":"none";
+ if(!opsCan("report.view"))return;
+ const hide=(id,cap)=>{const el=document.getElementById(id);if(el)el.style.display=opsCan(cap)?"":"none"};
+ hide("rpExportCycle","report.export");hide("rpExportExceptions","report.export");
+ const payoutTab=document.querySelector("#reportTabs [data-rp=payout]");
+ if(payoutTab)payoutTab.style.display=opsCan("commission.prepare_payment")?"":"none";
+ const auditTab=document.querySelector("#reportTabs [data-rp=audit]");
+ if(auditTab)auditTab.style.display=opsCan("audit.view")?"":"none";
+ loadExecutiveOverview();loadReportCycles();loadAgentStatementList();
+ loadInstallationReport();loadExceptionWorkspace();loadAuditReport();loadPayoutBatches();}
 
 function switchTab(z){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.zone===z));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+z))}
 function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'0')+'/'+date.getFullYear()}
