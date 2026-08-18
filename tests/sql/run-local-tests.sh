@@ -117,6 +117,15 @@ fi
 echo "$out12" | grep -E "^ {4,6}(ok|==) " || true
 passed=$((passed + $(echo "$out12" | grep -c "     ok ")))
 
+echo "== identity bootstrap =="
+out13=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/identity-bootstrap.sql 2>&1)
+if echo "$out13" | grep -qE "FAILED|ERROR"; then
+  echo "$out13" | grep -E "FAILED|ERROR" || true
+  echo "IDENTITY BOOTSTRAP TESTS FAILED" >&2; exit 1
+fi
+echo "$out13" | grep -E "^ {5,7}(ok|==) " || true
+passed=$((passed + $(echo "$out13" | grep -c "      ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
