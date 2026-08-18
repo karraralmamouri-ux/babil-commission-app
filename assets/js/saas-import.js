@@ -25,7 +25,7 @@
     id: 'id',
     username: 'username',
     firstname: 'firstname', irstname: 'firstname',
-    lastname: 'lastname', lastnam: 'lastname',
+    lastname: 'lastname', lastnam: 'lastname', tnam: 'lastname',
     profile_name: 'profile_name', proile_name: 'profile_name',
     manager_firstname: 'manager_firstname', manager_irstname: 'manager_firstname',
     manager_lastname: 'manager_lastname', manager_lastnam: 'manager_lastname',
@@ -118,12 +118,46 @@
     return null;
   }
 
+  // صيغة مرصودة في تصديرين حقيقيين: الوقت بلا نقطتين — "2026-04-30 235650".
+  // Date ترفضها، فكان كل حدث في ملفَي نيسان والغرامات يخرج بتاريخ فارغ (100%).
+  // وحدثٌ بلا تاريخ لا يقع في أي نافذة دورة، فيُستبعد من كل حساب بلا استثناء
+  // يُعلنه — أي صفرٌ صامت بدل خطأ ظاهر. لذلك تُقرأ الصيغة صراحةً.
+  const COMPACT_TIME = /^(\d{4}-\d{2}-\d{2})[ T](\d{2})(\d{2})(\d{2})$/;
+
+  // الطابع الزمني في التصدير بلا منطقة زمنية، وقراءتُه بالتوقيت المحلي للجهاز
+  // تجعل الملف الواحد يُنتج لحظات UTC مختلفة باختلاف من استورده — وحدثٌ قرب
+  // حدّ الشهر قد يقع عندها في دورة أخرى. لذلك تُثبَّت المنطقة صراحةً.
+  //
+  // و+03:00 ليست اختياراً: بيانات تموز في الإنتاج مخزَّنة بها فعلاً (أقصى حدث
+  // 2026-07-31T20:58:30Z أي 23:58:30 بتوقيت بغداد)، وبغداد بلا توقيت صيفي منذ
+  // 2015. فتثبيتها يطابق المخزَّن ويمنع اختلاف النتيجة بين جهاز وآخر.
+  const SOURCE_UTC_OFFSET = '+03:00';
+  const HAS_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
   function timestamp(value) {
     if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value.toISOString();
     const raw = text(value);
     if (raw === null) return null;
-    const parsed = new Date(raw);
+
+    const compact = raw.match(COMPACT_TIME);
+    let normalized = compact
+      ? `${compact[1]}T${compact[2]}:${compact[3]}:${compact[4]}`
+      : raw.replace(' ', 'T');
+
+    // ما حمل منطقةً يُحترم كما هو؛ وما خلا منها يُنسب إلى منطقة المصدر.
+    if (!HAS_ZONE.test(normalized)) normalized += SOURCE_UTC_OFFSET;
+
+    const parsed = new Date(normalized);
     return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  }
+
+  /**
+   * تاريخ لم يُفهَم ليس تاريخاً فارغاً.
+   * الفراغ قد يعني «لم يُصدَّر»، وعدمُ الفهم يعني «صيغة لا نعرفها» — والثاني
+   * يستوجب وقفة لا تجاهلاً. تُميَّز الحالتان هنا ليُبلَّغ عنهما مختلفتين.
+   */
+  function unparsedTimestamp(value) {
+    return text(value) !== null && timestamp(value) === null;
   }
 
   // الطوبولوجيا مبثوثة في lastname وأحياناً في أعمدة __EMPTY المجاورة.
@@ -215,7 +249,12 @@
       });
     });
 
-    return { kind: 'ACTIVATION_EVENTS', events, rejected, secretsDropped };
+    return {
+      kind: 'ACTIVATION_EVENTS', events, rejected, secretsDropped,
+      // تُعدّ ولا تُبتلع: صفرٌ هنا يعني أن كل تاريخ فُهم.
+      unparsedDates: rows.reduce(
+        (n, row) => n + (unparsedTimestamp(readField(row, mapping, 'created_at')) ? 1 : 0), 0),
+    };
   }
 
   /** يحلّل لقطة مستخدمين. ct_password غير مقروء أصلاً. */
@@ -274,6 +313,7 @@
     const users = [];
     const seenUsers = new Set();
     let duplicates = 0;
+    let unparsedDates = 0;
     let secretsDropped = 0;
 
     (sheets || []).forEach((sheet) => {
@@ -308,8 +348,9 @@
         });
         sheetResults.push({
           sheet: sheet.name, rows: rows.length, kind, imported, duplicates: dupes,
-          rejected: parsed.rejected.length,
+          rejected: parsed.rejected.length, unparsedDates: parsed.unparsedDates,
         });
+        unparsedDates += parsed.unparsedDates;
         return;
       }
 
@@ -345,6 +386,8 @@
       users,
       duplicateCount: duplicates,
       secretsDropped,
+      // مجموع ما لم يُفهَم من التواريخ. غير صفر ⇒ لا تُستورَد قبل الفحص.
+      unparsedDates,
       // الحدود مرصودة من البيانات، وهي لا تُثبت التغطية. لذلك يبقى الاكتمال
       // UNKNOWN ما لم يُعلَن صراحة من خارج الملف.
       observedMinCreatedAt: stamps.length ? stamps[0] : null,
@@ -473,6 +516,7 @@
     FORBIDDEN_COLUMNS, HEADER_ALIASES, EVENT_CONTRACT, USER_CONTRACT,
     normalizeHeader, canonicalField, mapHeaders, classifySheet,
     parseTopology, parseActivationSheet, parseUsersSheet, parseWorkbook,
+    unparsedTimestamp,
     matchSubscriber, classifyNewness,
   };
 });

@@ -269,3 +269,69 @@ test('كل تصنيف يحمل دليله المعدود', () => {
   assert.equal(c.evidence.debt_service_events, 1);
   assert.equal(c.evidence.canceled_events, 1);
 });
+
+// --- انحدارات مكتشفة من مصادر حقيقية ----------------------------------------
+
+test('الوقت المضغوط بلا نقطتين يُقرأ — صيغة مرصودة في تصديرين حقيقيين', () => {
+  // "2026-04-30 235650" ترفضها Date، وكانت تُنتج تاريخاً فارغاً لكل حدث في
+  // ملفَي نيسان والغرامات (100% من 56,718 حدثاً).
+  const rows = [{ ...EVENT_HEADERS, created_at: '2026-04-30 235650' }];
+  const parsed = S.parseActivationSheet(rows, { sheetName: 'W' });
+  assert.equal(parsed.events[0].event_created_at, '2026-04-30T20:56:50.000Z');
+  assert.equal(parsed.unparsedDates, 0);
+});
+
+test('الصيغة المعتادة لم تتأثر بإضافة المضغوطة', () => {
+  const rows = [{ ...EVENT_HEADERS, created_at: '2026-02-28 23:58:35' }];
+  assert.equal(S.parseActivationSheet(rows, {}).events[0].event_created_at,
+    '2026-02-28T20:58:35.000Z');
+});
+
+test('تاريخ لا يُفهَم يُعَدّ ولا يُبتلع', () => {
+  // الفراغ يعني «لم يُصدَّر»؛ وعدم الفهم يعني صيغة مجهولة — والثاني يستوجب وقفة.
+  const rows = [
+    { ...EVENT_HEADERS, id: 'a', created_at: 'ليس تاريخاً' },
+    { ...EVENT_HEADERS, id: 'b', created_at: null },
+    { ...EVENT_HEADERS, id: 'c', created_at: '2026-04-30 235650' },
+  ];
+  const parsed = S.parseActivationSheet(rows, {});
+  assert.equal(parsed.unparsedDates, 1, 'المجهول وحده يُعَدّ، لا الفارغ');
+  assert.equal(S.unparsedTimestamp('ليس تاريخاً'), true);
+  assert.equal(S.unparsedTimestamp(null), false);
+  assert.equal(S.unparsedTimestamp('2026-04-30 235650'), false);
+});
+
+test('عدّ التواريخ المجهولة يصعد إلى نتيجة المصنّف', () => {
+  const out = S.parseWorkbook([{ name: 'W', rows: [
+    { ...EVENT_HEADERS, id: 'x', created_at: 'صيغة مجهولة' },
+    { ...EVENT_HEADERS, id: 'y', created_at: '2026-07-01T00:00:00Z' },
+  ] }]);
+  assert.equal(out.unparsedDates, 1);
+  // غير صفر يعني: لا تُستورَد قبل الفحص.
+  assert.ok(out.unparsedDates > 0);
+});
+
+test('رأس lastname المقطوع إلى tnam مرصود في ملف نيسان', () => {
+  assert.equal(S.canonicalField('tnam'), 'lastname');
+  // والطوبولوجيا تُقرأ منه كما تُقرأ من الاسم السليم.
+  const rows = [{ ...EVENT_HEADERS, tnam: 'FDT:41 FAT:2 PORT:9' }];
+  const parsed = S.parseActivationSheet(rows, {});
+  assert.equal(parsed.events[0].fdt_code, '41');
+  assert.equal(parsed.events[0].port_code, '9');
+});
+
+test('التوقيت مستقل عن جهاز الاستيراد', () => {
+  // المصدر بلا منطقة زمنية. قراءتُه محلياً تجعل النتيجة تابعة لمن استورد،
+  // وحدثٌ قرب حدّ الشهر قد يقع في دورة أخرى. المنطقة مثبَّتة على +03:00،
+  // وهي المنطقة التي خُزِّنت بها بيانات تموز في الإنتاج فعلاً.
+  const at = (raw) => S.parseActivationSheet(
+    [{ ...EVENT_HEADERS, created_at: raw }], {}).events[0].event_created_at;
+
+  // أقصى حدث في تموز الحقيقي: مخزَّن في الإنتاج 2026-07-31T20:58:30.000Z
+  assert.equal(at('2026-07-31 23:58:30'), '2026-07-31T20:58:30.000Z');
+  assert.equal(at('2026-04-30 235650'), '2026-04-30T20:56:50.000Z');
+
+  // ومنطقة صريحة تُحترم كما وردت ولا تُزاح.
+  assert.equal(at('2026-07-01T00:00:00Z'), '2026-07-01T00:00:00.000Z');
+  assert.equal(at('2026-07-01T00:00:00+03:00'), '2026-06-30T21:00:00.000Z');
+});
