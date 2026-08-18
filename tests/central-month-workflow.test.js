@@ -66,7 +66,16 @@ test('workspace exposes safe loading, empty, filtering, and mobile navigation st
   assert.match(html, /function scheduleFilterRender\(\)/);
   assert.match(html, /id="filterSummary"/);
   assert.match(html, /function toggleMobileMenu\(force\)/);
-  assert.match(html, /@media\(max-width:820px\)/);
+  // انتقلت الأنماط إلى ملفها، فالتوكيد يتبعها إلى هناك بدل أن يُحذف — وهو أقوى
+  // مما كان: لا يكتفي بوجود نقطة قياس، بل يتحقّق أنها تُحوّل الشريط إلى درج
+  // يخرج عن الشاشة ويعود، وأن زرّ القائمة يظهر معه.
+  const css = fs.readFileSync(path.join(root, 'assets', 'css', 'babil-flow.css'), 'utf8');
+  assert.match(css, /@media \(max-width: 860px\)/);
+  const drawer = css.slice(css.indexOf('@media (max-width: 860px)'));
+  assert.match(drawer, /\.sidebar \{[^}]*position: fixed/);
+  assert.match(drawer, /\.sidebar \{[^}]*transform: translateX\(105%\)/);
+  assert.match(drawer, /\.sidebar\.open \{ transform: translateX\(0\)/);
+  assert.match(drawer, /\.mobile-menu \{[^}]*display: flex/);
   assert.match(html, /id="readinessInsights"/);
   assert.match(html, /id="operationalAlerts"/);
 });

@@ -181,8 +181,64 @@
     return { total, pages, current, limit, hasPrev: current > 1, hasNext: current < pages };
   }
 
+  // ---------------------------------------------------------------------------
+  // عرض دورة الحياة
+  //
+  // الحالات الفعلية ثمانٍ، وعرضها ثمانيَ خطوات يجعل الشريط ضجيجاً. تُطوى إلى
+  // خمس مراحل يفهمها المستخدم، ولا تُخترع حالة ولا تُغيَّر حالة: الطيّ عرضٌ
+  // فقط، والمصدر يبقى status كما هو.
+  // ---------------------------------------------------------------------------
+
+  const CYCLE_STAGES = [
+    { key: 'draft',    label: 'مسودة',        css: 'cycle-draft' },
+    { key: 'review',   label: 'مراجعة',       css: 'cycle-review' },
+    { key: 'approved', label: 'معتمدة',       css: 'cycle-approved' },
+    { key: 'payable',  label: 'جاهزة للصرف', css: 'cycle-payable' },
+    { key: 'closed',   label: 'مغلقة',        css: 'cycle-closed' },
+  ];
+
+  const STAGE_OF_STATUS = {
+    DRAFT: 0, DATA_IMPORTED: 0,
+    UNDER_REVIEW: 1,
+    READY_TO_FINALIZE: 2, FINALIZED: 2,
+    READY_FOR_PAYMENT: 3, PARTIALLY_PAID: 3, PAID: 3,
+    CLOSED: 4,
+  };
+
+  /** المرحلة المعروضة لحالة فعلية. المجهول لا يُنسب إلى مرحلة. */
+  function cycleStage(status) {
+    const i = STAGE_OF_STATUS[status];
+    if (i === undefined) return null;
+    return Object.assign({ index: i, status, statusLabel: statusLabel(status) }, CYCLE_STAGES[i]);
+  }
+
+  // الرقم غير المعتمد لا يجوز أن يبدو نهائياً. أي حالة قبل الاعتماد تقديرية.
+  const FINAL_STATUSES = new Set(['FINALIZED', 'PARTIALLY_PAID', 'PAID', 'CLOSED']);
+  function isProjected(status) { return !FINAL_STATUSES.has(status); }
+
+  // ---------------------------------------------------------------------------
+  // المال
+  //
+  // قاعدة تنسيق واحدة في كل الشاشات. الدينار لا كسور، والفاصلة كل ثلاث خانات،
+  // والوحدة تلي الرقم. تعدُّد الصيغ في تطبيق مالي يجعل رقمين متطابقين يبدوان
+  // مختلفين.
+  // ---------------------------------------------------------------------------
+
+  const IQD = 'د.ع';
+
+  function amount(value) {
+    const n = Math.round(Number(value) || 0);
+    return n.toLocaleString('en-US');
+  }
+
+  function money(value) { return amount(value) + ' ' + IQD; }
+
+  /** الصفر يُقال صفراً لا يُترك فراغاً: الفراغ يُقرأ «غير معروف». */
+  function moneyOrZero(value) { return money(value || 0); }
+
   return {
     STATUS_LABELS, statusLabel, CYCLE_FLOW, flowPosition,
+    CYCLE_STAGES, cycleStage, isProjected, IQD, amount, money, moneyOrZero,
     summaryCards, reconcile,
     csvField, toCsv, COMMISSION_EXPORT_COLUMNS, EXCEPTION_EXPORT_COLUMNS,
     MAX_PAGE, pageParams, pageInfo,
