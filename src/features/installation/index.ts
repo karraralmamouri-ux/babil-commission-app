@@ -183,7 +183,10 @@ export const subscriberCase: Route = {
     const tab = m.query.get('tab') || 'overview';
     view.innerHTML = loading('جارٍ تحميل ملفّ المشترك…');
 
-    const doc = await rpc<Row>('installation_subscriber_case', { p_subscriber_id: id });
+    const [doc, next] = await Promise.all([
+      rpc<Row>('installation_subscriber_case', { p_subscriber_id: id }),
+      rpc<Row>('subscriber_next_action', { p_subscriber_id: id }).catch(() => null),
+    ]);
     const sub = (doc?.['subscriber'] || null) as Row | null;
     if (!sub) { view.innerHTML = empty('المشترك غير موجود', id); return; }
 
@@ -206,6 +209,7 @@ export const subscriberCase: Route = {
         { label: 'المنطقة', value: esc(str(enr, 'zone') === 'new' ? 'جديدة' : str(enr, 'zone') === 'old' ? 'قديمة' : '—'), tone: 'blue' },
         { label: 'الإيقافات الفعّالة', value: count(activeHolds.length), tone: 'red' },
       ])
+      + nextActionBanner(next)
       + `<div class="tabs">${tabs}</div><div class="panel active">${renderCaseTab(doc as Row, tab, id)}</div>`;
 
     // مفتاح المشترك هو ما تعرفه أحداث SaaS، وهو صغير الأحرف.
@@ -224,6 +228,25 @@ export const subscriberCase: Route = {
     }
   },
 };
+
+/**
+ * الإجراء التالي.
+ *
+ * قراءةٌ للحالة القائمة لا قاعدةٌ مالية جديدة: تقول أين يقف هذا المشترك
+ * وأيّ شاشةٍ تحسمه، ولا تحسب مبلغاً. وترتيبها ترتيب الحجب — ما يمنع
+ * الصرف قبل ما ينتظره — فلا يُرسَل المستخدم إلى شاشةٍ يحجبها شيء آخر.
+ */
+function nextActionBanner(doc: Row | null): string {
+  const a = (doc?.['action'] || null) as Row | null;
+  if (!a || str(a, 'code') === 'NONE') return '';
+  const tone = str(a, 'tone');
+  const cls = tone === 'critical' ? 'danger' : tone === 'success' ? 'good' : 'warn';
+  const path = str(a, 'path');
+  return `<div class="insight ${cls}" style="margin:12px 0"><span class="insight-dot"></span>
+    <span><b>الإجراء التالي: ${esc(str(a, 'label'))}</b>
+    <small>${esc(str(a, 'why'))}</small></span>
+    ${path ? `<a class="btn gold" href="${esc(href(path))}">افتح</a>` : ''}</div>`;
+}
 
 function renderCaseTab(doc: Row, tab: string, id: string): string {
   const list = (k: string) => (doc[k] || []) as Row[];
