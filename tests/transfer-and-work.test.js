@@ -85,22 +85,39 @@ test('اسم الأب يُحمل كما هو ولا يُشتقّ من التصن
   assert.match(transfer, /اسم الأب لا يتغيّر/);
 });
 
-test('مركز العمل يُجمِّع بوحدة القرار لا بالصفّ', () => {
+test('مركز العمل يُجمِّع بوحدة القرار، والتجميع على الخادم', () => {
   assert.match(work, /pattern: '\/work'/);
-  assert.match(work, /REASON_UNIT/);
-  assert.match(work, /وحدة القرار: الأب/);
-  assert.match(work, /تُحسم على مستوى/);
-  // ثلاث مجموعات: أب، مشترك، استثناء مجمَّع.
-  assert.match(work, /list_parents/);
-  assert.match(work, /pending_business_decisions/);
-  assert.match(work, /report_commission_exception_impact/);
+  // التجميع انتقل إلى الخادم: مصدرٌ واحد بدل ثلاثة تُركَّب في الواجهة،
+  // فتُقارَن المجموعات ببعضها بدل أن تُقرأ كلٌّ وحدها.
+  assert.match(work, /rpc<Row>\('action_center', \{\}\)/);
+  assert.match(work, /وحدة القرار/);
+
+  const sql = read(
+    'supabase/migrations/20260912090000_action_center.sql');
+  // كل مجموعة تقول وحدتها ومسؤولها وإجراءها التالي ومسارها.
+  for (const key of ['unit', 'role', 'next_action', 'path', 'decisions',
+    'subscribers', 'events', 'amount']) {
+    assert.ok(sql.includes(`'${key}'`), `حقل مفقود: ${key}`);
+  }
+  // والأصناف التي يطلبها التكليف حاضرة.
+  for (const g of ['UNKNOWN_PARENT', 'MISSING_INVOICE', 'UNKNOWN_FDT', 'ACTIVE_HOLD',
+    'IDENTITY_CONFLICT', 'CLASSIFICATION_REVIEW', 'NEEDS_BUSINESS_DECISION',
+    'SOURCE_INCOMPLETE']) {
+    assert.ok(sql.includes(`'${g}'`), `مجموعة مفقودة: ${g}`);
+  }
+  // الكابينة تُعدّ مرّةً لا مرّةً لكل صفّ استثناء.
+  assert.match(sql, /count\(distinct e\.fdt_code\)/);
 });
 
-test('مركز العمل يقول إن مبالغه مؤشِّرة', () => {
-  assert.match(work, /مؤشِّر/);
-  assert.match(work, /لا ما سيُصرف/);
+test('الأثقل أوّلاً: المال ثم المشتركون، لا عدد الصفوف', () => {
+  assert.ok(work.includes("const byAmount = num(b, 'amount') - num(a, 'amount')"),
+    'الترتيب لا يبدأ بالمال');
+  assert.ok(work.includes("num(b, 'subscribers') - num(a, 'subscribers')"),
+    'ولا يُرجَّح بالمشتركين بعده');
+  // والمحسوم يُعرض أيضاً: صفرٌ معلوم خيرٌ من غيابٍ يُقرأ نسياناً.
+  assert.match(work, /محسومة/);
+  assert.match(work, /لا شيء ينتظر/);
 });
-
 test('المسارات الجديدة مسجّلة في المُوجِّه والملاحة', () => {
   const main = read('src/main.ts');
   assert.match(main, /routes as workRoutes/);
