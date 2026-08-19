@@ -10,6 +10,7 @@ import { href } from '../../app/router';
 import { rpc, toPage, pageRpc } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { transferPanel, wireTransfer } from '../ownership/transfer';
+import { classificationPanel } from './classification';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -51,11 +52,14 @@ export const controlCenter: Route = {
   breadcrumb: () => [{ label: 'الرئيسية', href: href('/') }, { label: 'أجور التنصيب' }],
   async render(view) {
     view.write(loading('جارٍ تحميل حالة التنصيب…'));
-    const state = await rpc<Row>('installation_cycle_state', {});
+    // حالة التصنيف تُقرأ من الخادم الآن، لا تُحسب في المتصفّح وتضيع.
+    const [state, classState] = await Promise.all([
+      rpc<Row>('installation_cycle_state', {}),
+      rpc<Row>('classification_state', {}).catch(() => null),
+    ]);
     const hist = (state?.['historical'] || {}) as Row;
     const ent = (state?.['entitlements'] || {}) as Row;
     const enroll = (state?.['enrollments'] || {}) as Record<string, number>;
-    const cls = (state?.['classification'] || {}) as Record<string, number>;
 
     const stageRows = Object.entries(enroll).map(([k, v]) => ({ stage: k, n: v }));
 
@@ -71,11 +75,8 @@ export const controlCenter: Route = {
             ${stageRows.length
               ? stageRows.map((r) => `<div class="minirow"><span>${chip(r.stage, STAGE_TONE[r.stage] || 'neutral')}</span><b>${count(r.n)}</b></div>`).join('')
               : '<p class="muted">لا تسجيلات</p>'}</div>
-          <div class="box"><h3>التصنيف</h3>
-            ${Object.keys(cls).length
-              ? Object.entries(cls).map(([k, v]) => `<div class="minirow"><span>${esc(k)}</span><b>${count(v)}</b></div>`).join('')
-              : `<p class="muted">التصنيف لا يُحفَظ بعد على الخادم — يُحسب أثناء الاستيراد في المتصفح.
-                 مسجَّل في قائمة ما بعد الإطلاق.</p>`}</div>
+          <div class="box"><h3>تصنيف الجِدّة</h3>
+            ${classificationPanel(classState)}</div>
         </div>`;
   },
 };

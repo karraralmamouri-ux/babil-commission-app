@@ -189,6 +189,12 @@ fi
 echo "$out20" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out20" | grep -c "            ok ")))
 
+echo "== newness parity =="
+out21=$(bash tests/sql/newness-parity.sh 2>&1)
+if [ $? -ne 0 ]; then echo "$out21" >&2; echo "PARITY TESTS FAILED" >&2; exit 1; fi
+echo "$out21" | grep -E "^pass  parity" || true
+passed=$((passed + $(echo "$out21" | grep -c "^pass  parity")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
