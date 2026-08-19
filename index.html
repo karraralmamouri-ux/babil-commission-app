@@ -21,19 +21,67 @@
   <linearGradient id="bfGold" x1="0" y1="0" x2="1" y2="1">
    <stop offset="0" stop-color="#E3B75A"/><stop offset="1" stop-color="#A87C1E"/>
   </linearGradient>
+  <!--
+    علامة BABIL FLOW.
+
+    حرف B هندسي + مسارُ تدفّق يخرج من التقاء البطنين.
+
+    الساق كانت مضمرة: المسار يعود إلى H14 فيرسمها ضمناً، فتَرقّ عند 20px
+    وتكاد تنقطع في الشريط الجانبي. صارت شريطاً مصمتاً قائماً بذاته.
+    وذيل التدفّق كان يمتدّ إلى 39.5 بينما ينتهي البطنان عند 33، فيميل
+    الثقل يميناً؛ أُعيد داخل الإطار ليتوازن الهامش.
+  -->
   <symbol id="bfMark" viewBox="0 0 48 48">
    <rect width="48" height="48" rx="12" fill="#0B1930"/>
-   <path d="M14 12h11.5a7.5 7.5 0 0 1 0 15H14z" fill="none" stroke="url(#bfGold)" stroke-width="3.4" stroke-linejoin="round"/>
-   <path d="M14 27h13a7.5 7.5 0 0 1 0 15H14z" fill="none" stroke="url(#bfGold)" stroke-width="3.4" stroke-linejoin="round"/>
-   <path d="M27 19.5c6.5 0 9.5-4 12.5-7.5" fill="none" stroke="#F8FAFC" stroke-width="2.6" stroke-linecap="round" opacity=".92"/>
-   <circle cx="39.5" cy="12" r="2.6" fill="#F8FAFC"/>
+   <g transform="translate(-1.9 0.6)">
+     <rect x="12" y="11" width="5.2" height="26" rx="1.6" fill="url(#bfGold)"/>
+     <path d="M16.6 12.6h9.4a6.2 6.2 0 0 1 0 12.4h-9.4" fill="none"
+           stroke="url(#bfGold)" stroke-width="3.6" stroke-linecap="round"/>
+     <path d="M16.6 23.6h10.9a6.4 6.4 0 0 1 0 12.8h-10.9" fill="none"
+           stroke="url(#bfGold)" stroke-width="3.6" stroke-linecap="round"/>
+     <path d="M28.4 18.8c4.6-.2 6.6-2.4 8.2-5.2" fill="none" stroke="#F8FAFC"
+           stroke-width="2.4" stroke-linecap="round" opacity=".95"/>
+     <circle cx="37.4" cy="12.2" r="2.4" fill="#F8FAFC"/>
+   </g>
   </symbol>
   <symbol id="bfMarkLight" viewBox="0 0 48 48">
    <rect width="48" height="48" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
-   <path d="M14 12h11.5a7.5 7.5 0 0 1 0 15H14z" fill="none" stroke="url(#bfGold)" stroke-width="3.4" stroke-linejoin="round"/>
-   <path d="M14 27h13a7.5 7.5 0 0 1 0 15H14z" fill="none" stroke="url(#bfGold)" stroke-width="3.4" stroke-linejoin="round"/>
-   <path d="M27 19.5c6.5 0 9.5-4 12.5-7.5" fill="none" stroke="#0B1930" stroke-width="2.6" stroke-linecap="round"/>
-   <circle cx="39.5" cy="12" r="2.6" fill="#0B1930"/>
+   <g transform="translate(-1.9 0.6)">
+     <rect x="12" y="11" width="5.2" height="26" rx="1.6" fill="url(#bfGold)"/>
+     <path d="M16.6 12.6h9.4a6.2 6.2 0 0 1 0 12.4h-9.4" fill="none"
+           stroke="url(#bfGold)" stroke-width="3.6" stroke-linecap="round"/>
+     <path d="M16.6 23.6h10.9a6.4 6.4 0 0 1 0 12.8h-10.9" fill="none"
+           stroke="url(#bfGold)" stroke-width="3.6" stroke-linecap="round"/>
+     <path d="M28.4 18.8c4.6-.2 6.6-2.4 8.2-5.2" fill="none" stroke="#0B1930"
+           stroke-width="2.4" stroke-linecap="round"/>
+     <circle cx="37.4" cy="12.2" r="2.4" fill="#0B1930"/>
+   </g>
+  </symbol>
+  <!--
+    المُصغَّرة: بلا ذيل التدفّق ولا نقطته.
+
+    تحت 24px يتحوّل الذيل إلى لطخة ويلتصق بالنقطة، فيُقرأ الحرف خطأً.
+    الحذف هنا أوضح من التصغير.
+  -->
+  <symbol id="bfMarkCompact" viewBox="0 0 48 48">
+   <rect width="48" height="48" rx="12" fill="#0B1930"/>
+   <g transform="translate(-0.7 0)">
+     <rect x="13.5" y="11" width="5.6" height="26" rx="1.8" fill="url(#bfGold)"/>
+     <path d="M18.4 12.8h9.6a6.3 6.3 0 0 1 0 12.6h-9.6" fill="none"
+           stroke="url(#bfGold)" stroke-width="4" stroke-linecap="round"/>
+     <path d="M18.4 23.6h11a6.5 6.5 0 0 1 0 13h-11" fill="none"
+           stroke="url(#bfGold)" stroke-width="4" stroke-linecap="round"/>
+   </g>
+  </symbol>
+  <symbol id="bfMarkCompactLight" viewBox="0 0 48 48">
+   <rect width="48" height="48" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+   <g transform="translate(-0.7 0)">
+     <rect x="13.5" y="11" width="5.6" height="26" rx="1.8" fill="url(#bfGold)"/>
+     <path d="M18.4 12.8h9.6a6.3 6.3 0 0 1 0 12.6h-9.6" fill="none"
+           stroke="url(#bfGold)" stroke-width="4" stroke-linecap="round"/>
+     <path d="M18.4 23.6h11a6.5 6.5 0 0 1 0 13h-11" fill="none"
+           stroke="url(#bfGold)" stroke-width="4" stroke-linecap="round"/>
+   </g>
   </symbol>
  </defs>
 </svg>
@@ -49,9 +97,9 @@
     </div>
     <h1>تسجيل الدخول</h1>
     <div class="sub">منصة إدارة العمليات المالية للوكلاء</div>
-    <label>البريد الإلكتروني</label>
+    <label for="loginEmail">البريد الإلكتروني</label>
     <input id="loginEmail" class="input" type="email" autocomplete="username" placeholder="name@example.com">
-    <label>كلمة المرور</label>
+    <label for="loginPassword">كلمة المرور</label>
     <input id="loginPassword" class="input" type="password" autocomplete="current-password" placeholder="••••••••">
     <div id="loginError" class="login-error"></div>
     <button id="loginButton" class="btn gold" style="width:100%;padding:11px">تسجيل الدخول</button>
@@ -70,9 +118,9 @@
     </div>
     <h1>تعيين كلمة مرور جديدة</h1>
     <div class="sub">أدخل كلمة مرور جديدة لحسابك للمتابعة</div>
-    <label>كلمة المرور الجديدة</label>
+    <label for="newPasswordInput">كلمة المرور الجديدة</label>
     <input id="newPasswordInput" class="input" type="password" autocomplete="new-password" placeholder="8 أحرف أو أكثر">
-    <label>تأكيد كلمة المرور</label>
+    <label for="confirmPasswordInput">تأكيد كلمة المرور</label>
     <input id="confirmPasswordInput" class="input" type="password" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور">
     <div id="resetPasswordError" class="login-error"></div>
     <button id="resetPasswordButton" class="btn gold" style="width:100%;padding:11px">حفظ كلمة المرور وتسجيل الدخول</button>
@@ -158,7 +206,7 @@
   <span class="muted" style="font-size:11px">الشهر:</span>
   <input id="monthInput" class="input" value="08/2026" placeholder="MM/YYYY" style="width:105px;text-align:center" title="اكتب الشهر بصيغة MM/YYYY">
   <button id="applyMonthButton" class="btn" onclick="applyMonthInput()">تطبيق</button>
-  <select id="monthSelect" class="select" onchange="loadSelectedMonth()"></select>
+  <select id="monthSelect" class="select" aria-label="اختيار شهر محفوظ" onchange="loadSelectedMonth()"></select>
   <span id="unsavedIndicator" class="unsaved">● تعديلات غير محفوظة</span>
  </div>
 </header>

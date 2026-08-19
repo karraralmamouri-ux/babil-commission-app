@@ -19,6 +19,7 @@ import { routes as financeRoutes } from './features/finance';
 import { routes as masterRoutes } from './features/master';
 import { routes as workRoutes } from './features/work';
 import { routes as auditRoutes } from './features/audit';
+import { routes as systemRoutes } from './features/system/users';
 
 const legacyRoute: Route = {
   pattern: '/legacy',
@@ -39,6 +40,7 @@ const ROUTES: Route[] = [
   ...masterRoutes,
   ...workRoutes,
   ...auditRoutes,
+  ...systemRoutes,
   legacyRoute,
 ];
 
