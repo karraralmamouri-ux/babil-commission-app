@@ -13,6 +13,7 @@ import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, pageRpc, can, ApiError } from '../../services/api';
 import { money, count } from '../../domain/money';
+import { routes as fdtRoutes } from './fdts';
 import {
   esc, loading, empty, pageHeader, table, pager, chip,
   filterBar, wireFilters, kpiRow, type Column,
@@ -351,4 +352,4 @@ function wireDecision(view: View, name: string): void {
   });
 }
 
-export const routes: Route[] = [parents, parentCase];
+export const routes: Route[] = [parents, parentCase, ...fdtRoutes];

@@ -20,6 +20,8 @@ import { routes as masterRoutes } from './features/master';
 import { routes as workRoutes } from './features/work';
 import { routes as auditRoutes } from './features/audit';
 import { routes as systemRoutes } from './features/system/users';
+import { routes as importRoutes } from './features/system/imports';
+import { routes as reportRoutes } from './features/reports';
 
 const legacyRoute: Route = {
   pattern: '/legacy',
@@ -41,6 +43,8 @@ const ROUTES: Route[] = [
   ...workRoutes,
   ...auditRoutes,
   ...systemRoutes,
+  ...importRoutes,
+  ...reportRoutes,
   legacyRoute,
 ];
 
