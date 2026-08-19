@@ -23,6 +23,13 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+/**
+ * الملاحة.
+ *
+ * لغة أيقونات واحدة: محارف هندسية أحادية اللون. الرموز التعبيرية (🗓 👥 🧾)
+ * تُرسَم ملوّنةً بخطّ النظام، فتكسر النظام البصري وتتغيّر شكلاً بين
+ * المنصّات. استُبدلت بمحارف من العائلة نفسها.
+ */
 export const NAV: NavGroup[] = [
   {
     key: 'main', label: '', items: [
@@ -32,17 +39,17 @@ export const NAV: NavGroup[] = [
   {
     key: 'commission', label: 'عمولات الوكلاء', items: [
       { label: 'نظرة عامة', path: '/commissions', icon: '◎', capability: 'commission.view' },
-      { label: 'الدورات', path: '/commissions/cycles', icon: '🗓', capability: 'commission.view' },
-      { label: 'الوكلاء', path: '/commissions/agents', icon: '♟', capability: 'commission.view' },
+      { label: 'الدورات', path: '/commissions/cycles', icon: '◷', capability: 'commission.view' },
+      { label: 'الوكلاء', path: '/commissions/agents', icon: '◍', capability: 'commission.view' },
     ],
   },
   {
     key: 'installation', label: 'أجور التنصيب', items: [
-      { label: 'مركز التحكّم', path: '/installation', icon: '⚙', capability: 'installation.view' },
-      { label: 'المشتركون', path: '/installation/subscribers', icon: '👥', capability: 'installation.view' },
-      { label: 'الفواتير', path: '/installation/invoices', icon: '🧾', capability: 'installation.view' },
+      { label: 'مركز التحكّم', path: '/installation', icon: '⊞', capability: 'installation.view' },
+      { label: 'المشتركون', path: '/installation/subscribers', icon: '◫', capability: 'installation.view' },
+      { label: 'مراجعة الفواتير', path: '/installation/invoices', icon: '▤', capability: 'invoice.view' },
       { label: 'جاهز للصرف', path: '/installation/ready', icon: '✓', capability: 'installation.view' },
-      { label: 'الموقوفون', path: '/installation/holds', icon: '⏸', capability: 'installation.view' },
+      { label: 'التعليقات', path: '/installation/holds', icon: '‖', capability: 'installation.view' },
     ],
   },
   {
@@ -51,13 +58,26 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    key: 'work', label: 'العمل', items: [
-      { label: 'الاستثناءات', path: '/exceptions', icon: '⚠', capability: 'commission.view' },
+    key: 'work', label: 'تحتاج إجراء', items: [
+      { label: 'مركز العمل', path: '/work', icon: '◉', capability: 'report.view' },
+      { label: 'الاستثناءات', path: '/exceptions', icon: '◬', capability: 'commission.view' },
     ],
   },
   {
+    key: 'master', label: 'البيانات الرئيسية', items: [
+      { label: 'الآباء والعائدية', path: '/master/parents', icon: '⌂', capability: 'agent.view' },
+    ],
+  },
+  {
+    key: 'system', label: 'النظام', items: [
+      { label: 'المستخدمون', path: '/system/users', icon: '◍', capability: 'permission.manage' },
+      { label: 'سجلّ التدقيق', path: '/audit', icon: '❑', capability: 'audit.view' },
+    ],
+  },
+  {
+    // تبقى مرئيّةً حتى تكتمل المكافئات، ومُعلَّمةً بأنها سابقة.
     key: 'legacy', label: 'الشاشات السابقة', items: [
-      { label: 'مساحة العمل الكاملة', path: '/legacy', icon: '▤', legacy: true },
+      { label: 'مساحة العمل الكاملة', path: '/legacy', icon: '▥', legacy: true },
     ],
   },
 ];

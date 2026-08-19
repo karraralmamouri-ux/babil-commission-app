@@ -410,24 +410,58 @@ test('الصدفة تفصل الإجمالي عن الصفوف', () => {
    العائدية التشغيلية
    ------------------------------------------------------------------------ */
 
-test('الأنواع الأربعة معرَّفة بتسمياتها العربية', () => {
-  const s = read('src/features/installation/index.ts');
+test('التصنيف ثلاثي لا خمسة', () => {
+  // FTTH وOffice اسما أبَوين لا صنفَين ماليَّين. جعلُهما صنفَين كان يعني أن
+  // كل أبٍ شركاتيّ جديد يحتاج نشرَ واجهة.
+  // يُقتطع المصدر عند تركيب المسارات: ما بعده يشير إلى وحداتٍ مستوردة،
+  // والمقصود هنا جدول التسميات وحده. والنمط كان قد فقد شرطتيه المائلتين
+  // فصار يطابق سطر استيرادٍ واحداً لا كتلته.
+  const full = read('src/features/installation/index.ts');
+  const s = full.slice(0, full.indexOf('export const routes'));
   const { OWNERSHIP_LABEL } = evalTs(s.replace(/^import[\s\S]*?;$/gm, ''), ['OWNERSHIP_LABEL']);
+  assert.deepEqual(Object.keys(OWNERSHIP_LABEL).sort(),
+    ['DIRECT_COMPANY', 'NEEDS_REVIEW', 'RESELLER']);
   assert.equal(OWNERSHIP_LABEL.RESELLER, 'وكيل');
-  assert.equal(OWNERSHIP_LABEL.FTTH_USER, 'FTTH User');
-  assert.equal(OWNERSHIP_LABEL.OFFICE, 'Office');
+  assert.equal(OWNERSHIP_LABEL.DIRECT_COMPANY, 'الشركة');
   assert.equal(OWNERSHIP_LABEL.NEEDS_REVIEW, 'تحتاج مراجعة');
+  assert.equal(OWNERSHIP_LABEL.FTTH_USER, undefined);
+  assert.equal(OWNERSHIP_LABEL.OFFICE, undefined);
 });
 
-test('FTTH User وOffice بطاقتان منفصلتان لا بطاقة «شركة مباشرة» واحدة', () => {
-  // دمجهما يُخفي فرقاً تشغيلياً حقيقياً على من يعمل بهما.
-  const s = read('src/features/home/index.ts');
-  assert.match(s, /FTTH User/);
-  assert.match(s, />Office</);
-  assert.doesNotMatch(s, /شركة مباشرة<\/div>/);
-  // وكلٌّ يفتح السجلّ مُصفّى عليه
-  assert.match(s, /ownership: 'FTTH_USER'/);
-  assert.match(s, /ownership: 'OFFICE'/);
+test('اسم الأب لا يُستبدَل بتسمية التصنيف', () => {
+  // المشغّل يبحث في ملف SaaS عن hrins.office بعينه؛ عرضُ «Office» مكانه
+  // يقطع الجسر بين الشاشة والمصدر.
+  const home = read('src/features/home/index.ts');
+  const reg = read('src/features/installation/index.ts');
+
+  // لا أسماء آباء مثبَّتة في شيفرة الواجهة.
+  //
+  // التعليقات تُستثنى: شرحُ القاعدة يذكر الأسماء مثالاً، والمقصود منعُ
+  // اعتمادِ الشيفرة عليها لا منعُ ذكرها.
+  const NL = String.fromCharCode(10);
+  const homeCode = home.split(NL).filter((l) => !l.trim().startsWith('//')).join(NL);
+  assert.ok(!homeCode.includes('FTTH_Users'), 'اسم أب مثبَّت في الشيفرة');
+  assert.ok(!homeCode.includes('hrins.office'), 'اسم أب مثبَّت في الشيفرة');
+  assert.doesNotMatch(home, /label">FTTH User</);
+  assert.doesNotMatch(home, /label">Office</);
+
+  // التفصيل يأتي من الخادم بالأسماء الحقيقية
+  assert.match(home, /company_parent_breakdown/);
+  assert.match(home, /parent_name/);
+  assert.match(home, /الاسم كما ورد في المصدر/);
+
+  // والسجلّ يعرض الأب لا التصنيف مكانه
+  assert.ok(reg.includes('الوكيل / الأب'), 'عمود الأب مفقود');
+  assert.match(reg, /الاسم الأصلي كما ورد من المصدر/);
+});
+
+test('بطاقة الشركة واحدة بمجموع، وتحتها تفصيل ديناميكي', () => {
+  const home = read('src/features/home/index.ts');
+  assert.match(home, /مشتركو الشركة/);
+  assert.match(home, /ownership: 'DIRECT_COMPANY'/);
+  // التفصيل مبنيّ من المصفوفة العائدة لا من قائمة مكتوبة
+  assert.ok(home.includes('parents.map('), 'التفصيل ليس مبنيّاً من المصفوفة');
+  assert.match(home, /total_subscribers/);
 });
 
 test('السجلّ يُرشَّح بالعائدية على الخادم', () => {

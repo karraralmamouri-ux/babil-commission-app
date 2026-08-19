@@ -1121,3 +1121,13 @@ a.card .value { text-decoration: none; }
 
 /* صفّ الجدول القابل للفتح */
 tbody tr[onclick]:hover td { background: var(--gold-100); }
+
+/* اسم الأب كما ورد من المصدر: لاتيني، أحادي العرض، لا يُقتطع.
+   يُقرأ بجانب ملف المصدر حرفاً بحرف، فالاقتطاع فيه يفقده وظيفته. */
+.parent-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0;
+  unicode-bidi: isolate;
+  word-break: break-all;
+}

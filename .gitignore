@@ -3,11 +3,11 @@
 !.env.example
 node_modules/
 dist/
-coverage/
+/coverage/
 .vite/
 *.log
 *.local
-backups/
-exports/
-work/
+/backups/
+/exports/
+/work/
 supabase/.temp/

@@ -7,8 +7,13 @@
 
 import type { Route } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, toPage, pageRpc } from '../../services/api';
+import { rpc, pageRpc } from '../../services/api';
 import { money, count } from '../../domain/money';
+import { transferPanel, wireTransfer } from '../ownership/transfer';
+import { classificationPanel } from './classification';
+import { routes as holdRoutes, holdPanel, wireHoldPanel } from './holds';
+import { routes as payoutRoutes } from './payout';
+import { routes as invoiceRoutes } from './invoices';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -19,20 +24,19 @@ const num = (r: Row, k: string) => Number(r[k] || 0);
 const str = (r: Row, k: string) => String(r[k] ?? '');
 
 /**
- * العائدية التشغيلية.
+ * العائدية: تصنيفٌ ثلاثي، لا اسمٌ بديل.
  *
- * FTTH User وOffice شركةٌ مباشرة مالياً — لا عمولة ولا شريحة — لكنهما
- * يُعرضان منفصلَين لأنهما وحدتان تشغيليّتان مختلفتان، ودمجهما في «شركة
- * مباشرة» واحدة يُخفي فرقاً يهمّ من يعمل يومياً.
+ * الاسم الأصلي للأب يبقى معروضاً كما ورد في المصدر — hrins.office يظل
+ * hrins.office. والتصنيف عمودٌ بجانبه يقول ما هو مالياً، لا يحلّ محلّه.
+ * فالمشغّل الذي يبحث في ملف SaaS يجد ما يراه على الشاشة.
  */
 export const OWNERSHIP_LABEL: Record<string, string> = {
   RESELLER: 'وكيل',
-  FTTH_USER: 'FTTH User',
-  OFFICE: 'Office',
+  DIRECT_COMPANY: 'الشركة',
   NEEDS_REVIEW: 'تحتاج مراجعة',
 };
 
-function ownershipChip(type: string): string {
+export function ownershipChip(type: string): string {
   const tone: 'info' | 'warning' | 'brand' = type === 'RESELLER' ? 'info'
     : type === 'NEEDS_REVIEW' ? 'warning' : 'brand';
   return chip(OWNERSHIP_LABEL[type] || type || '—', tone);
@@ -51,11 +55,14 @@ export const controlCenter: Route = {
   breadcrumb: () => [{ label: 'الرئيسية', href: href('/') }, { label: 'أجور التنصيب' }],
   async render(view) {
     view.write(loading('جارٍ تحميل حالة التنصيب…'));
-    const state = await rpc<Row>('installation_cycle_state', {});
+    // حالة التصنيف تُقرأ من الخادم الآن، لا تُحسب في المتصفّح وتضيع.
+    const [state, classState] = await Promise.all([
+      rpc<Row>('installation_cycle_state', {}),
+      rpc<Row>('classification_state', {}).catch(() => null),
+    ]);
     const hist = (state?.['historical'] || {}) as Row;
     const ent = (state?.['entitlements'] || {}) as Row;
     const enroll = (state?.['enrollments'] || {}) as Record<string, number>;
-    const cls = (state?.['classification'] || {}) as Record<string, number>;
 
     const stageRows = Object.entries(enroll).map(([k, v]) => ({ stage: k, n: v }));
 
@@ -71,11 +78,8 @@ export const controlCenter: Route = {
             ${stageRows.length
               ? stageRows.map((r) => `<div class="minirow"><span>${chip(r.stage, STAGE_TONE[r.stage] || 'neutral')}</span><b>${count(r.n)}</b></div>`).join('')
               : '<p class="muted">لا تسجيلات</p>'}</div>
-          <div class="box"><h3>التصنيف</h3>
-            ${Object.keys(cls).length
-              ? Object.entries(cls).map(([k, v]) => `<div class="minirow"><span>${esc(k)}</span><b>${count(v)}</b></div>`).join('')
-              : `<p class="muted">التصنيف لا يُحفَظ بعد على الخادم — يُحسب أثناء الاستيراد في المتصفح.
-                 مسجَّل في قائمة ما بعد الإطلاق.</p>`}</div>
+          <div class="box"><h3>تصنيف الجِدّة</h3>
+            ${classificationPanel(classState)}</div>
         </div>`;
   },
 };
@@ -111,7 +115,8 @@ export const subscribers: Route = {
     const columns: Array<Column<Row>> = [
       { key: 'sid', label: 'المشترك', cell: (r) => `<b>${esc(str(r, 'subscriber_id'))}</b>` },
       { key: 'own', label: 'العائدية', cell: (r) => ownershipChip(str(r, 'ownership_type')) },
-      { key: 'agent', label: 'الوكيل', cell: (r) => esc(str(r, 'reseller') || '—') },
+      // الاسم الأصلي كما ورد من المصدر — لا يُستبدَل بتسمية التصنيف.
+      { key: 'agent', label: 'الوكيل / الأب', cell: (r) => esc(str(r, 'reseller') || '—') },
       { key: 'fdt', label: 'الكابينة', cell: (r) => esc(str(r, 'fdt') || '—') },
       { key: 'zone', label: 'المنطقة', cell: (r) => {
         const z = str(r, 'zone');
@@ -130,11 +135,10 @@ export const subscribers: Route = {
     view.innerHTML = pageHeader('سجلّ المشتركين', 'يُصفَّح ويُصفّى على الخادم — لا يُنقل الجدول إلى المتصفح')
       + filterBar([
         { key: 'search', label: 'بحث بالمعرّف أو الوكيل', type: 'search' },
-        // العائدية التشغيلية: أربعة أنواع صريحة، وFTTH وOffice منفصلان عمداً.
+        // ثلاثة أصناف مالية. أسماء الآباء ليست أصنافاً — تُعرض كما هي.
         { key: 'ownership', label: 'العائدية', type: 'select', options: [
           { value: 'RESELLER', label: 'وكيل' },
-          { value: 'FTTH_USER', label: 'FTTH User' },
-          { value: 'OFFICE', label: 'Office' },
+          { value: 'DIRECT_COMPANY', label: 'الشركة' },
           { value: 'NEEDS_REVIEW', label: 'تحتاج مراجعة' },
         ] },
         { key: 'stage', label: 'المراحل', type: 'select', options: ['P1', 'P2', 'P3', 'P4', 'DONE', 'UNKNOWN'].map((s) => ({ value: s, label: s })) },
@@ -157,6 +161,7 @@ export const subscribers: Route = {
 
 const CASE_TABS = [
   { key: 'overview', label: 'نظرة عامة' },
+  { key: 'ownership', label: 'العائدية' },
   { key: 'activations', label: 'التفعيلات' },
   { key: 'invoices', label: 'الفواتير' },
   { key: 'entitlements', label: 'الاستحقاقات' },
@@ -181,7 +186,10 @@ export const subscriberCase: Route = {
     const tab = m.query.get('tab') || 'overview';
     view.innerHTML = loading('جارٍ تحميل ملفّ المشترك…');
 
-    const doc = await rpc<Row>('installation_subscriber_case', { p_subscriber_id: id });
+    const [doc, next] = await Promise.all([
+      rpc<Row>('installation_subscriber_case', { p_subscriber_id: id }),
+      rpc<Row>('subscriber_next_action', { p_subscriber_id: id }).catch(() => null),
+    ]);
     const sub = (doc?.['subscriber'] || null) as Row | null;
     if (!sub) { view.innerHTML = empty('المشترك غير موجود', id); return; }
 
@@ -204,7 +212,12 @@ export const subscriberCase: Route = {
         { label: 'المنطقة', value: esc(str(enr, 'zone') === 'new' ? 'جديدة' : str(enr, 'zone') === 'old' ? 'قديمة' : '—'), tone: 'blue' },
         { label: 'الإيقافات الفعّالة', value: count(activeHolds.length), tone: 'red' },
       ])
+      + nextActionBanner(next)
       + `<div class="tabs">${tabs}</div><div class="panel active">${renderCaseTab(doc as Row, tab, id)}</div>`;
+
+    // مفتاح المشترك هو ما تعرفه أحداث SaaS، وهو صغير الأحرف.
+    if (tab === 'ownership') await wireTransfer(view, id.toLowerCase().trim());
+    if (tab === 'holds') wireHoldPanel(view);
 
     if (tab === 'history') {
       const host = view.el.querySelector<HTMLElement>('#timelineHost');
@@ -220,8 +233,29 @@ export const subscriberCase: Route = {
   },
 };
 
+/**
+ * الإجراء التالي.
+ *
+ * قراءةٌ للحالة القائمة لا قاعدةٌ مالية جديدة: تقول أين يقف هذا المشترك
+ * وأيّ شاشةٍ تحسمه، ولا تحسب مبلغاً. وترتيبها ترتيب الحجب — ما يمنع
+ * الصرف قبل ما ينتظره — فلا يُرسَل المستخدم إلى شاشةٍ يحجبها شيء آخر.
+ */
+function nextActionBanner(doc: Row | null): string {
+  const a = (doc?.['action'] || null) as Row | null;
+  if (!a || str(a, 'code') === 'NONE') return '';
+  const tone = str(a, 'tone');
+  const cls = tone === 'critical' ? 'danger' : tone === 'success' ? 'good' : 'warn';
+  const path = str(a, 'path');
+  return `<div class="insight ${cls}" style="margin:12px 0"><span class="insight-dot"></span>
+    <span><b>الإجراء التالي: ${esc(str(a, 'label'))}</b>
+    <small>${esc(str(a, 'why'))}</small></span>
+    ${path ? `<a class="btn gold" href="${esc(href(path))}">افتح</a>` : ''}</div>`;
+}
+
 function renderCaseTab(doc: Row, tab: string, id: string): string {
   const list = (k: string) => (doc[k] || []) as Row[];
+
+  if (tab === 'ownership') return transferPanel();
 
   if (tab === 'entitlements') {
     const rows = list('entitlements');
@@ -255,12 +289,14 @@ function renderCaseTab(doc: Row, tab: string, id: string): string {
 
   if (tab === 'holds') {
     const rows = list('holds');
-    return rows.length ? table([
+    const listed = rows.length ? table([
       { key: 'reason', label: 'السبب', cell: (r) => esc(str(r, 'reason')) },
       { key: 'stage', label: 'المرحلة', cell: (r) => esc(str(r, 'stage') || '—') },
       { key: 'status', label: 'الحالة', cell: (r) => str(r, 'status') === 'ACTIVE' ? chip('فعّال', 'critical') : chip('مُفرَج', 'success') },
       { key: 'note', label: 'ملاحظة', cell: (r) => esc(str(r, 'note') || '—') },
     ] as Array<Column<Row>>, rows) : empty('لا إيقافات');
+    // القائمة أوّلاً ثم لوحة التعليق: يُقرأ القائم قبل أن يُضاف إليه.
+    return listed + holdPanel(id);
   }
 
   if (tab === 'activations' || tab === 'history' || tab === 'audit') {
@@ -299,86 +335,10 @@ function timeline(events: Row[]): string {
     </div>`).join('')}</div>`;
 }
 
-/* ---- الطوابير ----------------------------------------------------------- */
-
-function queueScreen(
-  pattern: string, title: string, subtitle: string, fn: string,
-  args: Record<string, unknown>, columns: Array<Column<Row>>, emptyLabel: string,
-): Route {
-  return {
-    pattern,
-    capability: 'installation.view',
-    title,
-    breadcrumb: () => [
-      { label: 'الرئيسية', href: href('/') },
-      { label: 'أجور التنصيب', href: href('/installation') },
-      { label: title },
-    ],
-    async render(view, m) {
-      const limit = 50;
-      const offset = Number(m.query.get('offset') || 0);
-      view.innerHTML = loading();
-      const rows = await rpc<Row[]>(fn, { ...args, p_limit: limit, p_offset: offset });
-      const page = toPage(rows as never, limit, offset);
-      view.innerHTML = pageHeader(title, subtitle)
-        + (page.rows.length ? table(columns, page.rows as Row[]) : empty(emptyLabel))
-        + pager(page.total, limit, offset, pattern, m.query);
-    },
-  };
-}
-
-export const invoices = queueScreen(
-  '/installation/invoices', 'الفواتير', 'استحقاقات بانتظار مراجعة الفاتورة',
-  'list_installation_entitlements', { p_invoice_status: 'pending' },
-  [
-    { key: 'sid', label: 'المشترك', cell: (r) => `<a href="${esc(href(`/installation/subscribers/${encodeURIComponent(str(r, 'subscriber_id'))}`))}">${esc(str(r, 'subscriber_id'))}</a>` },
-    { key: 'period', label: 'الفترة', cell: (r) => esc(str(r, 'period')) },
-    { key: 'stage', label: 'المرحلة', cell: (r) => esc(str(r, 'stage')) },
-    { key: 'amount', label: 'المبلغ', cell: (r) => `<span class="money">${money(num(r, 'amount'))}</span>`, numeric: true },
-    { key: 'inv', label: 'الفاتورة', cell: (r) => chip(str(r, 'invoice_status') || '—', 'warning') },
-  ],
-  'لا فواتير بانتظار المراجعة',
-);
-
-export const ready = queueScreen(
-  '/installation/ready', 'جاهز للصرف', 'استحقاقات اكتملت شروطها — الدفع يبقى بيد الخادم',
-  'list_installation_entitlements', { p_payment_status: 'pending' },
-  [
-    { key: 'sid', label: 'المشترك', cell: (r) => `<a href="${esc(href(`/installation/subscribers/${encodeURIComponent(str(r, 'subscriber_id'))}`))}">${esc(str(r, 'subscriber_id'))}</a>` },
-    { key: 'period', label: 'الفترة', cell: (r) => esc(str(r, 'period')) },
-    { key: 'stage', label: 'المرحلة', cell: (r) => esc(str(r, 'stage')) },
-    { key: 'amount', label: 'المبلغ', cell: (r) => `<span class="money">${money(num(r, 'amount'))}</span>`, numeric: true },
-    { key: 'pay', label: 'الدفع', cell: (r) => chip(str(r, 'payment_status') || '—', 'info') },
-  ],
-  'لا استحقاقات جاهزة',
-);
-
-export const holds: Route = {
-  pattern: '/installation/holds',
-  capability: 'installation.view',
-  title: 'الموقوفون',
-  breadcrumb: () => [
-    { label: 'الرئيسية', href: href('/') },
-    { label: 'أجور التنصيب', href: href('/installation') },
-    { label: 'الموقوفون' },
-  ],
-  async render(view, m) {
-    const limit = 50;
-    const offset = Number(m.query.get('offset') || 0);
-    view.innerHTML = loading();
-    const rows = await rpc<Row[]>('list_installation_holds', { p_status: 'ACTIVE', p_limit: limit, p_offset: offset });
-    const page = toPage(rows as never, limit, offset);
-    const columns: Array<Column<Row>> = [
-      { key: 'sid', label: 'المشترك', cell: (r) => `<a href="${esc(href(`/installation/subscribers/${encodeURIComponent(str(r, 'subscriber_id'))}`))}">${esc(str(r, 'subscriber_id'))}</a>` },
-      { key: 'reason', label: 'السبب', cell: (r) => `<b>${esc(str(r, 'reason_label') || str(r, 'reason_code'))}</b>` },
-      { key: 'stage', label: 'المرحلة', cell: (r) => esc(str(r, 'stage_code') || '—') },
-      { key: 'blocks', label: 'يمنع الدفع', cell: (r) => r['blocks_payment'] ? chip('نعم', 'critical') : chip('لا', 'neutral') },
-      { key: 'note', label: 'ملاحظة', cell: (r) => esc(str(r, 'note') || '—') },
-    ];
-    view.innerHTML = pageHeader('الموقوفون', 'الإيقاف يمنع الدفع حتى يُفرَج عنه')
-      + (page.rows.length ? table(columns, page.rows as Row[]) : empty('لا إيقافات فعّالة'))
-      + pager(page.total, limit, offset, '/installation/holds', m.query);
-  },
-};
-
-export const routes: Route[] = [controlCenter, subscribers, subscriberCase, invoices, ready, holds];
+// «جاهز للصرف» و«التعليقات» انتقلتا إلى ملفَّيهما: الأولى صارت تجميعاً
+// بالوكيل مع سطورٍ تحته، والثانية صارت تحمل نوع الحجب ومصدره وأجله.
+export const routes: Route[] = [
+  controlCenter, subscribers, subscriberCase,
+  ...invoiceRoutes,
+  ...payoutRoutes, ...holdRoutes,
+];

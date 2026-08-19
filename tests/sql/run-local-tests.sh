@@ -180,6 +180,48 @@ fi
 echo "$out19" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out19" | grep -c "            ok ")))
 
+echo "== subscriber transfer =="
+out20=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/subscriber-transfer.sql 2>&1)
+if echo "$out20" | grep -qE "FAILED|ERROR"; then
+  echo "$out20" | grep -E "FAILED|ERROR" || true
+  echo "TRANSFER TESTS FAILED" >&2; exit 1
+fi
+echo "$out20" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out20" | grep -c "            ok ")))
+
+echo "== installation holds =="
+out22=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-holds.sql 2>&1)
+if echo "$out22" | grep -qE "FAILED|ERROR"; then
+  echo "$out22" | grep -E "FAILED|ERROR" || true
+  echo "HOLD TESTS FAILED" >&2; exit 1
+fi
+echo "$out22" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out22" | grep -c "            ok ")))
+
+echo "== installation payout =="
+out23=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-payout.sql 2>&1)
+if echo "$out23" | grep -qE "FAILED|ERROR"; then
+  echo "$out23" | grep -E "FAILED|ERROR" || true
+  echo "PAYOUT TESTS FAILED" >&2; exit 1
+fi
+echo "$out23" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out23" | grep -c "            ok ")))
+
+echo "== invoice review =="
+out24=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/invoice-review.sql 2>&1)
+if echo "$out24" | grep -qE "FAILED|ERROR"; then
+  echo "$out24" | grep -E "FAILED|ERROR" || true
+  echo "INVOICE TESTS FAILED" >&2; exit 1
+fi
+echo "$out24" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out24" | grep -c "            ok ")))
+
+echo "== newness parity =="
+out21=$(bash tests/sql/newness-parity.sh 2>&1)
+if [ $? -ne 0 ]; then echo "$out21" >&2; echo "PARITY TESTS FAILED" >&2; exit 1; fi
+echo "$out21" | grep -E "^pass  parity" || true
+passed=$((passed + $(echo "$out21" | grep -c "^pass  parity")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
