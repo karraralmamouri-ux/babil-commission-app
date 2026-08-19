@@ -42,7 +42,7 @@ export const NAV: NavGroup[] = [
       { label: 'المشتركون', path: '/installation/subscribers', icon: '👥', capability: 'installation.view' },
       { label: 'الفواتير', path: '/installation/invoices', icon: '🧾', capability: 'installation.view' },
       { label: 'جاهز للصرف', path: '/installation/ready', icon: '✓', capability: 'installation.view' },
-      { label: 'الموقوفون', path: '/installation/holds', icon: '⏸', capability: 'installation.view' },
+      { label: 'التعليقات', path: '/installation/holds', icon: '⏸', capability: 'installation.view' },
     ],
   },
   {

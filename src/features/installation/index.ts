@@ -11,6 +11,8 @@ import { rpc, toPage, pageRpc } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { transferPanel, wireTransfer } from '../ownership/transfer';
 import { classificationPanel } from './classification';
+import { routes as holdRoutes } from './holds';
+import { routes as payoutRoutes } from './payout';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -370,45 +372,9 @@ export const invoices = queueScreen(
   'لا فواتير بانتظار المراجعة',
 );
 
-export const ready = queueScreen(
-  '/installation/ready', 'جاهز للصرف', 'استحقاقات اكتملت شروطها — الدفع يبقى بيد الخادم',
-  'list_installation_entitlements', { p_payment_status: 'pending' },
-  [
-    { key: 'sid', label: 'المشترك', cell: (r) => `<a href="${esc(href(`/installation/subscribers/${encodeURIComponent(str(r, 'subscriber_id'))}`))}">${esc(str(r, 'subscriber_id'))}</a>` },
-    { key: 'period', label: 'الفترة', cell: (r) => esc(str(r, 'period')) },
-    { key: 'stage', label: 'المرحلة', cell: (r) => esc(str(r, 'stage')) },
-    { key: 'amount', label: 'المبلغ', cell: (r) => `<span class="money">${money(num(r, 'amount'))}</span>`, numeric: true },
-    { key: 'pay', label: 'الدفع', cell: (r) => chip(str(r, 'payment_status') || '—', 'info') },
-  ],
-  'لا استحقاقات جاهزة',
-);
-
-export const holds: Route = {
-  pattern: '/installation/holds',
-  capability: 'installation.view',
-  title: 'الموقوفون',
-  breadcrumb: () => [
-    { label: 'الرئيسية', href: href('/') },
-    { label: 'أجور التنصيب', href: href('/installation') },
-    { label: 'الموقوفون' },
-  ],
-  async render(view, m) {
-    const limit = 50;
-    const offset = Number(m.query.get('offset') || 0);
-    view.innerHTML = loading();
-    const rows = await rpc<Row[]>('list_installation_holds', { p_status: 'ACTIVE', p_limit: limit, p_offset: offset });
-    const page = toPage(rows as never, limit, offset);
-    const columns: Array<Column<Row>> = [
-      { key: 'sid', label: 'المشترك', cell: (r) => `<a href="${esc(href(`/installation/subscribers/${encodeURIComponent(str(r, 'subscriber_id'))}`))}">${esc(str(r, 'subscriber_id'))}</a>` },
-      { key: 'reason', label: 'السبب', cell: (r) => `<b>${esc(str(r, 'reason_label') || str(r, 'reason_code'))}</b>` },
-      { key: 'stage', label: 'المرحلة', cell: (r) => esc(str(r, 'stage_code') || '—') },
-      { key: 'blocks', label: 'يمنع الدفع', cell: (r) => r['blocks_payment'] ? chip('نعم', 'critical') : chip('لا', 'neutral') },
-      { key: 'note', label: 'ملاحظة', cell: (r) => esc(str(r, 'note') || '—') },
-    ];
-    view.innerHTML = pageHeader('الموقوفون', 'الإيقاف يمنع الدفع حتى يُفرَج عنه')
-      + (page.rows.length ? table(columns, page.rows as Row[]) : empty('لا إيقافات فعّالة'))
-      + pager(page.total, limit, offset, '/installation/holds', m.query);
-  },
-};
-
-export const routes: Route[] = [controlCenter, subscribers, subscriberCase, invoices, ready, holds];
+// «جاهز للصرف» و«التعليقات» انتقلتا إلى ملفَّيهما: الأولى صارت تجميعاً
+// بالوكيل مع سطورٍ تحته، والثانية صارت تحمل نوع الحجب ومصدره وأجله.
+export const routes: Route[] = [
+  controlCenter, subscribers, subscriberCase, invoices,
+  ...payoutRoutes, ...holdRoutes,
+];

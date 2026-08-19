@@ -413,8 +413,12 @@ test('الصدفة تفصل الإجمالي عن الصفوف', () => {
 test('التصنيف ثلاثي لا خمسة', () => {
   // FTTH وOffice اسما أبَوين لا صنفَين ماليَّين. جعلُهما صنفَين كان يعني أن
   // كل أبٍ شركاتيّ جديد يحتاج نشرَ واجهة.
-  const s = read('src/features/installation/index.ts');
-  const { OWNERSHIP_LABEL } = evalTs(s.replace(/^import[sS]*?;$/gm, ''), ['OWNERSHIP_LABEL']);
+  // يُقتطع المصدر عند تركيب المسارات: ما بعده يشير إلى وحداتٍ مستوردة،
+  // والمقصود هنا جدول التسميات وحده. والنمط كان قد فقد شرطتيه المائلتين
+  // فصار يطابق سطر استيرادٍ واحداً لا كتلته.
+  const full = read('src/features/installation/index.ts');
+  const s = full.slice(0, full.indexOf('export const routes'));
+  const { OWNERSHIP_LABEL } = evalTs(s.replace(/^import[\s\S]*?;$/gm, ''), ['OWNERSHIP_LABEL']);
   assert.deepEqual(Object.keys(OWNERSHIP_LABEL).sort(),
     ['DIRECT_COMPANY', 'NEEDS_REVIEW', 'RESELLER']);
   assert.equal(OWNERSHIP_LABEL.RESELLER, 'وكيل');
