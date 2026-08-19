@@ -12,21 +12,29 @@ Ordered by the cost of leaving it alone.
 
 **Severity:** high (operational, not code)
 
+**Cutover finding:** the organization is on the Supabase **free plan**, where
+point-in-time recovery is not offered. Enabling it requires a plan upgrade — a
+billing decision — so it was deliberately not actioned during cutover.
+
 `pitr_enabled` is `false` and the backups API lists zero restorable points.
 `walg_enabled` is true, so the physical infrastructure exists, but there is no
 verified restore target the team can point at.
 
-Mitigated for launch by a complete logical backup taken during the audit:
-50 tables, 184,322 rows, per-table SHA-256, plus migration state, at
-`2026-08-19T05-22-32Z`.
+Mitigated for launch by a complete logical backup taken at cutover: 50 tables,
+184,322 rows, per-table SHA-256, migration state and release SHA, at
+`2026-08-19T05:50:30Z` against `e6a6933` / `v1.0.0`. Its per-table checksums are
+byte-identical to the audit backup taken 28 minutes earlier, which independently
+confirms no data drifted between audit and release.
 
 Why it matters: the historical installation payment history (17,117 rows,
 54,828,000 IQD) exists in exactly one place. It originated in Excel files the
 business holds, so it is reconstructable — but reconstruction is a project, not
 a restore.
 
-**Action:** enable PITR in the Supabase dashboard, confirm the first restore
-point appears, and record it in the runbook. Minutes of work.
+**Action:** upgrade the plan, enable PITR, confirm the first restore point
+appears, and record it in the runbook. Until then the logical backup **is** the
+recovery point, and must be taken before every monthly import and before every
+payment posting run.
 
 ---
 
