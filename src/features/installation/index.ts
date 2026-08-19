@@ -19,20 +19,19 @@ const num = (r: Row, k: string) => Number(r[k] || 0);
 const str = (r: Row, k: string) => String(r[k] ?? '');
 
 /**
- * العائدية التشغيلية.
+ * العائدية: تصنيفٌ ثلاثي، لا اسمٌ بديل.
  *
- * FTTH User وOffice شركةٌ مباشرة مالياً — لا عمولة ولا شريحة — لكنهما
- * يُعرضان منفصلَين لأنهما وحدتان تشغيليّتان مختلفتان، ودمجهما في «شركة
- * مباشرة» واحدة يُخفي فرقاً يهمّ من يعمل يومياً.
+ * الاسم الأصلي للأب يبقى معروضاً كما ورد في المصدر — hrins.office يظل
+ * hrins.office. والتصنيف عمودٌ بجانبه يقول ما هو مالياً، لا يحلّ محلّه.
+ * فالمشغّل الذي يبحث في ملف SaaS يجد ما يراه على الشاشة.
  */
 export const OWNERSHIP_LABEL: Record<string, string> = {
   RESELLER: 'وكيل',
-  FTTH_USER: 'FTTH User',
-  OFFICE: 'Office',
+  DIRECT_COMPANY: 'الشركة',
   NEEDS_REVIEW: 'تحتاج مراجعة',
 };
 
-function ownershipChip(type: string): string {
+export function ownershipChip(type: string): string {
   const tone: 'info' | 'warning' | 'brand' = type === 'RESELLER' ? 'info'
     : type === 'NEEDS_REVIEW' ? 'warning' : 'brand';
   return chip(OWNERSHIP_LABEL[type] || type || '—', tone);
@@ -111,7 +110,8 @@ export const subscribers: Route = {
     const columns: Array<Column<Row>> = [
       { key: 'sid', label: 'المشترك', cell: (r) => `<b>${esc(str(r, 'subscriber_id'))}</b>` },
       { key: 'own', label: 'العائدية', cell: (r) => ownershipChip(str(r, 'ownership_type')) },
-      { key: 'agent', label: 'الوكيل', cell: (r) => esc(str(r, 'reseller') || '—') },
+      // الاسم الأصلي كما ورد من المصدر — لا يُستبدَل بتسمية التصنيف.
+      { key: 'agent', label: 'الوكيل / الأب', cell: (r) => esc(str(r, 'reseller') || '—') },
       { key: 'fdt', label: 'الكابينة', cell: (r) => esc(str(r, 'fdt') || '—') },
       { key: 'zone', label: 'المنطقة', cell: (r) => {
         const z = str(r, 'zone');
@@ -130,11 +130,10 @@ export const subscribers: Route = {
     view.innerHTML = pageHeader('سجلّ المشتركين', 'يُصفَّح ويُصفّى على الخادم — لا يُنقل الجدول إلى المتصفح')
       + filterBar([
         { key: 'search', label: 'بحث بالمعرّف أو الوكيل', type: 'search' },
-        // العائدية التشغيلية: أربعة أنواع صريحة، وFTTH وOffice منفصلان عمداً.
+        // ثلاثة أصناف مالية. أسماء الآباء ليست أصنافاً — تُعرض كما هي.
         { key: 'ownership', label: 'العائدية', type: 'select', options: [
           { value: 'RESELLER', label: 'وكيل' },
-          { value: 'FTTH_USER', label: 'FTTH User' },
-          { value: 'OFFICE', label: 'Office' },
+          { value: 'DIRECT_COMPANY', label: 'الشركة' },
           { value: 'NEEDS_REVIEW', label: 'تحتاج مراجعة' },
         ] },
         { key: 'stage', label: 'المراحل', type: 'select', options: ['P1', 'P2', 'P3', 'P4', 'DONE', 'UNKNOWN'].map((s) => ({ value: s, label: s })) },
