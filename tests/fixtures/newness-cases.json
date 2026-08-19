@@ -1,0 +1,107 @@
+{
+  "note": "حالات تصنيف الجِدّة. مصدرٌ واحد يقرأه الجانبان: JS في المتصفّح وSQL على الخادم. أيّ اختلاف بينهما يظهر هنا لا في المال.",
+  "packages": {
+    "P-PAID": "PAID_PACKAGE",
+    "P-PAID2": "PAID_PACKAGE",
+    "P-DEBT": "DEBT_SERVICE",
+    "P-WHO": "UNKNOWN"
+  },
+  "cases": [
+    {
+      "key": "nc-registry",
+      "why": "وجودٌ سابق في سجلّ التنصيب يحسم مهما قال الملف",
+      "registryPreexisting": true,
+      "identityStatus": "MATCHED",
+      "completeness": "COMPLETE",
+      "events": [{ "profile_name": "P-PAID", "activations_count": 1, "canceled": false }],
+      "expect": { "classification": "EXISTING", "reason_code": "REGISTRY_PREEXISTING" }
+    },
+    {
+      "key": "nc-conflict",
+      "why": "تعارض هوية لا يُصنَّف",
+      "registryPreexisting": false,
+      "identityStatus": "CONFLICT",
+      "completeness": "COMPLETE",
+      "events": [{ "profile_name": "P-PAID", "activations_count": 1, "canceled": false }],
+      "expect": { "classification": "NEEDS_REVIEW", "reason_code": "IDENTITY_CONFLICT" }
+    },
+    {
+      "key": "nc-lifetime",
+      "why": "عدّاد العمر يتجاوز المرصود ⇒ تاريخٌ خارج الملف",
+      "registryPreexisting": false,
+      "identityStatus": "MATCHED",
+      "completeness": "UNKNOWN",
+      "events": [{ "profile_name": "P-PAID", "activations_count": 5, "canceled": false }],
+      "expect": { "classification": "EXISTING", "reason_code": "LIFETIME_COUNT_EXCEEDS_OBSERVED" }
+    },
+    {
+      "key": "nc-canceled",
+      "why": "كل ما رُصد ملغى ⇒ لا أساس لادعاء",
+      "registryPreexisting": false,
+      "identityStatus": "MATCHED",
+      "completeness": "COMPLETE",
+      "events": [
+        { "profile_name": "P-PAID", "activations_count": 1, "canceled": true },
+        { "profile_name": "P-PAID", "activations_count": 2, "canceled": true }
+      ],
+      "expect": { "classification": "NEEDS_REVIEW", "reason_code": "CANCELED_ONLY_HISTORY" }
+    },
+    {
+      "key": "nc-noqualify",
+      "why": "أحداث غير مدفوعة وحدها لا تصنع اشتراكاً جديداً",
+      "registryPreexisting": false,
+      "identityStatus": "MATCHED",
+      "completeness": "COMPLETE",
+      "events": [
+        { "profile_name": "P-DEBT", "activations_count": 1, "canceled": false },
+        { "profile_name": "P-WHO", "activations_count": 2, "canceled": false }
+      ],
+      "expect": { "classification": "NEEDS_REVIEW", "reason_code": "NO_QUALIFYING_PAID_EVENT" }
+    },
+    {
+      "key": "nc-new",
+      "why": "المصدر مكتمل والعدّاد يساوي المرصود ⇒ جديد",
+      "registryPreexisting": false,
+      "identityStatus": "MATCHED",
+      "completeness": "COMPLETE",
+      "events": [
+        { "profile_name": "P-PAID", "activations_count": 2, "canceled": false },
+        { "profile_name": "P-PAID2", "activations_count": 1, "canceled": false }
+      ],
+      "expect": { "classification": "NEW", "reason_code": "COMPLETE_LIFETIME_HISTORY_OBSERVED" }
+    },
+    {
+      "key": "nc-partial",
+      "why": "المصدر ناقص فلا تُمنح الجِدّة",
+      "registryPreexisting": false,
+      "identityStatus": "MATCHED",
+      "completeness": "PARTIAL",
+      "events": [
+        { "profile_name": "P-PAID", "activations_count": 2, "canceled": false },
+        { "profile_name": "P-PAID2", "activations_count": 1, "canceled": false }
+      ],
+      "expect": { "classification": "NEEDS_REVIEW", "reason_code": "PARTIAL_SOURCE" }
+    },
+    {
+      "key": "nc-unknown",
+      "why": "اكتمالٌ مجهول ⇒ للمراجعة، وهذه حال كل ملفات اليوم",
+      "registryPreexisting": false,
+      "identityStatus": "MATCHED",
+      "completeness": "UNKNOWN",
+      "events": [
+        { "profile_name": "P-PAID", "activations_count": 2, "canceled": false },
+        { "profile_name": "P-PAID2", "activations_count": 1, "canceled": false }
+      ],
+      "expect": { "classification": "NEEDS_REVIEW", "reason_code": "UNKNOWN_SOURCE_COMPLETENESS" }
+    },
+    {
+      "key": "nc-zero-lifetime",
+      "why": "مصدرٌ مكتمل بلا عدّاد عمر لا يُثبت الجِدّة",
+      "registryPreexisting": false,
+      "identityStatus": "MATCHED",
+      "completeness": "COMPLETE",
+      "events": [{ "profile_name": "P-PAID", "activations_count": 0, "canceled": false }],
+      "expect": { "classification": "NEEDS_REVIEW", "reason_code": "UNKNOWN_SOURCE_COMPLETENESS" }
+    }
+  ]
+}

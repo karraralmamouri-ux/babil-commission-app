@@ -12,6 +12,17 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'assets', 'css', 'babil-flow.css'), 'utf8');
+
+/**
+ * كل ورقة أنماط تربطها الصفحة، لا الأولى وحدها.
+ *
+ * قراءة ورقةٍ واحدة تُسقط صنفاً معرَّفاً في ورقةٍ أخرى مربوطة فيبدو بلا
+ * نمط. المرجع هنا ما تُحمِّله الصفحة فعلاً.
+ */
+const LINK_RE = new RegExp(String.raw`<link rel="stylesheet" href="./([^"]+)">`, "g");
+const linkedCss = [...html.matchAll(LINK_RE)]
+  .map((m) => fs.readFileSync(path.join(root, m[1]), 'utf8'))
+  .join(String.fromCharCode(10));
 const Reporting = require('../assets/js/reporting.js');
 const CommissionVNext = require('../assets/js/commission-vnext.js');
 
@@ -359,7 +370,7 @@ test('كل صنف تستعمله الصفحة معرَّف في نظام الت�
     m[1].split(/\s+/).forEach((c) => { if (literal.test(c)) used.add(c); });
   }
   const defined = new Set();
-  for (const m of css.matchAll(/\.([a-zA-Z][\w-]*)/g)) defined.add(m[1]);
+  for (const m of linkedCss.matchAll(/\.([a-zA-Z][\w-]*)/g)) defined.add(m[1]);
   const missing = [...used].filter((c) => !defined.has(c)).sort();
   assert.deepEqual(missing, [], `أصناف بلا نمط: ${missing.join(', ')}`);
 });

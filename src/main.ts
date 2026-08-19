@@ -8,6 +8,7 @@
 
 import { Router, readLocation, type Route } from './app/router';
 import { renderNav, renderBreadcrumbs } from './app/shell';
+import { mountSearch } from './app/search';
 import { can } from './services/api';
 import { errorState, forbidden, empty } from './components/ui';
 
@@ -15,6 +16,9 @@ import { routes as homeRoutes } from './features/home';
 import { routes as commissionRoutes } from './features/commissions';
 import { routes as installationRoutes } from './features/installation';
 import { routes as financeRoutes } from './features/finance';
+import { routes as masterRoutes } from './features/master';
+import { routes as workRoutes } from './features/work';
+import { routes as auditRoutes } from './features/audit';
 
 const legacyRoute: Route = {
   pattern: '/legacy',
@@ -32,6 +36,9 @@ const ROUTES: Route[] = [
   ...commissionRoutes,
   ...installationRoutes,
   ...financeRoutes,
+  ...masterRoutes,
+  ...workRoutes,
+  ...auditRoutes,
   legacyRoute,
 ];
 
@@ -66,6 +73,11 @@ function boot(): void {
   });
 
   renderNav(navHost, can);
+
+  // البحث يعيش في الترويسة القديمة؛ إن غابت مضى التطبيق بلا بحث لا بخطأ.
+  const searchHost = document.getElementById('appSearch');
+  if (searchHost) mountSearch(searchHost);
+
   router.start();
 
   // إعادة الرسم بعد وصول الصلاحيات من الخادم: الشريط يُبنى قبلها فارغاً.

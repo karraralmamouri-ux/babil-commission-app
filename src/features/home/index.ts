@@ -35,7 +35,7 @@ export const home: Route = {
     const [summary, impact, company] = await Promise.all([
       rpc<Row>('report_management_summary', { p_cycle_id: cycleId }).catch(() => null),
       rpc<Row[]>('report_commission_exception_impact', { p_cycle_id: cycleId }).catch(() => null),
-      rpc<Record<string, number>>('company_subscriber_counts', {}).catch(() => null),
+      rpc<Row>('company_parent_breakdown', {}).catch(() => null),
     ]);
 
     const g = (summary?.['global'] || {}) as Row;
@@ -109,40 +109,39 @@ export const home: Route = {
         </div>
       </div>`
 
-      // مشتركو الشركة: بطاقتان منفصلتان عمداً.
+      // مشتركو الشركة.
       //
-      // FTTH User وOffice كلاهما شركةٌ مباشرة مالياً — لا عمولة ولا شريحة —
-      // لكن دمجهما في بطاقة «شركة مباشرة» واحدة يُخفي فرقاً تشغيلياً حقيقياً
-      // على من يعمل بهما يومياً. وكلٌّ منهما يفتح السجلّ مُصفّى عليه.
-      + `<section style="margin-top:16px">
-        <h2 style="font-size:14px;color:var(--navy);margin:0 0 10px">مشتركو الشركة</h2>
-        <div class="cards cards-4">
-          <a class="card" href="${esc(href('/installation/subscribers', { ownership: 'FTTH_USER' }))}"
-             style="text-decoration:none;color:inherit">
-            <div class="label">FTTH User</div>
-            <div class="value">${company ? count(Number(company['FTTH_USER'] || 0)) : '—'}</div>
-            <div class="sub">مشترك · لا عمولة وكيل</div>
-          </a>
-          <a class="card" href="${esc(href('/installation/subscribers', { ownership: 'OFFICE' }))}"
-             style="text-decoration:none;color:inherit">
-            <div class="label">Office</div>
-            <div class="value">${company ? count(Number(company['OFFICE'] || 0)) : '—'}</div>
-            <div class="sub">مشترك · لا عمولة وكيل</div>
-          </a>
-          <a class="card" href="${esc(href('/installation/subscribers', { ownership: 'RESELLER' }))}"
-             style="text-decoration:none;color:inherit">
-            <div class="label">وكيل</div>
-            <div class="value">${company ? count(Number(company['RESELLER'] || 0)) : '—'}</div>
-            <div class="sub">مشترك تابع لوكيل</div>
-          </a>
-          <a class="card redline" href="${esc(href('/installation/subscribers', { ownership: 'NEEDS_REVIEW' }))}"
-             style="text-decoration:none;color:inherit">
-            <div class="label">تحتاج مراجعة</div>
-            <div class="value">${company ? count(Number(company['NEEDS_REVIEW'] || 0)) : '—'}</div>
-            <div class="sub">عائدية لم تُحسم بعد</div>
-          </a>
-        </div>
-      </section>`;
+      // بطاقة واحدة بالمجموع، وتحتها تفصيلٌ بأسماء الآباء كما وردت من المصدر:
+      // FTTH_Users يظل FTTH_Users، وhrins.office يظل hrins.office. لا أسماء
+      // مثبَّتة في الواجهة — أبٌ شركاتيّ جديد يظهر تلقائياً بلا نشر جديد.
+      + (() => {
+        const parents = Array.isArray(company?.['parents'])
+          ? (company['parents'] as Row[]) : [];
+        const total = company ? Number(company['total_subscribers'] || 0) : null;
+        return `<section style="margin-top:16px">
+          <h2 style="font-size:14px;color:var(--navy);margin:0 0 10px">مشتركو الشركة</h2>
+          <div class="grid2">
+            <a class="card kpi-primary" href="${esc(href('/master/parents', { ownership: 'DIRECT_COMPANY' }))}"
+               style="text-decoration:none">
+              <div class="label">تابعون للشركة مباشرةً</div>
+              <div class="value">${total === null ? '—' : count(total)}</div>
+              <div class="sub">مشترك · لا عمولة وكيل ولا مساهمة في شريحة</div>
+            </a>
+            <div class="box">
+              <h3>حسب الأب — بالأسماء الأصلية</h3>
+              ${parents.length
+                ? parents.map((p) => `<a class="minirow" style="text-decoration:none;color:inherit"
+                    href="${esc(href("/master/parents/" + encodeURIComponent(String(p['parent_name'] ?? ''))))}">
+                    <span class="num" style="direction:ltr;text-align:left">${esc(String(p['parent_name'] ?? ''))}</span>
+                    <b>${count(Number(p['subscribers'] || 0))}</b></a>`).join('')
+                : '<p class="muted">لا آباء مصنَّفين للشركة بعد</p>'}
+              <div class="muted" style="font-size:10px;margin-top:8px">
+                الاسم كما ورد في المصدر. التصنيف لا يُعيد التسمية.</div>
+            </div>
+          </div>
+        </section>`;
+      })();
+
   },
 };
 

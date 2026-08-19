@@ -9,6 +9,8 @@ import type { Route } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, toPage, pageRpc } from '../../services/api';
 import { money, count } from '../../domain/money';
+import { transferPanel, wireTransfer } from '../ownership/transfer';
+import { classificationPanel } from './classification';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -19,20 +21,19 @@ const num = (r: Row, k: string) => Number(r[k] || 0);
 const str = (r: Row, k: string) => String(r[k] ?? '');
 
 /**
- * العائدية التشغيلية.
+ * العائدية: تصنيفٌ ثلاثي، لا اسمٌ بديل.
  *
- * FTTH User وOffice شركةٌ مباشرة مالياً — لا عمولة ولا شريحة — لكنهما
- * يُعرضان منفصلَين لأنهما وحدتان تشغيليّتان مختلفتان، ودمجهما في «شركة
- * مباشرة» واحدة يُخفي فرقاً يهمّ من يعمل يومياً.
+ * الاسم الأصلي للأب يبقى معروضاً كما ورد في المصدر — hrins.office يظل
+ * hrins.office. والتصنيف عمودٌ بجانبه يقول ما هو مالياً، لا يحلّ محلّه.
+ * فالمشغّل الذي يبحث في ملف SaaS يجد ما يراه على الشاشة.
  */
 export const OWNERSHIP_LABEL: Record<string, string> = {
   RESELLER: 'وكيل',
-  FTTH_USER: 'FTTH User',
-  OFFICE: 'Office',
+  DIRECT_COMPANY: 'الشركة',
   NEEDS_REVIEW: 'تحتاج مراجعة',
 };
 
-function ownershipChip(type: string): string {
+export function ownershipChip(type: string): string {
   const tone: 'info' | 'warning' | 'brand' = type === 'RESELLER' ? 'info'
     : type === 'NEEDS_REVIEW' ? 'warning' : 'brand';
   return chip(OWNERSHIP_LABEL[type] || type || '—', tone);
@@ -51,11 +52,14 @@ export const controlCenter: Route = {
   breadcrumb: () => [{ label: 'الرئيسية', href: href('/') }, { label: 'أجور التنصيب' }],
   async render(view) {
     view.write(loading('جارٍ تحميل حالة التنصيب…'));
-    const state = await rpc<Row>('installation_cycle_state', {});
+    // حالة التصنيف تُقرأ من الخادم الآن، لا تُحسب في المتصفّح وتضيع.
+    const [state, classState] = await Promise.all([
+      rpc<Row>('installation_cycle_state', {}),
+      rpc<Row>('classification_state', {}).catch(() => null),
+    ]);
     const hist = (state?.['historical'] || {}) as Row;
     const ent = (state?.['entitlements'] || {}) as Row;
     const enroll = (state?.['enrollments'] || {}) as Record<string, number>;
-    const cls = (state?.['classification'] || {}) as Record<string, number>;
 
     const stageRows = Object.entries(enroll).map(([k, v]) => ({ stage: k, n: v }));
 
@@ -71,11 +75,8 @@ export const controlCenter: Route = {
             ${stageRows.length
               ? stageRows.map((r) => `<div class="minirow"><span>${chip(r.stage, STAGE_TONE[r.stage] || 'neutral')}</span><b>${count(r.n)}</b></div>`).join('')
               : '<p class="muted">لا تسجيلات</p>'}</div>
-          <div class="box"><h3>التصنيف</h3>
-            ${Object.keys(cls).length
-              ? Object.entries(cls).map(([k, v]) => `<div class="minirow"><span>${esc(k)}</span><b>${count(v)}</b></div>`).join('')
-              : `<p class="muted">التصنيف لا يُحفَظ بعد على الخادم — يُحسب أثناء الاستيراد في المتصفح.
-                 مسجَّل في قائمة ما بعد الإطلاق.</p>`}</div>
+          <div class="box"><h3>تصنيف الجِدّة</h3>
+            ${classificationPanel(classState)}</div>
         </div>`;
   },
 };
@@ -111,7 +112,8 @@ export const subscribers: Route = {
     const columns: Array<Column<Row>> = [
       { key: 'sid', label: 'المشترك', cell: (r) => `<b>${esc(str(r, 'subscriber_id'))}</b>` },
       { key: 'own', label: 'العائدية', cell: (r) => ownershipChip(str(r, 'ownership_type')) },
-      { key: 'agent', label: 'الوكيل', cell: (r) => esc(str(r, 'reseller') || '—') },
+      // الاسم الأصلي كما ورد من المصدر — لا يُستبدَل بتسمية التصنيف.
+      { key: 'agent', label: 'الوكيل / الأب', cell: (r) => esc(str(r, 'reseller') || '—') },
       { key: 'fdt', label: 'الكابينة', cell: (r) => esc(str(r, 'fdt') || '—') },
       { key: 'zone', label: 'المنطقة', cell: (r) => {
         const z = str(r, 'zone');
@@ -130,11 +132,10 @@ export const subscribers: Route = {
     view.innerHTML = pageHeader('سجلّ المشتركين', 'يُصفَّح ويُصفّى على الخادم — لا يُنقل الجدول إلى المتصفح')
       + filterBar([
         { key: 'search', label: 'بحث بالمعرّف أو الوكيل', type: 'search' },
-        // العائدية التشغيلية: أربعة أنواع صريحة، وFTTH وOffice منفصلان عمداً.
+        // ثلاثة أصناف مالية. أسماء الآباء ليست أصنافاً — تُعرض كما هي.
         { key: 'ownership', label: 'العائدية', type: 'select', options: [
           { value: 'RESELLER', label: 'وكيل' },
-          { value: 'FTTH_USER', label: 'FTTH User' },
-          { value: 'OFFICE', label: 'Office' },
+          { value: 'DIRECT_COMPANY', label: 'الشركة' },
           { value: 'NEEDS_REVIEW', label: 'تحتاج مراجعة' },
         ] },
         { key: 'stage', label: 'المراحل', type: 'select', options: ['P1', 'P2', 'P3', 'P4', 'DONE', 'UNKNOWN'].map((s) => ({ value: s, label: s })) },
@@ -157,6 +158,7 @@ export const subscribers: Route = {
 
 const CASE_TABS = [
   { key: 'overview', label: 'نظرة عامة' },
+  { key: 'ownership', label: 'العائدية' },
   { key: 'activations', label: 'التفعيلات' },
   { key: 'invoices', label: 'الفواتير' },
   { key: 'entitlements', label: 'الاستحقاقات' },
@@ -181,7 +183,10 @@ export const subscriberCase: Route = {
     const tab = m.query.get('tab') || 'overview';
     view.innerHTML = loading('جارٍ تحميل ملفّ المشترك…');
 
-    const doc = await rpc<Row>('installation_subscriber_case', { p_subscriber_id: id });
+    const [doc, next] = await Promise.all([
+      rpc<Row>('installation_subscriber_case', { p_subscriber_id: id }),
+      rpc<Row>('subscriber_next_action', { p_subscriber_id: id }).catch(() => null),
+    ]);
     const sub = (doc?.['subscriber'] || null) as Row | null;
     if (!sub) { view.innerHTML = empty('المشترك غير موجود', id); return; }
 
@@ -204,7 +209,11 @@ export const subscriberCase: Route = {
         { label: 'المنطقة', value: esc(str(enr, 'zone') === 'new' ? 'جديدة' : str(enr, 'zone') === 'old' ? 'قديمة' : '—'), tone: 'blue' },
         { label: 'الإيقافات الفعّالة', value: count(activeHolds.length), tone: 'red' },
       ])
+      + nextActionBanner(next)
       + `<div class="tabs">${tabs}</div><div class="panel active">${renderCaseTab(doc as Row, tab, id)}</div>`;
+
+    // مفتاح المشترك هو ما تعرفه أحداث SaaS، وهو صغير الأحرف.
+    if (tab === 'ownership') await wireTransfer(view, id.toLowerCase().trim());
 
     if (tab === 'history') {
       const host = view.el.querySelector<HTMLElement>('#timelineHost');
@@ -220,8 +229,29 @@ export const subscriberCase: Route = {
   },
 };
 
+/**
+ * الإجراء التالي.
+ *
+ * قراءةٌ للحالة القائمة لا قاعدةٌ مالية جديدة: تقول أين يقف هذا المشترك
+ * وأيّ شاشةٍ تحسمه، ولا تحسب مبلغاً. وترتيبها ترتيب الحجب — ما يمنع
+ * الصرف قبل ما ينتظره — فلا يُرسَل المستخدم إلى شاشةٍ يحجبها شيء آخر.
+ */
+function nextActionBanner(doc: Row | null): string {
+  const a = (doc?.['action'] || null) as Row | null;
+  if (!a || str(a, 'code') === 'NONE') return '';
+  const tone = str(a, 'tone');
+  const cls = tone === 'critical' ? 'danger' : tone === 'success' ? 'good' : 'warn';
+  const path = str(a, 'path');
+  return `<div class="insight ${cls}" style="margin:12px 0"><span class="insight-dot"></span>
+    <span><b>الإجراء التالي: ${esc(str(a, 'label'))}</b>
+    <small>${esc(str(a, 'why'))}</small></span>
+    ${path ? `<a class="btn gold" href="${esc(href(path))}">افتح</a>` : ''}</div>`;
+}
+
 function renderCaseTab(doc: Row, tab: string, id: string): string {
   const list = (k: string) => (doc[k] || []) as Row[];
+
+  if (tab === 'ownership') return transferPanel();
 
   if (tab === 'entitlements') {
     const rows = list('entitlements');

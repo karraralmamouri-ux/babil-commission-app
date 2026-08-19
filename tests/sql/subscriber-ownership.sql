@@ -46,7 +46,7 @@ on conflict (code) do nothing;
 insert into public.subscriber_ownership
   (username_key, ownership_type, agent_id, effective_from, effective_to, reason, performed_by)
 values
-  ('so-sub-1','FTTH_USER', null,
+  ('so-sub-1','DIRECT_COMPANY', null,
    timestamptz '2026-08-01 00:00+03', timestamptz '2026-08-16 00:00+03',
    'اختبار', '50000000-0000-0000-0000-0000000000b1'),
   ('so-sub-1','RESELLER','50000000-0000-0000-0000-0000000000b2',
@@ -55,7 +55,7 @@ values
 
 select pg_temp.ok(
   (select ownership_type from public.subscriber_ownership_at('so-sub-1', timestamptz '2026-08-10 12:00+03'))
-    = 'FTTH_USER',
+    = 'DIRECT_COMPANY',
   'حدث ١٠ آب يخصّ الشركة');
 
 select pg_temp.ok(
@@ -76,7 +76,7 @@ select pg_temp.ok(
 
 select pg_temp.ok(
   (select ownership_type from public.subscriber_ownership_at('so-sub-1', timestamptz '2026-08-15 23:59:59+03'))
-    = 'FTTH_USER',
+    = 'DIRECT_COMPANY',
   'ما قبل الحدّ بثانية يخصّ الفترة السابقة');
 
 -- ما قبل أوّل فترة لا تغطّيه فترة صريحة، فيعود إلى الاشتقاق.
@@ -107,7 +107,7 @@ select pg_temp.must_fail(
 select pg_temp.must_fail(
   'insert into public.subscriber_ownership
      (username_key, ownership_type, agent_id, effective_from, reason)
-   values (''so-sub-9'',''FTTH_USER'',''50000000-0000-0000-0000-0000000000b2'', now(), ''شركة بوكيل'')',
+   values (''so-sub-9'',''DIRECT_COMPANY'',''50000000-0000-0000-0000-0000000000b2'', now(), ''شركة بوكيل'')',
   'النوع الشركاتي بوكيل مرفوض — بابُ عمولة لا تُستحقّ');
 
 select pg_temp.must_fail(
@@ -118,7 +118,7 @@ select pg_temp.must_fail(
 select pg_temp.must_fail(
   'insert into public.subscriber_ownership
      (username_key, ownership_type, effective_from, effective_to, reason)
-   values (''so-sub-9'',''OFFICE'', now(), now() - interval ''1 day'', ''نهاية قبل بداية'')',
+   values (''so-sub-9'',''DIRECT_COMPANY'', now(), now() - interval ''1 day'', ''نهاية قبل بداية'')',
   'نهاية قبل البداية مرفوضة');
 
 -- ---------------------------------------------------------------------------
@@ -135,11 +135,11 @@ insert into public.agent_aliases (agent_id, alias, resolution) values
 on conflict (alias_key) do nothing;
 
 select pg_temp.ok(
-  public.parent_ownership_type('so.ftth') = 'FTTH_USER',
+  public.parent_ownership_type('so.ftth') = 'DIRECT_COMPANY',
   'الأب المعروف شركةً يُقرأ FTTH User');
 
 select pg_temp.ok(
-  public.parent_ownership_type('so.office') = 'OFFICE',
+  public.parent_ownership_type('so.office') = 'DIRECT_COMPANY',
   'الأب المعروف مكتباً يُقرأ Office');
 
 select pg_temp.ok(
@@ -273,6 +273,156 @@ select pg_temp.ok(
 select pg_temp.ok(
   (public.page_subscriber_timeline('nope') ? 'out_of_range'),
   'الخطّ الزمني يستعمل الصدفة نفسها');
+
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- 8. الاسم الأصلي لا يُعاد تسميته أبداً
+--
+-- التصنيف يقول ما هو الأب مالياً؛ ولا يغيّر ما اسمه. المشغّل يبحث في ملف
+-- SaaS عن 'hrins.office' بعينه، فإن عرضنا له 'Office' انقطع الجسر بين
+-- الشاشة والمصدر.
+-- ---------------------------------------------------------------------------
+
+set local role authenticated;
+set local request.jwt.claim.sub = '50000000-0000-0000-0000-0000000000b1';
+
+select pg_temp.ok(
+  (public.classify_parent('SO.Company.Parent', 'DIRECT_COMPANY', null, 'اختبار',
+     gen_random_uuid()) ->> 'ownership_after') = 'DIRECT_COMPANY',
+  'التصنيف شركةً ينجح');
+
+select pg_temp.ok(
+  (select alias from public.agent_aliases
+   where alias_key = 'so.company.parent') = 'SO.Company.Parent',
+  'الاسم يُحفَظ بحروفه كما ورد — لا توحيد ولا ترجمة');
+
+select pg_temp.ok(
+  public.parent_ownership_type('SO.Company.Parent') = 'DIRECT_COMPANY',
+  'وتصنيفه يُقرأ شركةً مباشرة');
+
+-- والتفصيل يعرض الاسم الأصلي لا تسميةً مخترعة.
+select pg_temp.ok(
+  not exists (
+    select 1 from jsonb_array_elements(public.company_parent_breakdown() -> 'parents') p
+    where p ->> 'parent_name' in ('Office', 'FTTH User', 'Direct Company')),
+  'التفصيل لا يخترع أسماء عرض');
+
+-- التصنيف الثلاثي وحده مقبول.
+select pg_temp.must_fail(
+  'select public.classify_parent(''X'', ''FTTH_USER'', null, ''ن'', gen_random_uuid())',
+  'صنف خارج الثلاثة مرفوض');
+
+select pg_temp.must_fail(
+  'select public.classify_parent(''X'', ''RESELLER'', null, ''ن'', gen_random_uuid())',
+  'وكالة بلا وكيل مرفوضة');
+
+select pg_temp.must_fail(
+  'select public.classify_parent(''X'', ''DIRECT_COMPANY'',
+     ''50000000-0000-0000-0000-0000000000b2'', ''ن'', gen_random_uuid())',
+  'شركة بوكيل مرفوضة');
+
+-- والقيم القديمة تُترجَم ولا تنكسر.
+select pg_temp.ok(
+  public.normalize_ownership_type('FTTH_USER') = 'DIRECT_COMPANY'
+  and public.normalize_ownership_type('OFFICE') = 'DIRECT_COMPANY'
+  and public.normalize_ownership_type('RESELLER') = 'RESELLER'
+  and public.normalize_ownership_type('nonsense') = 'NEEDS_REVIEW',
+  'القيم السابقة تُترجَم إلى الثلاثية');
+
+-- تكرار الطلب لا يُنتج أثراً ثانياً.
+select pg_temp.ok(
+  (select (public.classify_parent('SO.Idem', 'NEEDS_REVIEW', null, 'ن',
+     '50000000-0000-0000-0000-00000000cafe') ->> 'idempotent')::boolean) = false,
+  'أوّل تصنيف ليس مكرَّراً');
+
+select pg_temp.ok(
+  (select (public.classify_parent('SO.Idem', 'NEEDS_REVIEW', null, 'ن',
+     '50000000-0000-0000-0000-00000000cafe') ->> 'idempotent')::boolean) = true,
+  'إعادة الطلب نفسه لا تُكرّر الأثر');
+
+-- الشاشتان تقولان الرقم نفسه.
+--
+-- أوّل صياغة جمعت المشتركين لكل أبٍ، فعُدّ من ظهر تحت اسمَي أبٍ مرّتين
+-- (TTH_Users في أيار وFTTH_Users في تموز — الاسم نفسه فقد حرفاً في تصدير
+-- أيار). فقال التفصيل 26,371 وقال العدّاد 15,978 عن الشيء ذاته.
+select pg_temp.ok(
+  (public.company_parent_breakdown() ->> 'total_subscribers')::bigint
+  = coalesce((public.company_subscriber_counts() ->> 'DIRECT_COMPANY')::bigint, 0),
+  'إجمالي التفصيل يساوي عدّاد الشركة — لا ازدواج');
+
+-- ---------------------------------------------------------------------------
+-- 9. شواهد الأب — ما يُعرض قبل القرار
+--
+-- الشواهد قراءةٌ محضة: تفتح الأب، تقرأ، ثم تقرّر. استدعاؤها يجب ألّا يغيّر
+-- تصنيفاً ولا يكتب صفاً.
+-- ---------------------------------------------------------------------------
+
+-- التلقيم بصلاحية المالك، والقراءة بهوية المستخدم — كما في بقيّة الملف.
+reset role;
+
+-- أبٌ باسم مختلط الحالة، ومشتركٌ ظهر تحت اسمين — الاسم فقد حرفاً في تصدير.
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, canceled, raw_parent, event_created_at, fdt_code)
+values
+  ('50000000-0000-0000-0000-0000000000b4','SO-EV-M','so-mixed-1','P-35000',false,'SO.Mixed.Case',
+   timestamptz '2026-12-08 10:00+03','SO-FDT'),
+  -- المشترك نفسه (so-office-1) تحت اسمٍ ناقصِ حرف.
+  ('50000000-0000-0000-0000-0000000000b4','SO-EV-T','so-office-1','P-35000',false,'so.ofice',
+   timestamptz '2026-11-06 10:00+03','SO-FDT')
+on conflict do nothing;
+
+set local role authenticated;
+set local request.jwt.claim.sub = '50000000-0000-0000-0000-0000000000b1';
+
+
+select pg_temp.ok(
+  (public.parent_evidence('so.mixed.case') ->> 'parent_name') = 'SO.Mixed.Case',
+  'الشواهد تُعيد الاسم بحروفه الأصلية لا بالمفتاح المشتق');
+
+select pg_temp.ok(
+  (public.parent_evidence('SO.MIXED.CASE') ->> 'parent_name') = 'SO.Mixed.Case',
+  'والمطابقة لا تتأثّر بحالة الأحرف');
+
+select pg_temp.ok(
+  (public.parent_evidence('so.parent.that.never.existed') ->> 'found')::boolean = false,
+  'أبٌ غير موجود يُقال صراحةً لا يُخترع');
+
+-- تداخل المشتركين: واقعةٌ في البيانات تُعرض شاهداً.
+select pg_temp.ok(
+  exists (
+    select 1 from jsonb_array_elements(public.parent_evidence('so.office') -> 'related_parents') r
+    where r ->> 'parent_name' = 'so.ofice'
+      and (r ->> 'shared_subscribers')::bigint = 1),
+  'الأب المتقاسِم للمشتركين يظهر في الشواهد');
+
+-- ولا يُصنَّف شيء بناءً عليه: التصنيف بعد القراءة كما كان قبلها.
+select pg_temp.ok(
+  public.parent_ownership_type('so.ofice') = 'NEEDS_REVIEW',
+  'قراءة الشواهد لا تُصنِّف الأب المتقاسِم تلقائياً');
+
+select pg_temp.ok(
+  (public.parent_evidence('so.ofice') -> 'exposure' ->> 'meaning') = 'AWAITING_DECISION',
+  'معنى المبلغ يتبع التصنيف ويُقال صراحةً');
+
+select pg_temp.ok(
+  (public.parent_evidence('so.office') -> 'volume' ->> 'subscribers')::bigint >= 1
+  and jsonb_array_length(public.parent_evidence('so.office') -> 'samples') >= 1,
+  'الحجم والعيّنة الخام حاضران قبل القرار');
+
+-- العيّنة تحمل الاسم كما ورد، لا مُطبَّعاً.
+select pg_temp.ok(
+  exists (
+    select 1 from jsonb_array_elements(public.parent_evidence('so.mixed.case') -> 'samples') s
+    where s ->> 'raw_parent' = 'SO.Mixed.Case'),
+  'العيّنة تعرض الأب كما كُتب في المصدر');
+
+-- والوكلاء المعروضون للاختيار فعّالون فقط.
+select pg_temp.ok(
+  not exists (
+    select 1 from jsonb_array_elements(public.list_agents_for_pick(null, 200)) a
+    where a ->> 'status' <> 'ACTIVE'),
+  'قائمة الاختيار لا تعرض وكيلاً غير فعّال');
 
 reset role;
 
