@@ -21,20 +21,21 @@ export const home: Route = {
   capability: 'report.view',
   title: 'الرئيسية',
   breadcrumb: () => [{ label: 'الرئيسية' }],
-  async render(outlet) {
-    outlet.innerHTML = loading('جارٍ تحميل النظرة التنفيذية…');
+  async render(view) {
+    view.write(loading('جارٍ تحميل النظرة التنفيذية…'));
 
     const cycles = (await select<Row[]>('commission_cycles?select=id,name,status&order=period_start.desc&limit=1')) || [];
     const cycle = cycles[0];
-    if (!cycle) { outlet.innerHTML = empty('لا توجد دورة بعد', 'ابدأ باستيراد ملف التفعيلات'); return; }
+    if (!cycle) { view.write(empty('لا توجد دورة بعد', 'ابدأ باستيراد ملف التفعيلات')); return; }
 
     const cycleId = String(cycle['id']);
     const status = String(cycle['status']);
     const projected = !FINAL.has(status);
 
-    const [summary, impact] = await Promise.all([
+    const [summary, impact, company] = await Promise.all([
       rpc<Row>('report_management_summary', { p_cycle_id: cycleId }).catch(() => null),
       rpc<Row[]>('report_commission_exception_impact', { p_cycle_id: cycleId }).catch(() => null),
+      rpc<Record<string, number>>('company_subscriber_counts', {}).catch(() => null),
     ]);
 
     const g = (summary?.['global'] || {}) as Row;
@@ -46,7 +47,7 @@ export const home: Route = {
     const blocked = (impact || []).reduce((a, r) => a + num(r, 'indicative_amount'), 0);
     const blockingCount = num(x, 'blocking');
 
-    outlet.innerHTML = pageHeader('النظرة التنفيذية',
+    view.innerHTML = pageHeader('النظرة التنفيذية',
       `${esc(String(cycle['name']))}`,
       projected ? projectedTag() : chip('معتمدة', 'success'))
 
@@ -106,7 +107,42 @@ export const home: Route = {
             <a class="btn" href="${esc(href('/installation/holds'))}">الموقوفون</a>
           </div>
         </div>
-      </div>`;
+      </div>`
+
+      // مشتركو الشركة: بطاقتان منفصلتان عمداً.
+      //
+      // FTTH User وOffice كلاهما شركةٌ مباشرة مالياً — لا عمولة ولا شريحة —
+      // لكن دمجهما في بطاقة «شركة مباشرة» واحدة يُخفي فرقاً تشغيلياً حقيقياً
+      // على من يعمل بهما يومياً. وكلٌّ منهما يفتح السجلّ مُصفّى عليه.
+      + `<section style="margin-top:16px">
+        <h2 style="font-size:14px;color:var(--navy);margin:0 0 10px">مشتركو الشركة</h2>
+        <div class="cards cards-4">
+          <a class="card" href="${esc(href('/installation/subscribers', { ownership: 'FTTH_USER' }))}"
+             style="text-decoration:none;color:inherit">
+            <div class="label">FTTH User</div>
+            <div class="value">${company ? count(Number(company['FTTH_USER'] || 0)) : '—'}</div>
+            <div class="sub">مشترك · لا عمولة وكيل</div>
+          </a>
+          <a class="card" href="${esc(href('/installation/subscribers', { ownership: 'OFFICE' }))}"
+             style="text-decoration:none;color:inherit">
+            <div class="label">Office</div>
+            <div class="value">${company ? count(Number(company['OFFICE'] || 0)) : '—'}</div>
+            <div class="sub">مشترك · لا عمولة وكيل</div>
+          </a>
+          <a class="card" href="${esc(href('/installation/subscribers', { ownership: 'RESELLER' }))}"
+             style="text-decoration:none;color:inherit">
+            <div class="label">وكيل</div>
+            <div class="value">${company ? count(Number(company['RESELLER'] || 0)) : '—'}</div>
+            <div class="sub">مشترك تابع لوكيل</div>
+          </a>
+          <a class="card redline" href="${esc(href('/installation/subscribers', { ownership: 'NEEDS_REVIEW' }))}"
+             style="text-decoration:none;color:inherit">
+            <div class="label">تحتاج مراجعة</div>
+            <div class="value">${company ? count(Number(company['NEEDS_REVIEW'] || 0)) : '—'}</div>
+            <div class="sub">عائدية لم تُحسم بعد</div>
+          </a>
+        </div>
+      </section>`;
   },
 };
 

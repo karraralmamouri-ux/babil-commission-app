@@ -162,6 +162,24 @@ fi
 echo "$out17" | grep -E "^ {9,11}(ok|==) " || true
 passed=$((passed + $(echo "$out17" | grep -c "          ok ")))
 
+echo "== arabic label integrity =="
+out18=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/arabic-label-integrity.sql 2>&1)
+if echo "$out18" | grep -qE "FAILED|ERROR"; then
+  echo "$out18" | grep -E "FAILED|ERROR" || true
+  echo "ARABIC LABEL TESTS FAILED" >&2; exit 1
+fi
+echo "$out18" | grep -E "^ {10,12}(ok|==) " || true
+passed=$((passed + $(echo "$out18" | grep -c "           ok ")))
+
+echo "== subscriber ownership =="
+out19=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/subscriber-ownership.sql 2>&1)
+if echo "$out19" | grep -qE "FAILED|ERROR"; then
+  echo "$out19" | grep -E "FAILED|ERROR" || true
+  echo "OWNERSHIP TESTS FAILED" >&2; exit 1
+fi
+echo "$out19" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out19" | grep -c "            ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh

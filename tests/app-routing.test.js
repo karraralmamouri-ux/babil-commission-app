@@ -23,7 +23,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
  */
 const ts = require('typescript');
 
-function evalTs(source, names) {
+function evalTs(source, names, win) {
   const js = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
@@ -32,8 +32,8 @@ function evalTs(source, names) {
   }).outputText;
   const sandbox = {
     module: { exports: {} }, exports: {}, console,
-    require: () => ({}),
-    window: { location: { hash: '' } },
+    require: () => ({}), URLSearchParams, DOMException, AbortController, HashChangeEvent: class {}, Promise, setTimeout,
+    window: win || { location: { hash: '' }, addEventListener() {}, history: { replaceState() {} } },
   };
   sandbox.exports = sandbox.module.exports;
   sandbox.globalThis = sandbox;
@@ -307,4 +307,144 @@ test('محوّل الجلسة القديم موثَّق بشرط إزالته', 
   assert.match(api, /محوّل مؤقّت مقصود/);
   assert.match(api, /شرط الإزالة/);
   assert.match(api, /index-html-exit-plan/);
+});
+
+/* ---------------------------------------------------------------------------
+   سباق الانتقال — ردٌّ بطيء لا يكتب فوق شاشة أخرى
+   ------------------------------------------------------------------------ */
+
+test('الردّ البطيء لشاشة غادرها المستخدم لا يكتب فوق الحالية', async () => {
+  // الرقم المتسلسل وحده لم يكن كافياً: كان يحرس مسار الخطأ فقط، فشاشةٌ تنتظر
+  // الخادم ثم تكتب مباشرةً كانت تكتب فوق الشاشة التالية. يُحاكى هنا فعلاً:
+  // شاشة أ بطيئة، ثم انتقال إلى ب، ثم يصل ردّ أ.
+  const listeners = [];
+  let hash = '#/a';
+  const win = {
+    get location() { return { get hash() { return hash; }, set hash(v) { hash = v; } }; },
+    addEventListener(type, fn) { if (type === 'hashchange') listeners.push(fn); },
+    history: { replaceState() {} },
+  };
+  const { Router } = evalTs(routerSrc, ['Router'], win);
+
+  const el = { innerHTML: '', querySelector: () => null };
+  let releaseA;
+  const slowA = new Promise((r) => { releaseA = r; });
+
+  const routes = [
+    {
+      pattern: '/a',
+      title: 'A',
+      async render(view) {
+        view.write('A: loading');
+        await slowA;
+        // الشاشة تحاول الكتابة بعد أن غادرها المستخدم — بالطريقتين معاً.
+        view.write('A: DONE');
+        view.innerHTML = 'A: DONE via setter';
+      },
+    },
+    { pattern: '/b', title: 'B', render(view) { view.write('B: ready'); } },
+  ];
+
+  const router = new Router({
+    outlet: el, routes, can: () => true,
+    renderForbidden: () => {}, renderNotFound: () => {}, renderError: () => {},
+  });
+
+  router.start();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(el.innerHTML, 'A: loading', 'الشاشة الأولى رسمت حالتها');
+
+  hash = '#/b';
+  listeners.forEach((fn) => fn());
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(el.innerHTML, 'B: ready', 'الانتقال رسم الشاشة الثانية');
+
+  releaseA();
+  await new Promise((r) => setTimeout(r, 5));
+
+  assert.equal(el.innerHTML, 'B: ready',
+    'ردّ الشاشة الأولى كتب فوق الثانية — السباق لم يُحَل');
+});
+
+test('الإلغاء يُمرَّر إشارةً فتُقطع الشبكة لا الكتابة وحدها', () => {
+  assert.match(routerSrc, /AbortController/);
+  assert.match(routerSrc, /this\.inflight\?\.abort\(\)/);
+  assert.match(routerSrc, /readonly signal: AbortSignal/);
+  const api = read('src/services/api.ts');
+  assert.match(api, /signal\?: AbortSignal/);
+  assert.match(api, /signal\?\.aborted/);
+});
+
+test('الإلغاء لا يُعرَض خطأً للمستخدم', () => {
+  // المستخدم غادر الشاشة عمداً؛ إظهار خطأ على ذلك يُربك بلا سبب.
+  assert.match(routerSrc, /الإلغاء ليس خطأً يُعرَض/);
+  assert.match(routerSrc, /if \(isAbortError\(error\)\) return;/);
+});
+
+/* ---------------------------------------------------------------------------
+   صدق الترقيم
+   ------------------------------------------------------------------------ */
+
+test('الصدفة تفصل الإجمالي عن الصفوف', () => {
+  const api = read('src/services/api.ts');
+  const { envelope } = evalTs(api, ['envelope']);
+
+  // صفحة عادية
+  const full = envelope({ rows: [{ a: 1 }], total: 22727, limit: 1, offset: 0, returned: 1 });
+  assert.equal(full.total, 22727);
+  assert.equal(full.outOfRange, false);
+
+  // وصفحة خارج المدى: صفر صفوف، وإجمالي صادق. هذا هو العيب الذي تُصلحه —
+  // العقد القديم كان يفقد الإجمالي مع الصفوف فيُقرأ 22,727 صفراً.
+  const beyond = envelope({ rows: [], total: 22727, limit: 50, offset: 99999, returned: 0, out_of_range: true });
+  assert.equal(beyond.rows.length, 0);
+  assert.equal(beyond.total, 22727, 'الإجمالي ضاع مع الصفحة الفارغة');
+  assert.equal(beyond.outOfRange, true);
+
+  // وردٌّ مشوَّه لا ينهار
+  assert.equal(envelope(null).total, 0);
+  assert.equal(envelope({ rows: 'nope' }).rows.length, 0);
+});
+
+/* ---------------------------------------------------------------------------
+   العائدية التشغيلية
+   ------------------------------------------------------------------------ */
+
+test('الأنواع الأربعة معرَّفة بتسمياتها العربية', () => {
+  const s = read('src/features/installation/index.ts');
+  const { OWNERSHIP_LABEL } = evalTs(s.replace(/^import[\s\S]*?;$/gm, ''), ['OWNERSHIP_LABEL']);
+  assert.equal(OWNERSHIP_LABEL.RESELLER, 'وكيل');
+  assert.equal(OWNERSHIP_LABEL.FTTH_USER, 'FTTH User');
+  assert.equal(OWNERSHIP_LABEL.OFFICE, 'Office');
+  assert.equal(OWNERSHIP_LABEL.NEEDS_REVIEW, 'تحتاج مراجعة');
+});
+
+test('FTTH User وOffice بطاقتان منفصلتان لا بطاقة «شركة مباشرة» واحدة', () => {
+  // دمجهما يُخفي فرقاً تشغيلياً حقيقياً على من يعمل بهما.
+  const s = read('src/features/home/index.ts');
+  assert.match(s, /FTTH User/);
+  assert.match(s, />Office</);
+  assert.doesNotMatch(s, /شركة مباشرة<\/div>/);
+  // وكلٌّ يفتح السجلّ مُصفّى عليه
+  assert.match(s, /ownership: 'FTTH_USER'/);
+  assert.match(s, /ownership: 'OFFICE'/);
+});
+
+test('السجلّ يُرشَّح بالعائدية على الخادم', () => {
+  const s = read('src/features/installation/index.ts');
+  assert.match(s, /\['ownership', 'p_ownership'\]/);
+  assert.match(s, /key: 'ownership'/);
+  assert.match(s, /page_installation_subscribers/);
+});
+
+test('الصفحة خارج المدى تُقال ولا تُقرأ صفراً', () => {
+  const s = read('src/features/installation/index.ts');
+  assert.match(s, /page\.outOfRange/);
+  assert.match(s, /الصفحة خارج المدى/);
+  assert.match(s, /المجموعة فيها \$\{count\(page\.total\)\}/);
+});
+
+test('الشاشات تمرّر إشارة الإلغاء إلى الشبكة', () => {
+  const s = read('src/features/installation/index.ts');
+  assert.match(s, /pageRpc<Row>\('page_installation_subscribers', args, view\.signal\)/);
 });

@@ -7,7 +7,7 @@
 
 import type { Route } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, toPage } from '../../services/api';
+import { rpc, toPage, pageRpc } from '../../services/api';
 import { money, count } from '../../domain/money';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
@@ -17,6 +17,26 @@ import {
 type Row = Record<string, unknown>;
 const num = (r: Row, k: string) => Number(r[k] || 0);
 const str = (r: Row, k: string) => String(r[k] ?? '');
+
+/**
+ * العائدية التشغيلية.
+ *
+ * FTTH User وOffice شركةٌ مباشرة مالياً — لا عمولة ولا شريحة — لكنهما
+ * يُعرضان منفصلَين لأنهما وحدتان تشغيليّتان مختلفتان، ودمجهما في «شركة
+ * مباشرة» واحدة يُخفي فرقاً يهمّ من يعمل يومياً.
+ */
+export const OWNERSHIP_LABEL: Record<string, string> = {
+  RESELLER: 'وكيل',
+  FTTH_USER: 'FTTH User',
+  OFFICE: 'Office',
+  NEEDS_REVIEW: 'تحتاج مراجعة',
+};
+
+function ownershipChip(type: string): string {
+  const tone: 'info' | 'warning' | 'brand' = type === 'RESELLER' ? 'info'
+    : type === 'NEEDS_REVIEW' ? 'warning' : 'brand';
+  return chip(OWNERSHIP_LABEL[type] || type || '—', tone);
+}
 
 const STAGE_TONE: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
   DONE: 'success', P4: 'info', P3: 'info', P2: 'warning', P1: 'warning', UNKNOWN: 'neutral',
@@ -29,8 +49,8 @@ export const controlCenter: Route = {
   capability: 'installation.view',
   title: 'أجور التنصيب',
   breadcrumb: () => [{ label: 'الرئيسية', href: href('/') }, { label: 'أجور التنصيب' }],
-  async render(outlet) {
-    outlet.innerHTML = loading('جارٍ تحميل حالة التنصيب…');
+  async render(view) {
+    view.write(loading('جارٍ تحميل حالة التنصيب…'));
     const state = await rpc<Row>('installation_cycle_state', {});
     const hist = (state?.['historical'] || {}) as Row;
     const ent = (state?.['entitlements'] || {}) as Row;
@@ -39,7 +59,7 @@ export const controlCenter: Route = {
 
     const stageRows = Object.entries(enroll).map(([k, v]) => ({ stage: k, n: v }));
 
-    outlet.innerHTML = pageHeader('أجور التنصيب', 'مركز التحكّم التشغيلي')
+    view.innerHTML = pageHeader('أجور التنصيب', 'مركز التحكّم التشغيلي')
       + kpiRow([
         { label: 'المشتركون', value: count(num(hist, 'subscribers')), tone: 'primary', link: href('/installation/subscribers') },
         { label: 'مدفوع تاريخياً', value: money(num(hist, 'paid')), tone: 'green', sub: `${count(num(hist, 'payment_rows'))} دفعة` },
@@ -71,24 +91,26 @@ export const subscribers: Route = {
     { label: 'أجور التنصيب', href: href('/installation') },
     { label: 'المشتركون' },
   ],
-  async render(outlet, m) {
+  async render(view, m) {
     const limit = 50;
     const offset = Number(m.query.get('offset') || 0);
-    outlet.innerHTML = loading('جارٍ تحميل السجلّ…');
+    view.innerHTML = loading('جارٍ تحميل السجلّ…');
 
     const args: Record<string, unknown> = { p_limit: limit, p_offset: offset };
     for (const [q, p] of [['search', 'p_search'], ['agent', 'p_agent'], ['fdt', 'p_fdt'],
-      ['zone', 'p_zone'], ['stage', 'p_stage']] as const) {
+      ['zone', 'p_zone'], ['stage', 'p_stage'], ['ownership', 'p_ownership']] as const) {
       const v = m.query.get(q);
       if (v) args[p] = v;
     }
     if (m.query.get('hold') === 'true') args['p_has_hold'] = true;
 
-    const rows = await rpc<Row[]>('list_installation_subscribers', args);
-    const page = toPage(rows as never, limit, offset);
+    // الصدفة تفصل الإجمالي عن الصفوف، وتُمرَّر إشارة الإلغاء فيُهمَل ردُّ
+    // شاشةٍ غادرها المستخدم.
+    const page = await pageRpc<Row>('page_installation_subscribers', args, view.signal);
 
     const columns: Array<Column<Row>> = [
       { key: 'sid', label: 'المشترك', cell: (r) => `<b>${esc(str(r, 'subscriber_id'))}</b>` },
+      { key: 'own', label: 'العائدية', cell: (r) => ownershipChip(str(r, 'ownership_type')) },
       { key: 'agent', label: 'الوكيل', cell: (r) => esc(str(r, 'reseller') || '—') },
       { key: 'fdt', label: 'الكابينة', cell: (r) => esc(str(r, 'fdt') || '—') },
       { key: 'zone', label: 'المنطقة', cell: (r) => {
@@ -105,17 +127,29 @@ export const subscribers: Route = {
       { key: 'go', label: '', cell: (r) => `<a class="smallbtn" href="${esc(href(`/installation/subscribers/${encodeURIComponent(str(r, 'subscriber_id'))}`))}">فتح</a>` },
     ];
 
-    outlet.innerHTML = pageHeader('سجلّ المشتركين', 'يُصفَّح ويُصفّى على الخادم — لا يُنقل الجدول إلى المتصفح')
+    view.innerHTML = pageHeader('سجلّ المشتركين', 'يُصفَّح ويُصفّى على الخادم — لا يُنقل الجدول إلى المتصفح')
       + filterBar([
-        { key: 'search', label: 'بحث بالمعرّف', type: 'search' },
+        { key: 'search', label: 'بحث بالمعرّف أو الوكيل', type: 'search' },
+        // العائدية التشغيلية: أربعة أنواع صريحة، وFTTH وOffice منفصلان عمداً.
+        { key: 'ownership', label: 'العائدية', type: 'select', options: [
+          { value: 'RESELLER', label: 'وكيل' },
+          { value: 'FTTH_USER', label: 'FTTH User' },
+          { value: 'OFFICE', label: 'Office' },
+          { value: 'NEEDS_REVIEW', label: 'تحتاج مراجعة' },
+        ] },
         { key: 'stage', label: 'المراحل', type: 'select', options: ['P1', 'P2', 'P3', 'P4', 'DONE', 'UNKNOWN'].map((s) => ({ value: s, label: s })) },
         { key: 'zone', label: 'المناطق', type: 'select', options: [{ value: 'old', label: 'قديمة' }, { value: 'new', label: 'جديدة' }] },
         { key: 'hold', label: 'الإيقاف', type: 'select', options: [{ value: 'true', label: 'الموقوفون فقط' }] },
       ], '/installation/subscribers', m.query)
+      // الصفحة خارج المدى تُقال صراحةً، ومعها الإجمالي الصادق — لا صفر صامت.
+      + (page.outOfRange
+        ? `<div class="insight warn"><span class="insight-dot"></span><span><b>الصفحة خارج المدى</b>
+           <small>المجموعة فيها ${count(page.total)} صفّاً. عُد إلى الصفحة الأولى.</small></span></div>`
+        : '')
       + (page.rows.length ? table(columns, page.rows as Row[], (r) => `location.hash='${href(`/installation/subscribers/${encodeURIComponent(str(r as Row, 'subscriber_id'))}`).slice(1)}'`) : empty('لا مشتركين مطابقين'))
       + pager(page.total, limit, offset, '/installation/subscribers', m.query);
 
-    wireFilters(outlet);
+    wireFilters(view.el);
   },
 };
 
@@ -142,14 +176,14 @@ export const subscriberCase: Route = {
     { label: 'المشتركون', href: href('/installation/subscribers') },
     { label: m.params['id'] || 'مشترك' },
   ],
-  async render(outlet, m) {
+  async render(view, m) {
     const id = m.params['id'] as string;
     const tab = m.query.get('tab') || 'overview';
-    outlet.innerHTML = loading('جارٍ تحميل ملفّ المشترك…');
+    view.innerHTML = loading('جارٍ تحميل ملفّ المشترك…');
 
     const doc = await rpc<Row>('installation_subscriber_case', { p_subscriber_id: id });
     const sub = (doc?.['subscriber'] || null) as Row | null;
-    if (!sub) { outlet.innerHTML = empty('المشترك غير موجود', id); return; }
+    if (!sub) { view.innerHTML = empty('المشترك غير موجود', id); return; }
 
     const enr = (doc?.['enrollment'] || {}) as Row;
     const totals = (doc?.['totals'] || {}) as Row;
@@ -160,7 +194,7 @@ export const subscriberCase: Route = {
     const tabs = CASE_TABS.map((t) =>
       `<a class="tab${t.key === tab ? ' active' : ''}" href="${esc(href(`/installation/subscribers/${encodeURIComponent(id)}`, { tab: t.key }))}">${esc(t.label)}</a>`).join('');
 
-    outlet.innerHTML = pageHeader(str(sub, 'subscriber_id'),
+    view.innerHTML = pageHeader(str(sub, 'subscriber_id'),
       `${esc(str(sub, 'reseller') || '—')} · كابينة ${esc(str(sub, 'fdt') || '—')}`,
       `${chip(stage, STAGE_TONE[stage] || 'neutral')}
        ${activeHolds.length ? chip('موقوف', 'critical') : chip('لا إيقاف', 'success')}`)
@@ -173,7 +207,7 @@ export const subscriberCase: Route = {
       + `<div class="tabs">${tabs}</div><div class="panel active">${renderCaseTab(doc as Row, tab, id)}</div>`;
 
     if (tab === 'history') {
-      const host = outlet.querySelector<HTMLElement>('#timelineHost');
+      const host = view.el.querySelector<HTMLElement>('#timelineHost');
       if (host) {
         try {
           const events = await rpc<Row[]>('subscriber_timeline', { p_subscriber_id: id });
@@ -280,13 +314,13 @@ function queueScreen(
       { label: 'أجور التنصيب', href: href('/installation') },
       { label: title },
     ],
-    async render(outlet, m) {
+    async render(view, m) {
       const limit = 50;
       const offset = Number(m.query.get('offset') || 0);
-      outlet.innerHTML = loading();
+      view.innerHTML = loading();
       const rows = await rpc<Row[]>(fn, { ...args, p_limit: limit, p_offset: offset });
       const page = toPage(rows as never, limit, offset);
-      outlet.innerHTML = pageHeader(title, subtitle)
+      view.innerHTML = pageHeader(title, subtitle)
         + (page.rows.length ? table(columns, page.rows as Row[]) : empty(emptyLabel))
         + pager(page.total, limit, offset, pattern, m.query);
     },
@@ -328,10 +362,10 @@ export const holds: Route = {
     { label: 'أجور التنصيب', href: href('/installation') },
     { label: 'الموقوفون' },
   ],
-  async render(outlet, m) {
+  async render(view, m) {
     const limit = 50;
     const offset = Number(m.query.get('offset') || 0);
-    outlet.innerHTML = loading();
+    view.innerHTML = loading();
     const rows = await rpc<Row[]>('list_installation_holds', { p_status: 'ACTIVE', p_limit: limit, p_offset: offset });
     const page = toPage(rows as never, limit, offset);
     const columns: Array<Column<Row>> = [
@@ -341,7 +375,7 @@ export const holds: Route = {
       { key: 'blocks', label: 'يمنع الدفع', cell: (r) => r['blocks_payment'] ? chip('نعم', 'critical') : chip('لا', 'neutral') },
       { key: 'note', label: 'ملاحظة', cell: (r) => esc(str(r, 'note') || '—') },
     ];
-    outlet.innerHTML = pageHeader('الموقوفون', 'الإيقاف يمنع الدفع حتى يُفرَج عنه')
+    view.innerHTML = pageHeader('الموقوفون', 'الإيقاف يمنع الدفع حتى يُفرَج عنه')
       + (page.rows.length ? table(columns, page.rows as Row[]) : empty('لا إيقافات فعّالة'))
       + pager(page.total, limit, offset, '/installation/holds', m.query);
   },
