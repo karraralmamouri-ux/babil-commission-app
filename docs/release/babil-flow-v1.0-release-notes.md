@@ -4,10 +4,9 @@
 
 | | |
 |---|---|
-| Version | `v1.0.0` |
-| Tagged commit | `609309cde2cff408e0c71b1aeae1655697ab72ab` |
+| Version | `v1.0.0` — see `git show v1.0.0` for the exact tagged commit |
 | Audited commit | `e6a693335a8e87a16a7754f66586a19f3a3565d7` |
-| Application code | identical between the two — the only commits in between are these release documents, verified by diff |
+| Application code | identical between the audited commit and the tag; every commit in between is one of these release documents, verified by `git diff e6a6933 v1.0.0 -- . ':(exclude)docs'` returning empty |
 | Released | 2026-08-19 |
 | Production | `fbgffpxpskjzgheheikd` · `ACTIVE_HEALTHY` · Postgres 17.6.1.155 |
 | Application | https://karraralmamouri-ux.github.io/babil-commission-app/ |
