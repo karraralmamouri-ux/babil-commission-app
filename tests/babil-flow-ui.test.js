@@ -253,7 +253,9 @@ test('ما لا صلاحية له يُخفى لا يُعطَّل فقط', () => 
 
 test('إخفاء الزر لا يُغني عن حارس الخادم', () => {
   // الاستدعاءات المالية تمرّ بدوال RPC تفحص القدرة داخلها.
-  assert.match(html, /rpc\/register_fdt/);
+  // تسجيل الكابينات انتقل إلى التطبيق الجديد، فيُفحص حارسه حيث صار.
+  const fdts = fs.readFileSync(path.join(root, 'src/features/master/fdts.ts'), 'utf8');
+  assert.ok(fdts.includes(String.fromCharCode(39) + 'register_fdt' + String.fromCharCode(39)), 'حارس التسجيل مفقود');
   assert.match(html, /rpc\/recalculate_cycle_after_master_change/);
 });
 

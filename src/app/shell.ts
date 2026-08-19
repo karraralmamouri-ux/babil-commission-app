@@ -46,6 +46,7 @@ export const NAV: NavGroup[] = [
   {
     key: 'installation', label: 'أجور التنصيب', items: [
       { label: 'مركز التحكّم', path: '/installation', icon: '⊞', capability: 'installation.view' },
+      { label: 'الدورة الشهرية', path: '/installation/cycle', icon: '◷', capability: 'installation.view' },
       { label: 'المشتركون', path: '/installation/subscribers', icon: '◫', capability: 'installation.view' },
       { label: 'مراجعة الفواتير', path: '/installation/invoices', icon: '▤', capability: 'invoice.view' },
       { label: 'جاهز للصرف', path: '/installation/ready', icon: '✓', capability: 'installation.view' },

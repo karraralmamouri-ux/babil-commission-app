@@ -14,6 +14,7 @@ import { classificationPanel } from './classification';
 import { routes as holdRoutes, holdPanel, wireHoldPanel } from './holds';
 import { routes as payoutRoutes } from './payout';
 import { routes as invoiceRoutes } from './invoices';
+import { routes as cycleRoutes } from './cycle';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -340,5 +341,6 @@ function timeline(events: Row[]): string {
 export const routes: Route[] = [
   controlCenter, subscribers, subscriberCase,
   ...invoiceRoutes,
+  ...cycleRoutes,
   ...payoutRoutes, ...holdRoutes,
 ];
