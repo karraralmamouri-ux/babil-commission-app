@@ -12,9 +12,9 @@
  * ولا يُعرض ct_password ولا يُخزَّن ولا يُصدَّر — يُسقَط عند التحليل أصلاً.
  */
 
-import type { Route } from '../../app/router';
+import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, pageRpc } from '../../services/api';
+import { rpc, pageRpc, can, ApiError } from '../../services/api';
 import { count } from '../../domain/money';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
@@ -219,6 +219,8 @@ export const importDetail: Route = {
         </div>
       </div>`
 
+      + declarePanel(id, str(b, 'completeness_status'))
+
       + `<div class="box" style="margin-top:12px">
           <h3>الآباء في هذه الدفعة</h3>
           ${parents.length ? table<Row>([
@@ -233,8 +235,98 @@ export const importDetail: Route = {
             { key: 'subs', label: 'المشتركون', cell: (r) => count(num(r, 'subscribers')), numeric: true },
             { key: 'ev', label: 'الأحداث', cell: (r) => count(num(r, 'events')), numeric: true },
           ], parents) : '<p class="muted">لا آباء</p>'}
+          ], parents) : '<p class="muted">لا آباء</p>'}
         </div>`;
+
+    wireDeclare(view);
   },
 };
+
+/**
+ * إعلان الاكتمال.
+ *
+ * الحكم الوحيد الذي يفتح باب «مشترك جديد»: الجِدّة لا تُمنح من مصدرٍ غير
+ * مُثبَت الاكتمال. فيُشترط شاهدٌ مكتوب — لا مجرّد اختيار من قائمة.
+ */
+function declarePanel(batchId: string, current: string): string {
+  if (!can('saas.import')) {
+    return `<div class="box" style="margin-top:12px">
+      <p class="muted">تحتاج صلاحية <code>saas.import</code> لإعلان اكتمال دفعة.</p></div>`;
+  }
+  return `<div class="box" style="margin-top:12px" id="declBox" data-batch="${esc(batchId)}">
+    <h3>إعلان الاكتمال</h3>
+    <p class="muted" style="font-size:11px;margin:0 0 10px">
+      الحالة الآن: <b>${esc(COMPLETENESS[current]?.label || current)}</b>.
+      إعلانُ الاكتمال يفتح إمكان منح الجِدّة من هذه الدفعة، فيُشترط له شاهد.</p>
+    <div class="toolbar">
+      <select class="select" id="dcStatus" aria-label="حالة الاكتمال">
+        <option value="">— الحالة —</option>
+        <option value="COMPLETE">مكتمل — كل صفوف الفترة موجودة</option>
+        <option value="PARTIAL">ناقص — تغطية جزئية معروفة</option>
+        <option value="UNKNOWN">غير مُثبَت</option>
+      </select>
+      <input class="search" type="date" id="dcFrom" aria-label="بداية التغطية">
+      <input class="search" type="date" id="dcTo" aria-label="نهاية التغطية">
+      <input class="search" id="dcEvidence" placeholder="الشاهد (إلزامي)" aria-label="الشاهد">
+      <button class="btn gold" id="dcApply">أعلِن</button>
+    </div>
+    <div id="dcResult"></div>
+  </div>`;
+}
+
+function wireDeclare(view: View): void {
+  const box = view.el.querySelector<HTMLElement>('#declBox');
+  if (!box) return;
+  const batchId = box.dataset['batch'] || '';
+  const status = box.querySelector<HTMLSelectElement>('#dcStatus');
+  const from = box.querySelector<HTMLInputElement>('#dcFrom');
+  const to = box.querySelector<HTMLInputElement>('#dcTo');
+  const evidence = box.querySelector<HTMLInputElement>('#dcEvidence');
+  const apply = box.querySelector<HTMLButtonElement>('#dcApply');
+  const out = box.querySelector<HTMLElement>('#dcResult');
+  if (!status || !apply || !out) return;
+
+  apply.addEventListener('click', async () => {
+    if (!status.value) {
+      out.innerHTML = insight('warn', 'اختر الحالة أولاً');
+      return;
+    }
+    const why = evidence?.value.trim() || '';
+    if (!why) {
+      out.innerHTML = insight('warn', 'الشاهد إلزامي',
+        'الاكتمال يُعلَن بدليل لا باختيار');
+      return;
+    }
+    apply.disabled = true;
+    out.innerHTML = loading('جارٍ حفظ الإعلان…');
+    try {
+      await rpc<Row>('declare_import_completeness', {
+        p_batch_id: batchId,
+        p_status: status.value,
+        p_coverage_start: from?.value || null,
+        p_coverage_end: to?.value || null,
+        p_evidence: why,
+        p_request_id: crypto.randomUUID(),
+      });
+      if (!view.live) return;
+      out.innerHTML = insight('good', 'حُفظ الإعلان',
+        status.value === 'COMPLETE'
+          ? 'صار بالإمكان منح الجِدّة من هذه الدفعة.'
+          : 'تبقى الجِدّة ممنوعة من هذه الدفعة.');
+      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1300);
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'لم يُحفظ الإعلان',
+        error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      apply.disabled = false;
+    }
+  });
+}
+
+function insight(tone: 'good' | 'warn' | 'danger', title: string, detail = ''): string {
+  return `<div class="insight ${tone}" style="margin-top:10px"><span class="insight-dot"></span><span>
+    <b>${esc(title)}</b>${detail ? `<small>${esc(detail)}</small>` : ''}</span></div>`;
+}
 
 export const routes: Route[] = [imports, importDetail];
