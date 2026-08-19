@@ -216,6 +216,15 @@ fi
 echo "$out24" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out24" | grep -c "            ok ")))
 
+echo "== payout end to end =="
+out25=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/payout-end-to-end.sql 2>&1)
+if echo "$out25" | grep -qE "FAILED|ERROR"; then
+  echo "$out25" | grep -E "FAILED|ERROR" || true
+  echo "END TO END TESTS FAILED" >&2; exit 1
+fi
+echo "$out25" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out25" | grep -c "            ok ")))
+
 echo "== newness parity =="
 out21=$(bash tests/sql/newness-parity.sh 2>&1)
 if [ $? -ne 0 ]; then echo "$out21" >&2; echo "PARITY TESTS FAILED" >&2; exit 1; fi
