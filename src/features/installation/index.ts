@@ -7,12 +7,13 @@
 
 import type { Route } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, toPage, pageRpc } from '../../services/api';
+import { rpc, pageRpc } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { transferPanel, wireTransfer } from '../ownership/transfer';
 import { classificationPanel } from './classification';
 import { routes as holdRoutes, holdPanel, wireHoldPanel } from './holds';
 import { routes as payoutRoutes } from './payout';
+import { routes as invoiceRoutes } from './invoices';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -334,50 +335,10 @@ function timeline(events: Row[]): string {
     </div>`).join('')}</div>`;
 }
 
-/* ---- الطوابير ----------------------------------------------------------- */
-
-function queueScreen(
-  pattern: string, title: string, subtitle: string, fn: string,
-  args: Record<string, unknown>, columns: Array<Column<Row>>, emptyLabel: string,
-): Route {
-  return {
-    pattern,
-    capability: 'installation.view',
-    title,
-    breadcrumb: () => [
-      { label: 'الرئيسية', href: href('/') },
-      { label: 'أجور التنصيب', href: href('/installation') },
-      { label: title },
-    ],
-    async render(view, m) {
-      const limit = 50;
-      const offset = Number(m.query.get('offset') || 0);
-      view.innerHTML = loading();
-      const rows = await rpc<Row[]>(fn, { ...args, p_limit: limit, p_offset: offset });
-      const page = toPage(rows as never, limit, offset);
-      view.innerHTML = pageHeader(title, subtitle)
-        + (page.rows.length ? table(columns, page.rows as Row[]) : empty(emptyLabel))
-        + pager(page.total, limit, offset, pattern, m.query);
-    },
-  };
-}
-
-export const invoices = queueScreen(
-  '/installation/invoices', 'الفواتير', 'استحقاقات بانتظار مراجعة الفاتورة',
-  'list_installation_entitlements', { p_invoice_status: 'pending' },
-  [
-    { key: 'sid', label: 'المشترك', cell: (r) => `<a href="${esc(href(`/installation/subscribers/${encodeURIComponent(str(r, 'subscriber_id'))}`))}">${esc(str(r, 'subscriber_id'))}</a>` },
-    { key: 'period', label: 'الفترة', cell: (r) => esc(str(r, 'period')) },
-    { key: 'stage', label: 'المرحلة', cell: (r) => esc(str(r, 'stage')) },
-    { key: 'amount', label: 'المبلغ', cell: (r) => `<span class="money">${money(num(r, 'amount'))}</span>`, numeric: true },
-    { key: 'inv', label: 'الفاتورة', cell: (r) => chip(str(r, 'invoice_status') || '—', 'warning') },
-  ],
-  'لا فواتير بانتظار المراجعة',
-);
-
 // «جاهز للصرف» و«التعليقات» انتقلتا إلى ملفَّيهما: الأولى صارت تجميعاً
 // بالوكيل مع سطورٍ تحته، والثانية صارت تحمل نوع الحجب ومصدره وأجله.
 export const routes: Route[] = [
-  controlCenter, subscribers, subscriberCase, invoices,
+  controlCenter, subscribers, subscriberCase,
+  ...invoiceRoutes,
   ...payoutRoutes, ...holdRoutes,
 ];

@@ -92,15 +92,69 @@ select public.apply_bulk_hold(array['pb-2'], 'PERMANENT', 'MANUAL_REVIEW',
   'مراجعة', 'pb.xlsx', null, '90000000-0000-0000-0000-00000000ab01');
 
 select pg_temp.ok(
-  (public.installation_payout_candidates() ->> 'held')::bigint = 1
+  (public.installation_payout_candidates() -> 'blocked' ->> 'hold')::bigint = 1
   and (public.installation_payout_candidates() ->> 'subscribers')::bigint = 2,
-  'المعلَّق يبقى مرشّحاً ويُعدّ محجوباً');
+  'المعلَّق يبقى مرشّحاً ويُعدّ محجوباً بالتعليق');
+
+-- والتجميع بالوكيل يفصل أصناف الحجب بدل رقمٍ واحد مبهم.
+select pg_temp.ok(
+  (select (r ->> 'blocked_hold')::int from jsonb_array_elements(
+     public.installation_payout_candidates() -> 'by_reseller') r
+   where r ->> 'reseller' = 'وكيل الصرف') = 1
+  and (select (r ->> 'blocked_invoice')::int from jsonb_array_elements(
+     public.installation_payout_candidates() -> 'by_reseller') r
+   where r ->> 'reseller' = 'وكيل الصرف') = 2,
+  'والتجميع بالوكيل يفصل التعليق عن الفاتورة');
+
+-- ---------------------------------------------------------------------------
+-- 1.5 «محجوب = صفر» لا تعني «الطريق سالك»
+--
+-- كل مرحلة في المخطّط المنشور تشترط فاتورة مدقَّقة. فمشتركٌ بلا فاتورة
+-- محجوبٌ ولو لم يكن عليه تعليق واحد. عدُّ التعليقات وحده كان يقول صفراً
+-- ويُفهَم منه أن المال جاهز.
+-- ---------------------------------------------------------------------------
 
 select pg_temp.ok(
-  (select (r ->> 'ready')::int from jsonb_array_elements(
-     public.installation_payout_candidates() -> 'by_reseller') r
-   where r ->> 'reseller' = 'وكيل الصرف') = 1,
-  'والجاهزون واحدٌ فقط بعد التعليق');
+  (public.installation_payout_candidates() -> 'blocked' ->> 'invoice')::int = 2,
+  'الحجب بالفاتورة يُعدّ ولو لم يكن ثمّة تعليق');
+
+select pg_temp.ok(
+  (public.installation_payout_candidates() ->> 'ready')::int = 0,
+  'ولا أحد جاهز ما دامت الفاتورة ناقصة');
+
+-- والتصنيف يفرّق بين الأصناف: تعليقٌ على واحدٍ لا يجعل الآخر محجوباً بتعليق.
+select pg_temp.ok(
+  (public.installation_payout_candidates() -> 'blocked' ->> 'hold')::int = 1
+  and (public.installation_payout_candidates() -> 'blocked' ->> 'any')::int = 2,
+  'وكل صنف يُعدّ على حدة، والمجموع لا يُكرّر من حجبه سببان');
+
+-- والسطر يحمل أصنافه.
+select pg_temp.ok(
+  (select r -> 'blockers' @> '["INVOICE"]'::jsonb
+   from jsonb_array_elements(public.page_payout_candidate_lines(p_limit => 50) -> 'rows') r
+   where r ->> 'subscriber_id' = 'pb-1'),
+  'وسطر بلا فاتورة يحمل صنف INVOICE');
+
+select pg_temp.ok(
+  (select r -> 'blockers' @> '["HOLD"]'::jsonb
+   from jsonb_array_elements(public.page_payout_candidate_lines(p_limit => 50) -> 'rows') r
+   where r ->> 'subscriber_id' = 'pb-2'),
+  'والمعلَّق يحمل صنف HOLD');
+
+-- والتصفية بالصنف تُعيد من يحمله فقط.
+select pg_temp.ok(
+  (public.page_payout_candidate_lines(p_blocker => 'HOLD') ->> 'total')::int = 1,
+  'والتصفية بصنف الحجب تعمل على الخادم');
+
+-- وتصنيف الرموز يضع كل رمزٍ في صنفه.
+select pg_temp.ok(
+  public.blocker_category('ON_HOLD') = 'HOLD'
+  and public.blocker_category('MISSING_INVOICE') = 'INVOICE'
+  and public.blocker_category('IDENTITY_CONFLICT') = 'IDENTITY'
+  and public.blocker_category('UNKNOWN_PARENT') = 'PARENT'
+  and public.blocker_category('NOT_ENROLLED') = 'ELIGIBILITY'
+  and public.blocker_category('WHATEVER') = 'OTHER',
+  'كل رمز حاجب يقع في صنفه');
 
 -- ---------------------------------------------------------------------------
 -- 2. الاستحقاق والدفعة

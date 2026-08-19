@@ -40,7 +40,8 @@ values
   ('80000000-0000-0000-0000-0000000000b1','hb-sub-1','وكيل الحجب','HB-FDT', date '2026-01-01', 13000,'80000000-0000-0000-0000-0000000000a1'),
   ('80000000-0000-0000-0000-0000000000b2','hb-sub-2','وكيل الحجب','HB-FDT', date '2026-01-01', 13000,'80000000-0000-0000-0000-0000000000a1'),
   ('80000000-0000-0000-0000-0000000000b3','hb-done','وكيل الحجب','HB-FDT', date '2026-01-01', 13000,'80000000-0000-0000-0000-0000000000a1'),
-  ('80000000-0000-0000-0000-0000000000b4','hb-held','وكيل الحجب','HB-FDT', date '2026-01-01', 13000,'80000000-0000-0000-0000-0000000000a1')
+  ('80000000-0000-0000-0000-0000000000b4','hb-held','وكيل الحجب','HB-FDT', date '2026-01-01', 13000,'80000000-0000-0000-0000-0000000000a1'),
+  ('80000000-0000-0000-0000-0000000000b5','hb-open','وكيل الحجب','HB-FDT', date '2026-01-01', 13000,'80000000-0000-0000-0000-0000000000a1')
 on conflict do nothing;
 
 insert into public.installation_subscriber_state
@@ -49,7 +50,8 @@ values
   ('80000000-0000-0000-0000-0000000000b1', date '2026-06-30', 13000, 'P1', 'resolved', true),
   ('80000000-0000-0000-0000-0000000000b2', date '2026-06-30', 10000, 'P2', 'resolved', true),
   ('80000000-0000-0000-0000-0000000000b3', date '2026-06-30', 0, 'DONE', 'resolved', false),
-  ('80000000-0000-0000-0000-0000000000b4', date '2026-06-30', 13000, 'P1', 'resolved', true)
+  ('80000000-0000-0000-0000-0000000000b4', date '2026-06-30', 13000, 'P1', 'resolved', true),
+  ('80000000-0000-0000-0000-0000000000b5', date '2026-06-30', 13000, 'P1', 'resolved', true)
 on conflict (subscriber_uuid) do update
   set remaining = excluded.remaining, current_stage = excluded.current_stage,
       resolution = excluded.resolution,
@@ -104,20 +106,35 @@ select pg_temp.ok(
 -- 2. شروط القرار
 -- ---------------------------------------------------------------------------
 
+-- المؤقّت بلا أجل مقبول: يبقى حتى يُرفع يدوياً. وهذه هي الحالة الأكثر
+-- وقوعاً — «علِّقه حتى نتحقّق» بلا تاريخٍ معروف سلفاً.
+select pg_temp.ok(
+  (public.apply_bulk_hold(array['hb-open'], 'TEMPORARY', 'MANUAL_REVIEW',
+     'حتى التحقّق', 'open.xlsx', null, '80000000-0000-0000-0000-00000000ab20')
+   ->> 'applied')::int = 1,
+  'المؤقّت بلا أجل مقبول ويُطبَّق');
+
+select pg_temp.ok(
+  (select expires_at is null and permanence = 'TEMPORARY'
+   from public.installation_holds where subscriber_id = 'hb-open') ,
+  'ويُحفظ مؤقّتاً بلا أجل');
+
+-- ويبقى سارياً: غياب الأجل ليس انقضاءً.
+select pg_temp.ok(
+  public.hold_is_effective('ACTIVE', 'TEMPORARY', null),
+  'والمؤقّت بلا أجل يحجب حتى يُرفع');
+
+-- والأجل في الماضي مرفوض في الحالين.
 select pg_temp.must_fail(
   'select public.apply_bulk_hold(array[''hb-sub-1''], ''TEMPORARY'', ''MANUAL_REVIEW'',
-     ''سبب'', ''f.xlsx'', null, gen_random_uuid())',
-  'مؤقّت بلا أجل مرفوض');
+     ''سبب'', ''f.xlsx'', now() - interval ''1 day'', gen_random_uuid())',
+  'أجل في الماضي مرفوض');
 
 select pg_temp.must_fail(
   'select public.apply_bulk_hold(array[''hb-sub-1''], ''PERMANENT'', ''MANUAL_REVIEW'',
      ''سبب'', ''f.xlsx'', now() + interval ''1 day'', gen_random_uuid())',
   'دائم بأجل مرفوض');
 
-select pg_temp.must_fail(
-  'select public.apply_bulk_hold(array[''hb-sub-1''], ''TEMPORARY'', ''MANUAL_REVIEW'',
-     ''سبب'', ''f.xlsx'', now() - interval ''1 day'', gen_random_uuid())',
-  'أجل في الماضي مرفوض');
 
 select pg_temp.must_fail(
   'select public.apply_bulk_hold(array[''hb-sub-1''], ''PERMANENT'', ''MANUAL_REVIEW'',
@@ -144,8 +161,10 @@ select public.apply_bulk_hold(
   '80000000-0000-0000-0000-00000000ab01');
 
 select pg_temp.ok(
-  (select count(*) from public.installation_holds
-   where source = 'BULK' and status = 'ACTIVE') = 2,
+  (select count(*) from public.installation_holds h
+   join public.installation_hold_uploads u on u.id = h.upload_id
+   where u.request_id = '80000000-0000-0000-0000-00000000ab01'
+     and h.status = 'ACTIVE') = 2,
   'يُعلَّق الصالحان فقط');
 
 select pg_temp.ok(
@@ -174,7 +193,9 @@ select pg_temp.ok(
   'إعادة الرفع نفسه بلا أثر ثانٍ');
 
 select pg_temp.ok(
-  (select count(*) from public.installation_holds where source = 'BULK') = 2,
+  (select count(*) from public.installation_holds h
+   join public.installation_hold_uploads u on u.id = h.upload_id
+   where u.request_id = '80000000-0000-0000-0000-00000000ab01') = 2,
   'وعدد التعليقات يبقى كما هو');
 
 -- والأثر مُدقَّق.
@@ -315,10 +336,17 @@ select pg_temp.must_fail(
      ''سبب'', null, null, gen_random_uuid())',
   'تعليق مشترك غير معروف مرفوض');
 
+select pg_temp.ok(
+  (public.place_hold_v2('hb-done', 'TEMPORARY', 'MANUAL_REVIEW',
+     'حتى التحقّق', null, null, '80000000-0000-0000-0000-00000000ab21')
+   ->> 'idempotent')::boolean = false,
+  'الفردي المؤقّت بلا أجل مقبول');
+
+-- والدائم بأجل مرفوض في الحالين.
 select pg_temp.must_fail(
-  'select public.place_hold_v2(''hb-sub-2'', ''TEMPORARY'', ''MANUAL_REVIEW'',
-     ''سبب'', null, null, gen_random_uuid())',
-  'الفردي المؤقّت بلا أجل مرفوض');
+  'select public.place_hold_v2(''hb-sub-1'', ''PERMANENT'', ''MANUAL_REVIEW'',
+     ''سبب'', null, now() + interval ''1 day'', gen_random_uuid())',
+  'الفردي الدائم بأجل مرفوض');
 
 -- ---------------------------------------------------------------------------
 -- 7. الحارس
