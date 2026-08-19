@@ -1,20 +1,46 @@
 /**
  * الرئيسية — النظرة التنفيذية.
  *
- * تبقى لوحةً، وهذا صحيح. الفرق أنها صارت شاشةَ البداية لا التطبيقَ كلَّه:
- * كل رقم فيها يقود إلى سجلاته.
+ * تجيب بترتيبٍ مقصود لا ببطاقاتٍ متساوية:
+ *
+ *   ١ · الوضع المالي     — كم مستحقّ، كم مدفوع، كم موقوف
+ *   ٢ · تحتاج إجراء      — ما ينتظر قراراً، بوحدة قراره
+ *   ٣ · الدورات الجارية  — أين نقف في العمولة والتنصيب
+ *   ٤ · ما يسند ذلك      — مشتركو الشركة
+ *
+ * البطاقة المتساوية مع كل شيء لا تقول شيئاً: حين يتساوى «المدفوع» بصرياً مع
+ * «عدد الآباء» يضيع السؤال الأول. فالمال أولاً وبحجمٍ أكبر، ثم ما يحجبه.
+ *
+ * وكل رقمٍ يقود إلى سجلّه — الرقم الذي لا يُفتح رقمٌ ميّت.
  */
 
 import type { Route } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, select } from '../../services/api';
 import { money, count } from '../../domain/money';
-import { esc, loading, empty, pageHeader, kpiRow, chip, projectedTag } from '../../components/ui';
+import { esc, loading, empty, pageHeader, chip, projectedTag } from '../../components/ui';
 
 type Row = Record<string, unknown>;
 const num = (r: Row, k: string) => Number(r[k] || 0);
+const str = (r: Row, k: string) => String(r[k] ?? '');
 
 const FINAL = new Set(['FINALIZED', 'PARTIALLY_PAID', 'PAID', 'CLOSED']);
+
+/** بطاقة مالية — أكبر خطّاً، لأنها تجيب السؤال الأول. */
+function moneyCard(label: string, value: string, sub: string, tone: string, link?: string): string {
+  const inner = `<div class="label">${esc(label)}</div>
+    <div class="value" style="font-size:25px">${value}</div>
+    <div class="sub">${esc(sub)}</div>`;
+  const cls = `card ${tone}`;
+  return link
+    ? `<a class="${cls}" href="${esc(link)}" style="text-decoration:none;color:inherit">${inner}</a>`
+    : `<div class="${cls}">${inner}</div>`;
+}
+
+function sectionTitle(text: string): string {
+  return `<h2 style="font-size:12px;color:var(--muted);margin:0 0 10px;
+    font-weight:700;letter-spacing:.02em">${esc(text)}</h2>`;
+}
 
 export const home: Route = {
   pattern: '/',
@@ -32,116 +58,146 @@ export const home: Route = {
     const status = String(cycle['status']);
     const projected = !FINAL.has(status);
 
-    const [summary, impact, company] = await Promise.all([
+    const [summary, action, pipeline, company] = await Promise.all([
       rpc<Row>('report_management_summary', { p_cycle_id: cycleId }).catch(() => null),
-      rpc<Row[]>('report_commission_exception_impact', { p_cycle_id: cycleId }).catch(() => null),
+      rpc<Row>('action_center', {}).catch(() => null),
+      rpc<Row>('installation_cycle_pipeline', {}).catch(() => null),
       rpc<Row>('company_parent_breakdown', {}).catch(() => null),
     ]);
+    if (!view.live) return;
 
     const g = (summary?.['global'] || {}) as Row;
     const c = (summary?.['commission'] || {}) as Row;
     const t = (c['totals'] || {}) as Row;
     const x = (c['exceptions'] || {}) as Row;
-    const inst = (summary?.['installation'] || {}) as Row;
 
-    const blocked = (impact || []).reduce((a, r) => a + num(r, 'indicative_amount'), 0);
-    const blockingCount = num(x, 'blocking');
+    const groups = (action?.['groups'] || []) as Row[];
+    const open = groups.filter((r) => num(r, 'decisions') > 0)
+      .sort((a, b) => (num(b, 'amount') - num(a, 'amount'))
+        || (num(b, 'subscribers') - num(a, 'subscribers')));
+    const decisions = open.reduce((a, r) => a + num(r, 'decisions'), 0);
+    const blockedMoney = open.reduce((a, r) => a + num(r, 'amount'), 0);
+
+    const steps = (pipeline?.['steps'] || []) as Row[];
+    const current = steps.filter((s) => str(s, 'state') === 'ACTIVE')
+      .sort((a, b) => num(a, 'order') - num(b, 'order'))[0] || null;
+    const cand = (pipeline?.['candidate'] || {}) as Row;
+    const ready = (pipeline?.['ready'] || {}) as Row;
+    const hist = (pipeline?.['historical'] || {}) as Row;
+
+    const parents = (company?.['parents'] || []) as Row[];
+    const companyTotal = company ? Number(company['total_subscribers'] || 0) : null;
 
     view.innerHTML = pageHeader('النظرة التنفيذية',
-      `${esc(String(cycle['name']))}`,
+      esc(String(cycle['name'])),
       projected ? projectedTag() : chip('معتمدة', 'success'))
 
-      // الترتيب مقصود: المستحق أولاً لأنه السؤال الأول، والموقوف آخراً ظاهراً
-      // دائماً حتى لا يُقرأ المتبقي على أنه كل ما تبقّى.
-      + kpiRow([
-        { label: 'إجمالي المستحق', value: money(num(g, 'total_obligations')), tone: 'primary',
-          sub: 'عمولات وأجور تنصيب', link: href(`/commissions/cycles/${cycleId}`) },
-        { label: 'المدفوع', value: money(num(g, 'total_paid')), tone: 'green',
-          link: href('/finance/payment-batches') },
-        { label: 'المتبقي', value: money(num(g, 'total_remaining')), tone: 'blue',
-          link: href(`/commissions/cycles/${cycleId}/payout`) },
-        { label: 'الموقوف / قيد المراجعة',
-          value: blocked ? money(blocked) : '—', tone: 'red',
-          sub: blockingCount ? `${count(blockingCount)} استثناء حاجب — مبلغ مؤشِّر` : 'لا يُصرف قبل الحسم',
-          link: href('/exceptions', { blocking: 'true' }) },
-      ])
-
-      + `<div class="grid2">
-        <div class="box">
-          <h3>◎ عمولات الوكلاء</h3>
-          <div class="split-money">
-            <div class="part released"><span class="k">محسوب</span>
-              <span class="v">${money(num(t, 'gross'))}</span></div>
-            <div class="part blocked"><span class="k">موقوف (مؤشِّر)</span>
-              <span class="v">${blocked ? money(blocked) : '—'}</span></div>
-            <div class="part exposure"><span class="k">النطاقات</span>
-              <span class="v">${count(num(t, 'scopes'))}</span></div>
-          </div>
-          <div class="minirow" style="margin-top:10px">
-            <span class="muted">أساس الشريحة — مشتركون فريدون</span>
-            <b>${count(num(t, 'unique_activated_subscribers'))}</b></div>
-          <div class="minirow"><span class="muted">الأحداث المؤهَّلة</span>
-            <b>${count(num(t, 'qualifying_events'))}</b></div>
-          <div class="actions" style="margin-top:10px">
-            <a class="btn" href="${esc(href(`/commissions/cycles/${cycleId}/scopes`))}">النطاقات</a>
-            <a class="btn" href="${esc(href(`/commissions/cycles/${cycleId}/review`))}">المراجعة</a>
-          </div>
+      /* ١ · الوضع المالي */
+      + `<section style="margin-top:4px">
+        ${sectionTitle('الوضع المالي')}
+        <div class="cards cards-4">
+          ${moneyCard('إجمالي المستحق', money(num(g, 'total_obligations')),
+            'عمولات وأجور تنصيب', 'kpi-primary', href(`/commissions/cycles/${cycleId}`))}
+          ${moneyCard('المدفوع', money(num(g, 'total_paid')),
+            'مُرحَّل في الدفتر', 'greenline', href('/reports/payments'))}
+          ${moneyCard('المتبقّي', money(num(g, 'total_remaining')),
+            'بعد المدفوع', 'blueline', href(`/commissions/cycles/${cycleId}/payout`))}
+          ${moneyCard('موقوف بانتظار قرار', blockedMoney ? money(blockedMoney) : '—',
+            blockedMoney ? 'حيث يُعرف المبلغ' : 'لا مبلغ محسوب بعد', 'redline', href('/work'))}
         </div>
+      </section>`
 
+      /* ٢ · تحتاج إجراء */
+      + `<section style="margin-top:20px">
+        ${sectionTitle('تحتاج إجراء')}
         <div class="box">
-          <h3>⚙ أجور التنصيب</h3>
-          <div class="split-money">
-            <div class="part released"><span class="k">مستحق</span>
-              <span class="v">${money(num(inst, 'due'))}</span></div>
-            <div class="part blocked"><span class="k">موقوف</span>
-              <span class="v">${money(num(inst, 'held'))}</span></div>
-            <div class="part exposure"><span class="k">مدفوع تاريخياً</span>
-              <span class="v">${money(num(inst, 'historical_paid'))}</span></div>
-          </div>
-          <div class="minirow" style="margin-top:10px">
-            <span class="muted">المشتركون</span><b>${count(num(inst, 'subscribers'))}</b></div>
-          <div class="minirow"><span class="muted">التسجيلات</span>
-            <b>${count(num(inst, 'enrollments'))}</b></div>
-          <div class="actions" style="margin-top:10px">
-            <a class="btn" href="${esc(href('/installation/subscribers'))}">سجلّ المشتركين</a>
-            <a class="btn" href="${esc(href('/installation/holds'))}">الموقوفون</a>
-          </div>
+          ${open.length ? `
+            <div class="minirow" style="border-bottom:1px solid var(--line);padding-top:0">
+              <span><b style="font-size:15px">${count(decisions)} قراراً ينتظر</b>
+                <div class="muted" style="font-size:11px">في ${count(open.length)} مجموعة</div></span>
+              <a class="btn gold" href="${esc(href('/work'))}">افتح مركز العمل</a>
+            </div>
+            ${open.slice(0, 4).map((r) => `<a class="minirow"
+                style="text-decoration:none;color:inherit" href="${esc(href(str(r, 'path')))}">
+                <span><b>${esc(str(r, 'label'))}</b>
+                  <span class="muted">— ${esc(str(r, 'unit'))} · ${esc(str(r, 'role'))}</span></span>
+                <span><b>${count(num(r, 'decisions'))}</b>
+                  ${num(r, 'amount') ? ` <span class="money">${money(num(r, 'amount'))}</span>` : ''}
+                </span></a>`).join('')}`
+          : '<p class="muted">لا شيء ينتظر قراراً</p>'}
         </div>
-      </div>`
+      </section>`
 
-      // مشتركو الشركة.
-      //
-      // بطاقة واحدة بالمجموع، وتحتها تفصيلٌ بأسماء الآباء كما وردت من المصدر:
-      // FTTH_Users يظل FTTH_Users، وhrins.office يظل hrins.office. لا أسماء
-      // مثبَّتة في الواجهة — أبٌ شركاتيّ جديد يظهر تلقائياً بلا نشر جديد.
-      + (() => {
-        const parents = Array.isArray(company?.['parents'])
-          ? (company['parents'] as Row[]) : [];
-        const total = company ? Number(company['total_subscribers'] || 0) : null;
-        return `<section style="margin-top:16px">
-          <h2 style="font-size:14px;color:var(--navy);margin:0 0 10px">مشتركو الشركة</h2>
-          <div class="grid2">
-            <a class="card kpi-primary" href="${esc(href('/master/parents', { ownership: 'DIRECT_COMPANY' }))}"
-               style="text-decoration:none">
-              <div class="label">تابعون للشركة مباشرةً</div>
-              <div class="value">${total === null ? '—' : count(total)}</div>
-              <div class="sub">مشترك · لا عمولة وكيل ولا مساهمة في شريحة</div>
-            </a>
-            <div class="box">
-              <h3>حسب الأب — بالأسماء الأصلية</h3>
-              ${parents.length
-                ? parents.map((p) => `<a class="minirow" style="text-decoration:none;color:inherit"
-                    href="${esc(href("/master/parents/" + encodeURIComponent(String(p['parent_name'] ?? ''))))}">
-                    <span class="num" style="direction:ltr;text-align:left">${esc(String(p['parent_name'] ?? ''))}</span>
-                    <b>${count(Number(p['subscribers'] || 0))}</b></a>`).join('')
-                : '<p class="muted">لا آباء مصنَّفين للشركة بعد</p>'}
-              <div class="muted" style="font-size:10px;margin-top:8px">
-                الاسم كما ورد في المصدر. التصنيف لا يُعيد التسمية.</div>
+      /* ٣ · الدورات الجارية */
+      + `<section style="margin-top:20px">
+        ${sectionTitle('الدورات الجارية')}
+        <div class="grid2">
+          <div class="box">
+            <h3>◎ عمولات الوكلاء</h3>
+            <div class="split-money">
+              <div class="part released"><span class="k">محسوب</span>
+                <span class="v">${money(num(t, 'gross'))}</span></div>
+              <div class="part blocked"><span class="k">استثناءات حاجبة</span>
+                <span class="v">${count(num(x, 'blocking'))}</span></div>
+              <div class="part exposure"><span class="k">أساس الشريحة</span>
+                <span class="v">${count(num(t, 'unique_activated_subscribers'))}</span></div>
+            </div>
+            <div class="minirow" style="margin-top:10px">
+              <span class="muted">الأحداث المؤهَّلة</span>
+              <b>${count(num(t, 'qualifying_events'))}</b></div>
+            <div class="actions" style="margin-top:10px">
+              <a class="btn" href="${esc(href(`/commissions/cycles/${cycleId}/scopes`))}">النطاقات</a>
+              <a class="btn" href="${esc(href('/exceptions', { blocking: 'true' }))}">الاستثناءات</a>
             </div>
           </div>
-        </section>`;
-      })();
 
+          <div class="box">
+            <h3>⊞ أجور التنصيب</h3>
+            <div class="split-money">
+              <div class="part exposure"><span class="k">مرشّح</span>
+                <span class="v">${money(num(cand, 'amount'))}</span></div>
+              <div class="part released"><span class="k">جاهز</span>
+                <span class="v">${money(num(ready, 'amount'))}</span></div>
+              <div class="part blocked"><span class="k">مدفوع تاريخياً</span>
+                <span class="v">${money(num(hist, 'paid'))}</span></div>
+            </div>
+            <div class="minirow" style="margin-top:10px">
+              <span class="muted">الخطوة الحالية</span>
+              <b>${current ? esc(str(current, 'label')) : '—'}</b></div>
+            ${current && str(current, 'blocker')
+              ? `<div class="minirow"><span class="muted">ما يحجبها</span>
+                 <b>${esc(str(current, 'blocker'))}</b></div>` : ''}
+            <div class="actions" style="margin-top:10px">
+              <a class="btn" href="${esc(href('/installation/cycle'))}">الدورة</a>
+              <a class="btn" href="${esc(href('/installation/ready'))}">جاهز للصرف</a>
+            </div>
+          </div>
+        </div>
+      </section>`
+
+      /* ٤ · مشتركو الشركة — بالأسماء الأصلية */
+      + `<section style="margin-top:20px">
+        ${sectionTitle('مشتركو الشركة')}
+        <div class="grid2">
+          <a class="card kpi-primary" href="${esc(href('/master/parents', { ownership: 'DIRECT_COMPANY' }))}"
+             style="text-decoration:none">
+            <div class="label">تابعون للشركة مباشرةً</div>
+            <div class="value">${companyTotal === null ? '—' : count(companyTotal)}</div>
+            <div class="sub">مشترك · لا عمولة وكيل ولا مساهمة في شريحة</div>
+          </a>
+          <div class="box">
+            <h3>حسب الأب — بالأسماء الأصلية</h3>
+            ${parents.length
+              ? parents.map((p) => `<a class="minirow" style="text-decoration:none;color:inherit"
+                  href="${esc(href('/master/parents/' + encodeURIComponent(String(p['parent_name'] ?? ''))))}">
+                  <span class="parent-name" dir="ltr">${esc(String(p['parent_name'] ?? ''))}</span>
+                  <b>${count(Number(p['subscribers'] || 0))}</b></a>`).join('')
+              : '<p class="muted">لا آباء مصنَّفين للشركة بعد</p>'}
+            <div class="muted" style="font-size:10px;margin-top:8px">
+              الاسم كما ورد في المصدر. التصنيف لا يُعيد التسمية.</div>
+          </div>
+        </div>
+      </section>`;
   },
 };
 

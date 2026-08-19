@@ -206,7 +206,9 @@ test('الشاشات لا تحمل معدّلات ولا حدود شرائح', (
 test('الأرقام تأتي من دوالّ الخادم', () => {
   const s = read('src/features/home/index.ts');
   assert.match(s, /report_management_summary/);
-  assert.match(s, /report_commission_exception_impact/);
+  // الحجب صار يأتي من مركز العمل: مصدرٌ واحد مصنَّف بدل تقرير يُقرأ وحده.
+  assert.match(s, /action_center/);
+  assert.match(s, /installation_cycle_pipeline/);
 });
 
 test('أساس الشريحة والأحداث المؤهَّلة معروضان منفصلين', () => {

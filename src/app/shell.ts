@@ -46,6 +46,7 @@ export const NAV: NavGroup[] = [
   {
     key: 'installation', label: 'أجور التنصيب', items: [
       { label: 'مركز التحكّم', path: '/installation', icon: '⊞', capability: 'installation.view' },
+      { label: 'الدورة الشهرية', path: '/installation/cycle', icon: '◷', capability: 'installation.view' },
       { label: 'المشتركون', path: '/installation/subscribers', icon: '◫', capability: 'installation.view' },
       { label: 'مراجعة الفواتير', path: '/installation/invoices', icon: '▤', capability: 'invoice.view' },
       { label: 'جاهز للصرف', path: '/installation/ready', icon: '✓', capability: 'installation.view' },
@@ -67,10 +68,18 @@ export const NAV: NavGroup[] = [
   {
     key: 'master', label: 'البيانات الرئيسية', items: [
       { label: 'الآباء والعائدية', path: '/master/parents', icon: '⌂', capability: 'agent.view' },
+      { label: 'الكابينات', path: '/master/fdts', icon: '⊡', capability: 'commission.view' },
+    ],
+  },
+  {
+    key: 'reports', label: 'التقارير', items: [
+      { label: 'التقارير', path: '/reports', icon: '▧', capability: 'report.view' },
+      { label: 'الأرشيف', path: '/reports/archive', icon: '▩', capability: 'report.view' },
     ],
   },
   {
     key: 'system', label: 'النظام', items: [
+      { label: 'الاستيراد', path: '/system/imports', icon: '⊕', capability: 'saas.review' },
       { label: 'المستخدمون', path: '/system/users', icon: '◍', capability: 'permission.manage' },
       { label: 'سجلّ التدقيق', path: '/audit', icon: '❑', capability: 'audit.view' },
     ],

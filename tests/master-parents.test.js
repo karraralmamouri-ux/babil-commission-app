@@ -24,7 +24,9 @@ const migration = read('supabase/migrations/20260901090000_parent_evidence.sql')
 test('الشاشتان مسجّلتان بمسارَيهما', () => {
   assert.match(master, /pattern: '\/master\/parents'/);
   assert.match(master, /pattern: '\/master\/parents\/:name'/);
-  assert.match(master, /export const routes: Route\[\] = \[parents, parentCase\]/);
+  // الشاشتان مسجَّلتان. المصفوفة تنمو بشاشاتٍ أخرى (الكابينات)، فلا تُثبَّت
+  // حرفياً — المقصود التسجيل لا شكل السطر.
+  assert.match(master, /export const routes: Route\[\] = \[parents, parentCase/);
 
   const main = read('src/main.ts');
   assert.match(main, /routes as masterRoutes/);

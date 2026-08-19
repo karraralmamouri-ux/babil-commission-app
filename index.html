@@ -2426,31 +2426,21 @@ function fdtZoneSelect(code){
  return `<select class="select" id="${id}"><option value="">— اختر —</option>`+
   `<option value="old">قديمة (بالوكيل)</option><option value="new">جديدة (بالكابينة)</option></select>`}
 
-async function submitFdt(code){
- const sel=document.getElementById("fdtzone-"+encodeURIComponent(code));
- const zone=sel?sel.value:"";
- if(!zone){alert("اختر المنطقة أولاً. لا تُشتق من رقم الكابينة.");return}
- if(!confirm(`تسجيل الكابينة ${code} في المنطقة ${zone==="new"?"الجديدة":"القديمة"}؟`))return;
- try{
-  await sbRequest("/rest/v1/rpc/register_fdt",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({p_code:code,p_zone:zone,p_request_id:createRequestId()})});
-  toast("سُجِّلت الكابينة — يلزم إعادة حساب الدورة");loadUnregisteredFdts()}
- catch(error){alert(error?.message||"تعذّر التسجيل")}}
+/* انتقلت إلى شاشة الكابينات.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function submitFdt(){
+ toast("انتقلت هذه العملية إلى شاشة الكابينات");
+ location.hash = "#/master/fdts/unknown";
+}
 
-async function submitFdtBulk(){
- const box=document.getElementById("fdtBulkInput");if(!box)return;
- const rows=box.value.split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{
-  const [code,zone]=l.split(",").map(s=>(s||"").trim());return {code,zone}});
- if(!rows.length){alert("لا أسطر");return}
- const bad=rows.filter(r=>!r.code||!["old","new"].includes(r.zone));
- if(bad.length){alert(`${bad.length} سطراً بلا منطقة صالحة. المنطقة إما old أو new.`);return}
- if(!confirm(`تسجيل ${rows.length} كابينة؟`))return;
- try{
-  const res=await sbRequest("/rest/v1/rpc/register_fdt_bulk",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({p_rows:rows,p_request_id:createRequestId()})});
-  toast(`سُجِّلت ${res?.registered??0} · أُعيد تصنيف ${res?.reclassified??0}`);
-  box.value="";loadUnregisteredFdts()}
- catch(error){alert(error?.message||"تعذّر التسجيل الجماعي")}}
+/* انتقلت إلى شاشة الكابينات.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function submitFdtBulk(){
+ toast("انتقلت هذه العملية إلى شاشة الكابينات");
+ location.hash = "#/master/fdts/unknown";
+}
 
 async function recalcAfterFdt(){
  const sel=document.getElementById("fdtCycleSelect");
@@ -2819,14 +2809,12 @@ function openInstallationInvoiceAudit(id){
    </div>
    <div class="muted" style="font-size:10px;margin-top:8px">الاعتماد لا يعني الصرف. الصرف عملية منفصلة ولا تتم إلا بعد اعتماد الفاتورة.</div>`);
 }
-async function submitInstallationInvoiceAudit(id,status){
- const note=document.getElementById('installationInvoiceNote')?.value||'';
- if(status==='rejected'&&!note.trim()){toast('اذكر سبب الرفض');return}
- try{
-   await sbRequest('/rest/v1/rpc/audit_installation_invoice',{method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({p_entitlement_id:id,p_status:status,p_note:note||null,p_request_id:createRequestId()})});
-   closeModal();await refreshInstallation(true);toast('تم تسجيل نتيجة تدقيق الفاتورة');
- }catch(error){console.error(error);toast(`تعذر حفظ التدقيق: ${error?.message||''}`)}
+/* انتقلت إلى مراجعة الفواتير.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function submitInstallationInvoiceAudit(){
+ toast("انتقلت هذه العملية إلى مراجعة الفواتير");
+ location.hash = "#/installation/invoices";
 }
 async function payInstallationEntitlement(id){
  const row=installationRowById(id);if(!row)return;
