@@ -8,6 +8,7 @@
 
 import { Router, readLocation, type Route } from './app/router';
 import { renderNav, renderBreadcrumbs } from './app/shell';
+import { mountSearch } from './app/search';
 import { can } from './services/api';
 import { errorState, forbidden, empty } from './components/ui';
 
@@ -70,6 +71,11 @@ function boot(): void {
   });
 
   renderNav(navHost, can);
+
+  // البحث يعيش في الترويسة القديمة؛ إن غابت مضى التطبيق بلا بحث لا بخطأ.
+  const searchHost = document.getElementById('appSearch');
+  if (searchHost) mountSearch(searchHost);
+
   router.start();
 
   // إعادة الرسم بعد وصول الصلاحيات من الخادم: الشريط يُبنى قبلها فارغاً.

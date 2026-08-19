@@ -1,0 +1,91 @@
+/* البحث الشامل في الترويسة.
+   الذهب هنا للتركيز وحده — إطارُ الحقل النشط — لا زينةً على الصفّ. */
+
+.wh-search { flex: 0 1 340px; min-width: 180px; }
+
+.omni { position: relative; }
+
+.omni-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+.omni-input::placeholder { color: var(--muted); }
+.omni-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-100);
+}
+
+.omni-results {
+  position: absolute;
+  inset-inline-start: 0;
+  inset-inline-end: 0;
+  top: calc(100% + 6px);
+  z-index: 60;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(11, 25, 48, .14);
+}
+
+.omni-note { padding: 12px; font-size: 12px; color: var(--muted); }
+
+.omni-row {
+  display: grid;
+  grid-template-columns: 58px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  color: var(--text);
+}
+.omni-row:last-child { border-bottom: 0; }
+.omni-row:hover,
+.omni-row:focus-visible {
+  background: var(--surface-sunken);
+  outline: none;
+}
+
+.omni-kind {
+  font-size: 10px;
+  color: var(--navy);
+  background: var(--surface-sunken);
+  border-radius: 999px;
+  padding: 2px 8px;
+  text-align: center;
+}
+
+/* المعرّفات تُقرأ حرفاً بحرف، فلا تُقتطع في المنتصف بلا إشارة. */
+.omni-title {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  unicode-bidi: isolate;
+}
+
+.omni-sub {
+  font-size: 10px;
+  color: var(--muted);
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  unicode-bidi: isolate;
+}
+
+@media (max-width: 900px) {
+  .wh-search { flex-basis: 100%; order: 10; }
+  .omni-sub { display: none; }
+}
