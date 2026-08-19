@@ -27,10 +27,10 @@ export const batches: Route = {
   capability: 'payment.view',
   title: 'دفعات الصرف',
   breadcrumb: () => [{ label: 'الرئيسية', href: href('/') }, { label: 'المالية' }, { label: 'دفعات الصرف' }],
-  async render(outlet, m) {
+  async render(view, m) {
     const limit = 50;
     const offset = Number(m.query.get('offset') || 0);
-    outlet.innerHTML = loading('جارٍ تحميل الدفعات…');
+    view.write(loading('جارٍ تحميل الدفعات…'));
 
     const rows = await rpc<Row[]>('list_payment_batches', { p_limit: limit, p_offset: offset });
     const page = toPage(rows as never, limit, offset);
@@ -45,11 +45,11 @@ export const batches: Route = {
       { key: 'go', label: '', cell: (r) => `<a class="smallbtn" href="${esc(href(`/finance/payment-batches/${str(r, 'id')}`))}">فتح</a>` },
     ];
 
-    outlet.innerHTML = pageHeader('دفعات الصرف', 'الترحيل بيد الخادم — الشاشة تعرض قراره')
+    view.write(pageHeader('دفعات الصرف', 'الترحيل بيد الخادم — الشاشة تعرض قراره')
       + (page.rows.length
         ? table(columns, page.rows as Row[])
         : empty('لا دفعات', 'تُجهَّز الدفعة من دورة معتمدة'))
-      + pager(page.total, limit, offset, '/finance/payment-batches', m.query);
+      + pager(page.total, limit, offset, '/finance/payment-batches', m.query));
   },
 };
 
@@ -63,16 +63,16 @@ export const batchDetail: Route = {
     { label: 'دفعات الصرف', href: href('/finance/payment-batches') },
     { label: 'دفعة' },
   ],
-  async render(outlet, m) {
+  async render(view, m) {
     const id = m.params['id'] as string;
-    outlet.innerHTML = loading();
+    view.write(loading());
 
     const [batchRows, items] = await Promise.all([
       select<Row[]>(`commission_payment_batches?select=*&id=eq.${encodeURIComponent(id)}`),
       select<Row[]>(`commission_payment_batch_items?select=*&batch_id=eq.${encodeURIComponent(id)}&order=amount.desc`),
     ]);
     const batch = (batchRows || [])[0];
-    if (!batch) { outlet.innerHTML = empty('الدفعة غير موجودة'); return; }
+    if (!batch) { view.write(empty('الدفعة غير موجودة')); return; }
 
     const lines = items || [];
     const blocked = lines.filter((l) => str(l, 'status') === 'BLOCKED');
@@ -91,7 +91,7 @@ export const batchDetail: Route = {
       { key: 'reason', label: 'سبب الرفض', cell: (r) => esc(str(r, 'blocked_reason') || '—') },
     ];
 
-    outlet.innerHTML = pageHeader(str(batch, 'name') || 'دفعة',
+    view.write(pageHeader(str(batch, 'name') || 'دفعة',
       `${esc(str(batch, 'payment_reference') || 'بلا مرجع')}`,
       chip(str(batch, 'status'), BATCH_TONE[str(batch, 'status')] || 'neutral'))
       + kpiRow([
@@ -105,7 +105,7 @@ export const batchDetail: Route = {
             <b>${count(blocked.length)} سطراً مرفوضاً</b>
             <small>الخادم رفضها عند التحقّق. لا يُرحَّل سطر مرفوض مهما ظهر في الشاشة.</small></span></div>`
         : '')
-      + (lines.length ? table(columns, lines) : empty('لا سطور في هذه الدفعة'));
+      + (lines.length ? table(columns, lines) : empty('لا سطور في هذه الدفعة')));
   },
 };
 

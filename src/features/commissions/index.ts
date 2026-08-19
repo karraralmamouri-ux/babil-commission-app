@@ -5,7 +5,7 @@
  * حسبه المحرّك المعتمد.
  */
 
-import type { Route, RouteMatch } from '../../app/router';
+import type { Route, RouteMatch, View } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, select, toPage, can } from '../../services/api';
 import { money, count } from '../../domain/money';
@@ -54,24 +54,24 @@ export const overview: Route = {
   capability: 'commission.view',
   title: 'عمولات الوكلاء',
   breadcrumb: () => [{ label: 'الرئيسية', href: href('/') }, { label: 'عمولات الوكلاء' }],
-  async render(outlet) {
-    outlet.innerHTML = loading('جارٍ تحميل الدورات…');
+  async render(view) {
+    view.write(loading('جارٍ تحميل الدورات…'));
     const list = await cycles();
-    if (!list.length) { outlet.innerHTML = empty('لا توجد دورات عمولة بعد'); return; }
+    if (!list.length) { view.write(empty('لا توجد دورات عمولة بعد')); return; }
     const current = list[0] as Cycle;
     const detail = await rpc<Record<string, unknown>>('report_commission_cycle_detail', { p_cycle_id: current.id })
       .catch(() => null);
     const totals = (detail?.['totals'] || {}) as Record<string, number>;
     const projected = isProjected(current.status);
 
-    outlet.innerHTML = pageHeader('عمولات الوكلاء', 'الدورة الأحدث ومدخل إلى الدورات السابقة')
+    view.write(pageHeader('عمولات الوكلاء', 'الدورة الأحدث ومدخل إلى الدورات السابقة')
       + kpiRow([
         { label: 'الإجمالي المحسوب', value: money(totals['gross'] ?? null) + (projected ? ' ' + projectedTag() : ''), tone: 'primary', sub: current.name, link: href(`/commissions/cycles/${current.id}`) },
         { label: 'أساس الشريحة — مشتركون فريدون', value: count(totals['unique_activated_subscribers'] ?? null), tone: 'blue', link: href(`/commissions/cycles/${current.id}/scopes`) },
         { label: 'الأحداث المؤهَّلة', value: count(totals['qualifying_events'] ?? null), tone: 'green', link: href(`/commissions/cycles/${current.id}/events`) },
         { label: 'النطاقات', value: count(totals['scopes'] ?? null), tone: 'gold', link: href(`/commissions/cycles/${current.id}/scopes`) },
       ])
-      + `<div class="box"><h3>الدورات</h3>${table<Cycle>(cycleColumns(), list, (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`)}</div>`;
+      + `<div class="box"><h3>الدورات</h3>${table<Cycle>(cycleColumns(), list, (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`)}</div>`);
   },
 };
 
@@ -89,11 +89,11 @@ export const cycleList: Route = {
   capability: 'commission.view',
   title: 'دورات العمولة',
   breadcrumb: () => [{ label: 'الرئيسية', href: href('/') }, { label: 'عمولات الوكلاء', href: href('/commissions') }, { label: 'الدورات' }],
-  async render(outlet) {
-    outlet.innerHTML = loading();
+  async render(view) {
+    view.write(loading());
     const list = await cycles();
-    outlet.innerHTML = pageHeader('دورات العمولة', `${list.length} دورة`)
-      + (list.length ? table<Cycle>(cycleColumns(), list, (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`) : empty('لا دورات'));
+    view.write(pageHeader('دورات العمولة', `${list.length} دورة`)
+      + (list.length ? table<Cycle>(cycleColumns(), list, (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`) : empty('لا دورات')));
   },
 };
 
@@ -119,7 +119,7 @@ export const cycleDetail: Route = {
     { label: 'الدورات', href: href('/commissions/cycles') },
     { label: m.params['id'] ? 'الدورة' : '—' },
   ],
-  async render(outlet, m) { await renderCycle(outlet, m, m.query.get('tab') || 'overview'); },
+  async render(view, m) { await renderCycle(view, m, m.query.get('tab') || 'overview'); },
 };
 
 export const cycleTab: Route = {
@@ -132,16 +132,16 @@ export const cycleTab: Route = {
     { label: 'الدورات', href: href('/commissions/cycles') },
     { label: CYCLE_TABS.find((t) => t.key === m.params['tab'])?.label || 'الدورة' },
   ],
-  async render(outlet, m) { await renderCycle(outlet, m, m.params['tab'] || 'overview'); },
+  async render(view, m) { await renderCycle(view, m, m.params['tab'] || 'overview'); },
 };
 
-async function renderCycle(outlet: HTMLElement, m: RouteMatch, tab: string): Promise<void> {
+async function renderCycle(view: View, m: RouteMatch, tab: string): Promise<void> {
   const id = m.params['id'] as string;
-  outlet.innerHTML = loading('جارٍ تحميل الدورة…');
+  view.write(loading('جارٍ تحميل الدورة…'));
 
   const list = await cycles();
   const cycle = list.find((c) => c.id === id);
-  if (!cycle) { outlet.innerHTML = empty('الدورة غير موجودة', 'قد تكون أُغلقت أو حُذف رابطها'); return; }
+  if (!cycle) { view.write(empty('الدورة غير موجودة', 'قد تكون أُغلقت أو حُذف رابطها')); return; }
 
   const detail = await rpc<Record<string, unknown>>('report_commission_cycle_detail', { p_cycle_id: id }).catch(() => null);
   const totals = (detail?.['totals'] || {}) as Record<string, number>;
@@ -150,7 +150,7 @@ async function renderCycle(outlet: HTMLElement, m: RouteMatch, tab: string): Pro
   const tabs = CYCLE_TABS.map((t) =>
     `<a class="tab${t.key === tab ? ' active' : ''}" href="${esc(href(`/commissions/cycles/${id}/${t.key}`))}">${esc(t.label)}</a>`).join('');
 
-  outlet.innerHTML = pageHeader(cycle.name,
+  view.write(pageHeader(cycle.name,
     `${cycle.period_start} → ${cycle.period_end}`,
     `${chip(statusLabel(cycle.status), statusTone(cycle.status))}${projected ? ' ' + projectedTag() : ''}`)
     + kpiRow([
@@ -159,21 +159,21 @@ async function renderCycle(outlet: HTMLElement, m: RouteMatch, tab: string): Pro
       { label: 'الأحداث المؤهَّلة', value: count(totals['qualifying_events'] ?? null), sub: 'ليست أساس الشريحة', tone: 'green' },
       { label: 'النطاقات', value: count(totals['scopes'] ?? null), tone: 'gold' },
     ])
-    + `<div class="tabs">${tabs}</div><div class="panel active" id="cycleTabBody">${loading()}</div>`;
+    + `<div class="tabs">${tabs}</div><div class="panel active" id="cycleTabBody">${loading()}</div>`);
 
-  const body = outlet.querySelector<HTMLElement>('#cycleTabBody');
+  const body = view.el.querySelector<HTMLElement>('#cycleTabBody');
   if (!body) return;
   try {
-    await renderCycleTab(body, id, tab, m);
+    await renderCycleTab(view, id, tab, m);
   } catch (error) {
-    body.innerHTML = errorState(error instanceof Error ? error.message : 'خطأ غير متوقّع');
+    view.writeInto('#cycleTabBody', errorState(error instanceof Error ? error.message : 'خطأ غير متوقّع'));
   }
 }
 
-async function renderCycleTab(body: HTMLElement, id: string, tab: string, m: RouteMatch): Promise<void> {
+async function renderCycleTab(view: View, id: string, tab: string, m: RouteMatch): Promise<void> {
   if (tab === 'scopes') {
     const rows = (await select<Snapshot[]>(`commission_cycle_snapshots?select=*&cycle_id=eq.${encodeURIComponent(id)}&order=gross_commission.desc`)) || [];
-    body.innerHTML = rows.length ? scopeTable(rows) : empty('لا نطاقات محسوبة في هذه الدورة');
+    view.writeInto('#cycleTabBody', rows.length ? scopeTable(rows) : empty('لا نطاقات محسوبة في هذه الدورة'));
     return;
   }
 
@@ -185,10 +185,10 @@ async function renderCycleTab(body: HTMLElement, id: string, tab: string, m: Rou
       p_limit: limit, p_offset: offset,
     });
     const page = toPage(rows as never, limit, offset);
-    body.innerHTML = (page.rows.length
+    view.writeInto('#cycleTabBody', (page.rows.length
       ? table(eventColumns(), page.rows as Array<Record<string, unknown>>)
       : empty('لا أحداث مؤهَّلة'))
-      + pager(page.total, limit, offset, `/commissions/cycles/${id}/events`, m.query);
+      + pager(page.total, limit, offset, `/commissions/cycles/${id}/events`, m.query));
     return;
   }
 
@@ -199,33 +199,33 @@ async function renderCycleTab(body: HTMLElement, id: string, tab: string, m: Rou
       p_cycle_id: id, p_limit: limit, p_offset: offset,
     });
     const page = toPage(rows as never, limit, offset);
-    body.innerHTML = `<p class="muted" style="font-size:11px">الاستثناء يُحسم في شاشته، ثم تُعاد حسبة الدورة.</p>`
+    view.writeInto('#cycleTabBody', `<p class="muted" style="font-size:11px">الاستثناء يُحسم في شاشته، ثم تُعاد حسبة الدورة.</p>`
       + (page.rows.length ? table(exceptionColumns(), page.rows as Array<Record<string, unknown>>) : empty('لا استثناءات مفتوحة'))
-      + pager(page.total, limit, offset, `/commissions/cycles/${id}/exceptions`, m.query);
+      + pager(page.total, limit, offset, `/commissions/cycles/${id}/exceptions`, m.query));
     return;
   }
 
   if (tab === 'review') {
     const blockers = await rpc<Array<Record<string, unknown>>>('commission_finalization_blockers', { p_cycle_id: id });
     if (!blockers || !blockers.length) {
-      body.innerHTML = `<div class="insight good"><span class="insight-dot"></span><span>
-        <b>لا مانع من الاعتماد</b><small>لا استثناء حاجب مفتوح في هذه الدورة.</small></span></div>`;
+      view.writeInto('#cycleTabBody', `<div class="insight good"><span class="insight-dot"></span><span>
+        <b>لا مانع من الاعتماد</b><small>لا استثناء حاجب مفتوح في هذه الدورة.</small></span></div>`);
       return;
     }
     const total = blockers.reduce((a, b) => a + Number(b['indicative_amount'] || 0), 0);
-    body.innerHTML = `<div class="insight danger" style="margin-bottom:12px"><span class="insight-dot"></span><span>
+    view.writeInto('#cycleTabBody', `<div class="insight danger" style="margin-bottom:12px"><span class="insight-dot"></span><span>
         <b>الاعتماد محجوب</b>
         <small>${blockers.length} سبباً · أثر مؤشِّر ${money(total)}. تُحسم الأسباب ثم يُعاد الحساب.</small></span></div>`
-      + table(blockerColumns(), blockers);
+      + table(blockerColumns(), blockers));
     return;
   }
 
   if (tab === 'payout') {
     const rows = (await select<Snapshot[]>(`commission_cycle_snapshots?select=*&cycle_id=eq.${encodeURIComponent(id)}&order=gross_commission.desc`)) || [];
-    body.innerHTML = `<div class="insight warn" style="margin-bottom:12px"><span class="insight-dot"></span><span>
+    view.writeInto('#cycleTabBody', `<div class="insight warn" style="margin-bottom:12px"><span class="insight-dot"></span><span>
         <b>الصرف يتبع الاعتماد</b>
         <small>لا نطاق يصير قابلاً للدفع قبل اعتماد الدورة. الخادم يُعيد التحقّق عند الترحيل مهما أظهرت الشاشة.</small></span></div>`
-      + (rows.length ? table(payoutColumns(), rows) : empty('لا نطاقات'));
+      + (rows.length ? table(payoutColumns(), rows) : empty('لا نطاقات')));
     return;
   }
 
@@ -233,15 +233,15 @@ async function renderCycleTab(body: HTMLElement, id: string, tab: string, m: Rou
     const rows = await rpc<Array<Record<string, unknown>>>('list_audit_events', {
       p_action_prefix: 'commission.', p_limit: 50, p_offset: 0,
     }).catch(() => null);
-    body.innerHTML = rows && rows.length ? table(auditColumns(), rows) : empty('لا سجلّات تدقيق');
+    view.writeInto('#cycleTabBody', rows && rows.length ? table(auditColumns(), rows) : empty('لا سجلّات تدقيق'));
     return;
   }
 
   // overview
   const zones = (detailZones(await rpc<Record<string, unknown>>('report_commission_cycle_detail', { p_cycle_id: id }).catch(() => null)));
-  body.innerHTML = zones.length
+  view.writeInto('#cycleTabBody', zones.length
     ? `<div class="box"><h3>حسب المنطقة</h3>${table(zoneColumns(), zones)}</div>`
-    : empty('لا تفصيل متاح');
+    : empty('لا تفصيل متاح'));
 }
 
 function detailZones(detail: Record<string, unknown> | null): Array<Record<string, unknown>> {
@@ -348,8 +348,8 @@ export const agentList: Route = {
   capability: 'commission.view',
   title: 'الوكلاء',
   breadcrumb: () => [{ label: 'الرئيسية', href: href('/') }, { label: 'عمولات الوكلاء', href: href('/commissions') }, { label: 'الوكلاء' }],
-  async render(outlet) {
-    outlet.innerHTML = loading('جارٍ تحميل الوكلاء…');
+  async render(view) {
+    view.write(loading('جارٍ تحميل الوكلاء…'));
     const rows = await rpc<Array<Record<string, unknown>>>('list_agents_financial', {});
     const columns: Array<Column<Record<string, unknown>>> = [
       { key: 'name', label: 'الوكيل', cell: (r) => `<b>${esc(r['official_name'])}</b>
@@ -361,8 +361,8 @@ export const agentList: Route = {
       { key: 'inst', label: 'مشتركو التنصيب', cell: (r) => count(num(r, 'installation_subscribers')), numeric: true },
       { key: 'go', label: '', cell: (r) => `<a class="smallbtn" href="${esc(href(`/commissions/agents/${r['agent_id']}`))}">فتح</a>` },
     ];
-    outlet.innerHTML = pageHeader('الوكلاء', `${(rows || []).length} وكيلاً`)
-      + (rows && rows.length ? table(columns, rows) : empty('لا وكلاء'));
+    view.write(pageHeader('الوكلاء', `${(rows || []).length} وكيلاً`)
+      + (rows && rows.length ? table(columns, rows) : empty('لا وكلاء')));
   },
 };
 
@@ -376,11 +376,11 @@ export const agentDetail: Route = {
     { label: 'الوكلاء', href: href('/commissions/agents') },
     { label: 'الملفّ المالي' },
   ],
-  async render(outlet, m) {
+  async render(view, m) {
     const id = m.params['id'] as string;
-    outlet.innerHTML = loading('جارٍ تحميل ملفّ الوكيل…');
+    view.write(loading('جارٍ تحميل ملفّ الوكيل…'));
     const profile = await rpc<Record<string, unknown>>('agent_financial_profile', { p_agent_id: id });
-    if (!profile) { outlet.innerHTML = empty('الوكيل غير موجود'); return; }
+    if (!profile) { view.write(empty('الوكيل غير موجود')); return; }
 
     const agent = (profile['agent'] || {}) as Record<string, unknown>;
     const inst = (profile['installation'] || {}) as Record<string, unknown>;
@@ -391,7 +391,7 @@ export const agentDetail: Route = {
     const calc = cycleRows.reduce((a, c) => a + Number(c['gross_commission'] || 0), 0);
     const stages = (inst['stage_distribution'] || {}) as Record<string, number>;
 
-    outlet.innerHTML = pageHeader(String(agent['name'] || agent['code'] || 'وكيل'),
+    view.innerHTML = pageHeader(String(agent['name'] || agent['code'] || 'وكيل'),
       `${esc(String(agent['code'] || ''))} · ${chip(String(agent['status'] || '—'), 'neutral')}`)
       + kpiRow([
         { label: 'عمولة محسوبة', value: money(calc), tone: 'primary' },
@@ -430,10 +430,10 @@ export const exceptionsQueue: Route = {
   capability: 'commission.view',
   title: 'الاستثناءات',
   breadcrumb: () => [{ label: 'الرئيسية', href: href('/') }, { label: 'الاستثناءات' }],
-  async render(outlet, m) {
+  async render(view, m) {
     const limit = 50;
     const offset = Number(m.query.get('offset') || 0);
-    outlet.innerHTML = loading('جارٍ تحميل الطابور…');
+    view.innerHTML = loading('جارٍ تحميل الطابور…');
 
     const args: Record<string, unknown> = { p_limit: limit, p_offset: offset };
     if (m.query.get('reason')) args['p_reason'] = m.query.get('reason');
@@ -445,7 +445,7 @@ export const exceptionsQueue: Route = {
     const impact = (page.rows as Array<Record<string, unknown>>)
       .reduce((a, r) => a + Number(r['indicative_amount'] || 0), 0);
 
-    outlet.innerHTML = pageHeader('الاستثناءات', 'طابور عمل — لكل صفّ جهةٌ وإجراءٌ وشاشةُ حسم')
+    view.innerHTML = pageHeader('الاستثناءات', 'طابور عمل — لكل صفّ جهةٌ وإجراءٌ وشاشةُ حسم')
       + filterBar([
         { key: 'search', label: 'بحث', type: 'search' },
         { key: 'reason', label: 'الأسباب', type: 'select', options: [
@@ -462,7 +462,7 @@ export const exceptionsQueue: Route = {
       + (page.rows.length ? table(exceptionColumns(), page.rows as Array<Record<string, unknown>>) : empty('لا استثناءات مطابقة'))
       + pager(page.total, limit, offset, '/exceptions', m.query);
 
-    wireFilters(outlet);
+    wireFilters(view.el);
   },
 };
 

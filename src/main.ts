@@ -20,9 +20,9 @@ const legacyRoute: Route = {
   pattern: '/legacy',
   title: 'مساحة العمل السابقة',
   breadcrumb: () => [{ label: 'الرئيسية', href: '#/' }, { label: 'مساحة العمل السابقة' }],
-  render(outlet) {
+  render(view) {
     // الشاشات التي لم تُهاجَر بعد تبقى تعمل كما هي، ولا تُحذف قبل بديلها.
-    outlet.innerHTML = '';
+    view.write('');
     document.body.classList.add('legacy-visible');
   },
 };

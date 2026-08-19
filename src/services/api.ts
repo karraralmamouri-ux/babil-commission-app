@@ -92,8 +92,11 @@ export interface Page<T> {
 }
 
 /**
- * كل قائمة خادمية تُعيد total_count مكرَّراً في كل صفّ. يُستخرج مرة، ويبقى
- * صفر حين لا صفوف — وهذا صحيح: مجموعة فارغة إجماليها صفر.
+ * العقد القديم: الإجمالي محمولٌ في كل صفّ.
+ *
+ * يبقى للنداءات التي لم تنتقل بعد، وعيبه معروف ومُوثَّق: حين تقع الإزاحة خارج
+ * المدى لا تعود صفوف، فيختفي الإجمالي معها. لذلك انتقلت القوائم الكبيرة إلى
+ * الصدفة أدناه.
  */
 export function toPage<T extends { total_count?: number | string }>(
   rows: T[] | null,
@@ -104,4 +107,46 @@ export function toPage<T extends { total_count?: number | string }>(
   const first = list[0];
   const total = first && first.total_count !== undefined ? Number(first.total_count) : list.length;
   return { rows: list, total: Number.isFinite(total) ? total : list.length, limit, offset };
+}
+
+/**
+ * صدفة الصفحة — العقد الصحيح.
+ *
+ * الإجمالي منفصل عن الصفوف، فلا تُخفيه صفحةٌ فارغة. صفحةٌ خارج المدى تُعيد
+ * صفوفاً صفراً وإجمالياً صادقاً و`outOfRange` صريحة — بدل أن تُقرأ 22,727
+ * صفراً لأن الإزاحة تجاوزت النهاية.
+ */
+export interface Envelope<T> {
+  rows: T[];
+  total: number;
+  limit: number;
+  offset: number;
+  returned: number;
+  outOfRange: boolean;
+}
+
+export function envelope<T>(raw: unknown): Envelope<T> {
+  const o = (raw || {}) as Record<string, unknown>;
+  const rows = Array.isArray(o['rows']) ? (o['rows'] as T[]) : [];
+  const n = (v: unknown, d: number) => (Number.isFinite(Number(v)) ? Number(v) : d);
+  return {
+    rows,
+    total: n(o['total'], rows.length),
+    limit: n(o['limit'], rows.length),
+    offset: n(o['offset'], 0),
+    returned: n(o['returned'], rows.length),
+    outOfRange: Boolean(o['out_of_range']),
+  };
+}
+
+/** يُستدعى مع إشارة الإلغاء، فالطلب يُهمَل حين يغادر المستخدم الشاشة. */
+export async function pageRpc<T>(
+  name: string,
+  args: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<Envelope<T>> {
+  if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
+  const raw = await rpc<unknown>(name, args);
+  if (signal?.aborted) throw new DOMException('aborted', 'AbortError');
+  return envelope<T>(raw);
 }
