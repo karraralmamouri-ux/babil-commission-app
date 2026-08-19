@@ -11,7 +11,7 @@ import { rpc, toPage, pageRpc } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { transferPanel, wireTransfer } from '../ownership/transfer';
 import { classificationPanel } from './classification';
-import { routes as holdRoutes } from './holds';
+import { routes as holdRoutes, holdPanel, wireHoldPanel } from './holds';
 import { routes as payoutRoutes } from './payout';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
@@ -216,6 +216,7 @@ export const subscriberCase: Route = {
 
     // مفتاح المشترك هو ما تعرفه أحداث SaaS، وهو صغير الأحرف.
     if (tab === 'ownership') await wireTransfer(view, id.toLowerCase().trim());
+    if (tab === 'holds') wireHoldPanel(view);
 
     if (tab === 'history') {
       const host = view.el.querySelector<HTMLElement>('#timelineHost');
@@ -287,12 +288,14 @@ function renderCaseTab(doc: Row, tab: string, id: string): string {
 
   if (tab === 'holds') {
     const rows = list('holds');
-    return rows.length ? table([
+    const listed = rows.length ? table([
       { key: 'reason', label: 'السبب', cell: (r) => esc(str(r, 'reason')) },
       { key: 'stage', label: 'المرحلة', cell: (r) => esc(str(r, 'stage') || '—') },
       { key: 'status', label: 'الحالة', cell: (r) => str(r, 'status') === 'ACTIVE' ? chip('فعّال', 'critical') : chip('مُفرَج', 'success') },
       { key: 'note', label: 'ملاحظة', cell: (r) => esc(str(r, 'note') || '—') },
     ] as Array<Column<Row>>, rows) : empty('لا إيقافات');
+    // القائمة أوّلاً ثم لوحة التعليق: يُقرأ القائم قبل أن يُضاف إليه.
+    return listed + holdPanel(id);
   }
 
   if (tab === 'activations' || tab === 'history' || tab === 'audit') {

@@ -355,4 +355,90 @@ function insight(tone: 'good' | 'warn' | 'danger', title: string, detail = ''): 
     <b>${esc(title)}</b>${detail ? `<small>${esc(detail)}</small>` : ''}</span></div>`;
 }
 
+/* ---- تعليق مشترك واحد من ملفّه ------------------------------------------- */
+
+/**
+ * اللوحة تُدرَج في تبويب «الإيقافات» داخل ملفّ المشترك.
+ *
+ * القواعد نفسها التي تحكم الرفع بالجملة، لأن الطريقين يُنتجان الأثر نفسه:
+ * منعُ الصرف. اختلافُ الشاشتين لا يبرّر اختلاف الشروط.
+ */
+export function holdPanel(subscriberId: string): string {
+  if (!can('installation.hold')) {
+    return `<div class="box" style="margin-top:12px">
+      <p class="muted">تحتاج صلاحية <code>installation.hold</code> لتعليق الصرف.</p></div>`;
+  }
+  return `<div class="box" style="margin-top:12px" id="holdBox"
+      data-subscriber="${esc(subscriberId)}">
+    <h3>تعليق الصرف</h3>
+    <p class="muted" style="font-size:11px;margin:0 0 10px">
+      يمنع دخول أيّ استحقاق غير مدفوع في دفعة. لا يمسّ ما دُفع.</p>
+    <div class="toolbar">
+      <select class="select" id="hpPermanence" aria-label="نوع الحجب">
+        <option value="PERMANENT">دائم — لا ينتهي تلقائياً</option>
+        <option value="TEMPORARY">مؤقّت — ينتهي بتاريخ</option>
+      </select>
+      <input class="search" type="datetime-local" id="hpUntil"
+        aria-label="ينتهي في" style="display:none">
+      <input class="search" id="hpReason" placeholder="سبب الحجب (إلزامي)"
+        aria-label="سبب الحجب">
+      <button class="btn gold" id="hpApply">علّق</button>
+    </div>
+    <div id="hpResult"></div>
+  </div>`;
+}
+
+export function wireHoldPanel(view: View): void {
+  const box = view.el.querySelector<HTMLElement>('#holdBox');
+  if (!box) return;
+  const subscriberId = box.dataset['subscriber'] || '';
+  const permanence = box.querySelector<HTMLSelectElement>('#hpPermanence');
+  const until = box.querySelector<HTMLInputElement>('#hpUntil');
+  const reason = box.querySelector<HTMLInputElement>('#hpReason');
+  const apply = box.querySelector<HTMLButtonElement>('#hpApply');
+  const out = box.querySelector<HTMLElement>('#hpResult');
+  if (!permanence || !until || !apply || !out) return;
+
+  permanence.addEventListener('change', () => {
+    until.style.display = permanence.value === 'TEMPORARY' ? '' : 'none';
+  });
+
+  apply.addEventListener('click', async () => {
+    const why = reason?.value.trim() || '';
+    if (!why) {
+      out.innerHTML = insight('warn', 'السبب إلزامي', 'يُحفظ مع التعليق ويظهر في التدقيق');
+      return;
+    }
+    if (permanence.value === 'TEMPORARY' && !until.value) {
+      out.innerHTML = insight('warn', 'المؤقّت يحتاج تاريخ انتهاء');
+      return;
+    }
+    apply.disabled = true;
+    out.innerHTML = loading('جارٍ التعليق…');
+    try {
+      const result = await rpc<Row>('place_hold_v2', {
+        p_subscriber_id: subscriberId,
+        p_permanence: permanence.value,
+        p_reason_code: 'MANUAL_REVIEW',
+        p_note: why,
+        p_stage_code: null,
+        p_expires_at: permanence.value === 'TEMPORARY'
+          ? new Date(until.value).toISOString() : null,
+        p_request_id: crypto.randomUUID(),
+      });
+      if (!view.live) return;
+      out.innerHTML = result?.['idempotent'] === true
+        ? insight('good', 'المشترك معلَّق سلفاً', 'لم يُضَف تعليق ثانٍ')
+        : insight('good', 'عُلِّق الصرف', 'لا يدخل أيّ استحقاق غير مدفوع في دفعة.');
+      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1200);
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'لم يُعلَّق',
+        error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      apply.disabled = false;
+    }
+  });
+}
+
 export const routes: Route[] = [holds, bulkHold];

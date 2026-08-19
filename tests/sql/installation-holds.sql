@@ -281,6 +281,46 @@ select pg_temp.ok(
   'والمتبقّي التاريخي لم يُعد كتابته');
 
 -- ---------------------------------------------------------------------------
+-- 6.5 التعليق الفردي — الطريق الثاني، بالقواعد نفسها
+-- ---------------------------------------------------------------------------
+
+select pg_temp.ok(
+  (public.place_hold_v2('hb-sub-1', 'TEMPORARY', 'MANUAL_REVIEW', 'مراجعة فردية',
+     null, now() + interval '10 days', '80000000-0000-0000-0000-00000000ab10')
+   ->> 'idempotent')::boolean = false,
+  'التعليق الفردي يقع');
+
+select pg_temp.ok(
+  (select source from public.installation_holds
+   where request_id = '80000000-0000-0000-0000-00000000ab10') = 'INDIVIDUAL',
+  'ومصدره فردي لا ملف');
+
+select pg_temp.ok(
+  (select permanence from public.installation_holds
+   where request_id = '80000000-0000-0000-0000-00000000ab10') = 'TEMPORARY'
+  and (select expires_at is not null from public.installation_holds
+       where request_id = '80000000-0000-0000-0000-00000000ab10'),
+  'وأجله محفوظ');
+
+-- إعادة الطلب نفسه لا تُعلّق مرّتين.
+select pg_temp.ok(
+  (public.place_hold_v2('hb-sub-1', 'TEMPORARY', 'MANUAL_REVIEW', 'مراجعة فردية',
+     null, now() + interval '10 days', '80000000-0000-0000-0000-00000000ab10')
+   ->> 'idempotent')::boolean = true,
+  'وإعادة الطلب نفسه بلا أثر ثانٍ');
+
+-- والمشترك المجهول يُرفض بدل أن يُنشأ له صفّ.
+select pg_temp.must_fail(
+  'select public.place_hold_v2(''hb-ghost'', ''PERMANENT'', ''MANUAL_REVIEW'',
+     ''سبب'', null, null, gen_random_uuid())',
+  'تعليق مشترك غير معروف مرفوض');
+
+select pg_temp.must_fail(
+  'select public.place_hold_v2(''hb-sub-2'', ''TEMPORARY'', ''MANUAL_REVIEW'',
+     ''سبب'', null, null, gen_random_uuid())',
+  'الفردي المؤقّت بلا أجل مرفوض');
+
+-- ---------------------------------------------------------------------------
 -- 7. الحارس
 -- ---------------------------------------------------------------------------
 
