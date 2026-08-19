@@ -5,7 +5,9 @@
 | | |
 |---|---|
 | Version | `v1.0.0` |
-| Release SHA | `e6a693335a8e87a16a7754f66586a19f3a3565d7` |
+| Tagged commit | `609309cde2cff408e0c71b1aeae1655697ab72ab` |
+| Audited commit | `e6a693335a8e87a16a7754f66586a19f3a3565d7` |
+| Application code | identical between the two — the only commits in between are these release documents, verified by diff |
 | Released | 2026-08-19 |
 | Production | `fbgffpxpskjzgheheikd` · `ACTIVE_HEALTHY` · Postgres 17.6.1.155 |
 | Application | https://karraralmamouri-ux.github.io/babil-commission-app/ |
