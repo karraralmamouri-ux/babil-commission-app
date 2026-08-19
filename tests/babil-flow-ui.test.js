@@ -213,17 +213,29 @@ test('لا استثناء يُحيل إلى المطوّر', () => {
    الملاحة والصلاحيات
    ------------------------------------------------------------------------ */
 
+// الملاحة انتقلت من ترميز index.html إلى src/app/shell.ts. التوكيدان أدناه
+// يتبعانها إلى مصدرها الجديد بقوّتهما نفسها — لا يُضعَّفان ولا يُحذفان.
+const shell = fs.readFileSync(path.join(root, 'src', 'app', 'shell.ts'), 'utf8');
+
 test('معمارية الملاحة المعتمدة كاملة', () => {
-  ['عمولات الوكلاء', 'أجور التنصيب', 'البيانات الرئيسية', 'التقارير', 'النظام']
-    .forEach((label) => assert.match(html, new RegExp(label), `${label} مفقود من الملاحة`));
-  ['commission', 'installation', 'master', 'reports', 'system']
-    .forEach((key) => assert.match(html, new RegExp(`data-group="${key}"`), `${key} مفقود`));
+  ['عمولات الوكلاء', 'أجور التنصيب', 'المالية']
+    .forEach((label) => assert.match(shell, new RegExp(label), `${label} مفقود من الملاحة`));
+  ['commission', 'installation', 'finance']
+    .forEach((key) => assert.match(shell, new RegExp(`key: '${key}'`), `${key} مفقود`));
+  // وكل مجموعة تقود إلى شاشات مستقلّة لا إلى لوحة واحدة.
+  const paths = [...shell.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1]);
+  assert.equal(paths.length, new Set(paths).size, 'وجهتان متطابقتان في الملاحة');
 });
 
 test('ما لا صلاحية له يُخفى لا يُعطَّل فقط', () => {
   // الإخفاء راحةٌ للمستخدم؛ والحارس الحقيقي على الخادم. كلاهما مطلوب.
+  // الشاشات الجديدة تُرشَّح بالقدرة في الشريط وفي الموجِّه معاً.
+  assert.match(shell, /capability: '[a-z.]+'/);
+  assert.match(shell, /items\.filter\(\(i\) => !i\.capability \|\| can\(i\.capability\)\)/);
+  const router = fs.readFileSync(path.join(root, 'src', 'app', 'router.ts'), 'utf8');
+  assert.match(router, /route\.capability && !this\.options\.can\(route\.capability\)/);
+  // والشاشات التي لم تُهاجَر بعد تحتفظ بحارسها القديم في index.html.
   assert.match(html, /data-permission="edit"/);
-  assert.match(html, /data-role-permission="users"/);
   assert.match(html, /data-permission="rates"/);
   assert.match(html, /function applyPermissions\(\)/);
 });

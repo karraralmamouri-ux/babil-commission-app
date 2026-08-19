@@ -1087,3 +1087,37 @@ th[aria-sort="descending"]::after { content: "↓"; opacity: 1; color: var(--gol
   body { background: #fff; }
   .box, .card, .panel { box-shadow: none; border-color: #ccc; break-inside: avoid; }
 }
+
+/* ---------------------------------------------------------------------------
+   22. شاشات التطبيق
+   ------------------------------------------------------------------------ */
+
+/* فتات الخبز تتبع المسار لا تاريخ التصفّح: المستخدم يريد معرفة أين هو، لا
+   كيف وصل. */
+.crumbs {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 11px; color: var(--muted); padding: var(--s3) 0 0;
+}
+.crumbs a { color: var(--info-ink); text-decoration: none; }
+.crumbs a:hover { text-decoration: underline; }
+.crumbs .sep { color: var(--line-strong); }
+.crumbs [aria-current="page"] { color: var(--navy); font-weight: 700; }
+
+/* الشاشات المُهاجَرة يملكها الموجِّه؛ ما تبقّى يظهر تحت /legacy وحده. */
+#legacyWorkspace { display: none; }
+body.legacy-visible #legacyWorkspace { display: block; }
+body.legacy-visible #appOutlet { display: none; }
+
+/* الزرّ المعطَّل في الترقيم رابطٌ بلا وجهة: يُقرأ معطَّلاً ولا يُنقر. */
+.btn.is-disabled {
+  opacity: .45; pointer-events: none; cursor: not-allowed;
+}
+.pager .btn { text-decoration: none; }
+
+/* بطاقة رقم قابلة للفتح: الرقم الذي لا يقود إلى سجلاته رقمٌ ميّت. */
+a.card { transition: border-color .12s, box-shadow .12s; }
+a.card:hover { border-color: var(--gold); box-shadow: var(--shadow-md); }
+a.card .value { text-decoration: none; }
+
+/* صفّ الجدول القابل للفتح */
+tbody tr[onclick]:hover td { background: var(--gold-100); }

@@ -16,12 +16,17 @@
     "reconcile:backup": "node scripts/reconcile-local-backup.mjs",
     "guard:project-ref": "node scripts/assert-project-ref.mjs",
     "guard:staging-ref": "node scripts/assert-staging-project-ref.mjs",
-    "migrate:staging": "npm run guard:staging-ref && npx supabase db push"
+    "migrate:staging": "npm run guard:staging-ref && npx supabase db push",
+    "build": "vite build",
+    "dev": "vite",
+    "typecheck": "tsc --noEmit"
   },
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
-    "supabase": "^2.111.0"
+    "supabase": "^2.111.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6"
   }
 }

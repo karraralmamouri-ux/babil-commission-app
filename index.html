@@ -12,6 +12,7 @@
 <script src="./assets/js/commission-vnext.js"></script>
 <script src="./assets/js/reporting.js"></script>
 <link rel="stylesheet" href="./assets/css/babil-flow.css">
+<script type="module" src="./src/main.ts"></script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -92,67 +93,7 @@
    aria-label="طيّ القائمة الجانبية" title="طيّ القائمة الجانبية">⟨</button>
  </div>
  <div id="centralStatus" class="central-status"><span class="status-dot"></span><span><b>جاري الاتصال</b><small>تحميل البيانات المركزية...</small></span></div>
- <div class="side-section">
-  <nav class="side-nav">
-   <button class="side-btn active" data-nav-target="dashboardSection" onclick="scrollToSection('dashboardSection',this)"><span class="ico" aria-hidden="true">▦</span><span class="txt">الرئيسية</span></button>
-  </nav>
- </div>
-  <div class="side-group" data-group="commission" data-open="true">
-   <button type="button" class="side-group-head" onclick="toggleNavGroup('commission')" aria-expanded="true">
-    <span>عمولات الوكلاء</span><span class="chev" aria-hidden="true">▾</span></button>
-   <nav class="side-nav">
-   <button class="side-btn" data-nav-target="commissionVNextSection" onclick="scrollToSection('commissionVNextSection',this);switchCxTab('cycle')"><span class="ico" aria-hidden="true">◎</span><span class="txt">نظرة عامة</span></button>
-   <button class="side-btn" data-nav-target="agentsSection" onclick="scrollToSection('agentsSection',this)"><span class="ico" aria-hidden="true">♟</span><span class="txt">الوكلاء والكابينات</span></button>
-   <button class="side-btn" onclick="scrollToSection('commissionVNextSection',this);switchCxTab('scopes')"><span class="ico" aria-hidden="true">▤</span><span class="txt">الاستحقاقات</span></button>
-   <button class="side-btn" data-permission="edit" onclick="scrollToSection('executiveSection',this);switchRpTab('payout')"><span class="ico" aria-hidden="true">◈</span><span class="txt">الصرف</span></button>
-   <button class="side-btn" data-role-permission="edit" onclick="openArchiveManager()"><span class="ico" aria-hidden="true">🗄</span><span class="txt">الأرشيف</span></button>
-   </nav>
-  </div>
-  <div class="side-group" data-group="installation" data-open="false">
-   <button type="button" class="side-group-head" onclick="toggleNavGroup('installation')" aria-expanded="false">
-    <span>أجور التنصيب</span><span class="chev" aria-hidden="true">▾</span></button>
-   <nav class="side-nav">
-   <button class="side-btn" data-nav-target="installationSection" onclick="scrollToSection('installationSection',this)"><span class="ico" aria-hidden="true">⚙</span><span class="txt">مركز التحكم</span></button>
-   <button class="side-btn" onclick="scrollToSection('installationSection',this)"><span class="ico" aria-hidden="true">👥</span><span class="txt">المشتركون</span></button>
-   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('queues')"><span class="ico" aria-hidden="true">🗓</span><span class="txt">دورة الشهر</span></button>
-   <button class="side-btn" onclick="scrollToSection('executiveSection',this);switchRpTab('installation')"><span class="ico" aria-hidden="true">⚖</span><span class="txt">المطابقة والتدقيق</span></button>
-   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('queues')"><span class="ico" aria-hidden="true">🧾</span><span class="txt">الفواتير</span></button>
-   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('queues')"><span class="ico" aria-hidden="true">✓</span><span class="txt">جاهز للصرف</span></button>
-   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('queues')"><span class="ico" aria-hidden="true">⏸</span><span class="txt">الموقوفون</span></button>
-   <button class="side-btn" data-permission="edit" onclick="scrollToSection('operationsSection',this);switchOpsTab('queues')"><span class="ico" aria-hidden="true">◈</span><span class="txt">الدفعات</span></button>
-   <button class="side-btn" data-permission="edit" onclick="scrollToSection('operationsSection',this);switchOpsTab('import')"><span class="ico" aria-hidden="true">📥</span><span class="txt">الاستيراد / المزامنة</span></button>
-   </nav>
-  </div>
-  <div class="side-group" data-group="master" data-open="false">
-   <button type="button" class="side-group-head" onclick="toggleNavGroup('master')" aria-expanded="false">
-    <span>البيانات الرئيسية</span><span class="chev" aria-hidden="true">▾</span></button>
-   <nav class="side-nav">
-   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('master')"><span class="ico" aria-hidden="true">♟</span><span class="txt">الوكلاء</span></button>
-   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('master');focusFdtOnboarding()"><span class="ico" aria-hidden="true">▥</span><span class="txt">الكابينات FDT</span></button>
-   <button class="side-btn" data-permission="rates" onclick="scrollToSection('operationsSection',this);switchOpsTab('schemes')"><span class="ico" aria-hidden="true">⚖</span><span class="txt">الباقات والإعدادات</span></button>
-   </nav>
-  </div>
-  <div class="side-group" data-group="reports" data-open="false">
-   <button type="button" class="side-group-head" onclick="toggleNavGroup('reports')" aria-expanded="false">
-    <span>التقارير</span><span class="chev" aria-hidden="true">▾</span></button>
-   <nav class="side-nav">
-   <button class="side-btn" data-nav-target="executiveSection" onclick="scrollToSection('executiveSection',this)"><span class="ico" aria-hidden="true">▦</span><span class="txt">مركز التقارير</span></button>
-   <button class="side-btn" onclick="exportAll()"><span class="ico" aria-hidden="true">⇩</span><span class="txt">تصدير تقرير العمولات</span></button>
-   <button class="side-btn" onclick="exportExcelReport()"><span class="ico" aria-hidden="true">▤</span><span class="txt">تقرير Excel متكامل</span></button>
-   <button class="side-btn" onclick="scrollToSection('comparisonSection',this)"><span class="ico" aria-hidden="true">↕</span><span class="txt">مقارنة الأشهر</span></button>
-   </nav>
-  </div>
-  <div class="side-group" data-group="system" data-open="false">
-   <button type="button" class="side-group-head" onclick="toggleNavGroup('system')" aria-expanded="false">
-    <span>النظام</span><span class="chev" aria-hidden="true">▾</span></button>
-   <nav class="side-nav">
-   <button class="side-btn" data-role-permission="users" onclick="openUserManagement()"><span class="ico" aria-hidden="true">👥</span><span class="txt">المستخدمون والصلاحيات</span></button>
-   <button class="side-btn" onclick="openAuditLog()"><span class="ico" aria-hidden="true">▤</span><span class="txt">سجل التدقيق</span></button>
-   <button class="side-btn" onclick="scrollToSection('operationsSection',this);switchOpsTab('permissions')"><span class="ico" aria-hidden="true">🔐</span><span class="txt">الصلاحيات الفعّالة</span></button>
-   <button id="refreshCentralSidebarButton" class="side-btn central-only" onclick="refreshCentralData()"><span class="ico" aria-hidden="true">↻</span><span class="txt">تحديث البيانات المركزية</span></button>
-   <button class="side-btn" data-permission="backup" onclick="exportBackup()"><span class="ico" aria-hidden="true">🛡</span><span class="txt">نسخة احتياطية</span></button>
-   </nav>
-  </div>
+ <div id="appNav"></div>
  <div class="side-section" data-role-permission="edit">
   <div class="side-label">تجهيز الشهر</div>
   <div class="side-actions">
@@ -202,6 +143,9 @@
  </div>
 </header>
 <div class="wrap">
+<nav id="appCrumbs" class="crumbs" aria-label="مسار التنقّل"></nav>
+<div id="appOutlet"></div>
+<div id="legacyWorkspace">
 <header id="monthSection" class="mast section-anchor">
  <div>
   <div class="eyebrow">BABIL FLOW • RESELLER FINANCIAL OPERATIONS</div>
@@ -515,6 +459,7 @@
   <input type="file" id="installationHistoryFileInput" accept=".xlsx,.xls" style="display:none" onchange="readInstallationHistoryFile(event)">
  </div>
 </section>
+</div>
 </div>
 </main>
 </div>

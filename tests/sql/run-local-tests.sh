@@ -153,6 +153,15 @@ fi
 echo "$out16" | grep -E "^ {8,10}(ok|==) " || true
 passed=$((passed + $(echo "$out16" | grep -c "         ok ")))
 
+echo "== operational read api =="
+out17=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/operational-read-api.sql 2>&1)
+if echo "$out17" | grep -qE "FAILED|ERROR"; then
+  echo "$out17" | grep -E "FAILED|ERROR" || true
+  echo "OPERATIONAL READ API TESTS FAILED" >&2; exit 1
+fi
+echo "$out17" | grep -E "^ {9,11}(ok|==) " || true
+passed=$((passed + $(echo "$out17" | grep -c "          ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh

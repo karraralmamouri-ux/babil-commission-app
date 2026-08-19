@@ -30,5 +30,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Type-check
+        run: npm run typecheck
+
       - name: Run tests
         run: npm test
+
+      # البناء جزء من البوّابة. إدخال خطوة بناء أدخل عطلاً جديداً: قبله كان
+      # الملف المعطوب يُبقي نسخته السابقة تخدم، وبعده قد يُنشَر مخرَج ينقصه
+      # ملف فيسقط التطبيق عند التحميل. المُتحقِّق داخل vite.config يرفض أي
+      # مخرَج يشير إلى ملف لا يحتويه، والفشل هنا أرخص من اكتشافه لاحقاً.
+      - name: Build
+        run: npm run build
