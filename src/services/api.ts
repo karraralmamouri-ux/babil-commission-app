@@ -58,15 +58,39 @@ export async function select<T>(path: string): Promise<T> {
   }
 }
 
+/**
+ * يستخرج رسالةً مقروءة من أي شكل خطأ.
+ *
+ * الطبقة القديمة ترفض بكائن عادي لا بـError، وPostgREST يُعيد
+ * `{ message, code, details, hint }`. وString() على كائن تُنتج
+ * «[object Object]» — وهي أسوأ من رسالة تقنية: لا تقول شيئاً إطلاقاً،
+ * وقد ظهرت فعلاً على الشاشة المنشورة.
+ */
+function messageOf(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    const o = error as Record<string, unknown>;
+    for (const k of ['message', 'error_description', 'error', 'msg', 'details', 'hint']) {
+      const v = o[k];
+      if (typeof v === 'string' && v.trim()) return v;
+    }
+    const code = typeof o['code'] === 'string' ? o['code'] : null;
+    const status = typeof o['status'] === 'number' ? String(o['status']) : null;
+    if (code || status) return `الخادم ردّ برمز ${code || status}`;
+  }
+  return 'خطأ غير متوقّع';
+}
+
 function asApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error;
-  const message = error instanceof Error ? error.message : String(error);
+  const message = messageOf(error);
   // لا يُعرض أثر المكدّس ولا تفاصيل داخلية للمستخدم.
   if (/permission|capability|denied|42501/i.test(message)) {
     return new ApiError('لا صلاحية لهذا الإجراء', 403);
   }
-  if (/fetch|network|Failed to fetch/i.test(message)) {
-    return new ApiError('تعذّر الاتصال بالخادم', 0);
+  if (/fetch|network|Failed to fetch|JWT|token|401|session/i.test(message)) {
+    return new ApiError('انتهت الجلسة أو تعذّر الاتصال — سجّل الدخول من جديد', 0);
   }
   return new ApiError(message.slice(0, 200));
 }
