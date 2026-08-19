@@ -9,6 +9,7 @@ import type { Route } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, toPage, pageRpc } from '../../services/api';
 import { money, count } from '../../domain/money';
+import { transferPanel, wireTransfer } from '../ownership/transfer';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -156,6 +157,7 @@ export const subscribers: Route = {
 
 const CASE_TABS = [
   { key: 'overview', label: 'نظرة عامة' },
+  { key: 'ownership', label: 'العائدية' },
   { key: 'activations', label: 'التفعيلات' },
   { key: 'invoices', label: 'الفواتير' },
   { key: 'entitlements', label: 'الاستحقاقات' },
@@ -205,6 +207,9 @@ export const subscriberCase: Route = {
       ])
       + `<div class="tabs">${tabs}</div><div class="panel active">${renderCaseTab(doc as Row, tab, id)}</div>`;
 
+    // مفتاح المشترك هو ما تعرفه أحداث SaaS، وهو صغير الأحرف.
+    if (tab === 'ownership') await wireTransfer(view, id.toLowerCase().trim());
+
     if (tab === 'history') {
       const host = view.el.querySelector<HTMLElement>('#timelineHost');
       if (host) {
@@ -221,6 +226,8 @@ export const subscriberCase: Route = {
 
 function renderCaseTab(doc: Row, tab: string, id: string): string {
   const list = (k: string) => (doc[k] || []) as Row[];
+
+  if (tab === 'ownership') return transferPanel();
 
   if (tab === 'entitlements') {
     const rows = list('entitlements');

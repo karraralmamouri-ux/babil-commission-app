@@ -180,6 +180,15 @@ fi
 echo "$out19" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out19" | grep -c "            ok ")))
 
+echo "== subscriber transfer =="
+out20=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/subscriber-transfer.sql 2>&1)
+if echo "$out20" | grep -qE "FAILED|ERROR"; then
+  echo "$out20" | grep -E "FAILED|ERROR" || true
+  echo "TRANSFER TESTS FAILED" >&2; exit 1
+fi
+echo "$out20" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out20" | grep -c "            ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
