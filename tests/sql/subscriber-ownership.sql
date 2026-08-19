@@ -351,6 +351,79 @@ select pg_temp.ok(
   = coalesce((public.company_subscriber_counts() ->> 'DIRECT_COMPANY')::bigint, 0),
   'إجمالي التفصيل يساوي عدّاد الشركة — لا ازدواج');
 
+-- ---------------------------------------------------------------------------
+-- 9. شواهد الأب — ما يُعرض قبل القرار
+--
+-- الشواهد قراءةٌ محضة: تفتح الأب، تقرأ، ثم تقرّر. استدعاؤها يجب ألّا يغيّر
+-- تصنيفاً ولا يكتب صفاً.
+-- ---------------------------------------------------------------------------
+
+-- التلقيم بصلاحية المالك، والقراءة بهوية المستخدم — كما في بقيّة الملف.
+reset role;
+
+-- أبٌ باسم مختلط الحالة، ومشتركٌ ظهر تحت اسمين — الاسم فقد حرفاً في تصدير.
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, canceled, raw_parent, event_created_at, fdt_code)
+values
+  ('50000000-0000-0000-0000-0000000000b4','SO-EV-M','so-mixed-1','P-35000',false,'SO.Mixed.Case',
+   timestamptz '2026-12-08 10:00+03','SO-FDT'),
+  -- المشترك نفسه (so-office-1) تحت اسمٍ ناقصِ حرف.
+  ('50000000-0000-0000-0000-0000000000b4','SO-EV-T','so-office-1','P-35000',false,'so.ofice',
+   timestamptz '2026-11-06 10:00+03','SO-FDT')
+on conflict do nothing;
+
+set local role authenticated;
+set local request.jwt.claim.sub = '50000000-0000-0000-0000-0000000000b1';
+
+
+select pg_temp.ok(
+  (public.parent_evidence('so.mixed.case') ->> 'parent_name') = 'SO.Mixed.Case',
+  'الشواهد تُعيد الاسم بحروفه الأصلية لا بالمفتاح المشتق');
+
+select pg_temp.ok(
+  (public.parent_evidence('SO.MIXED.CASE') ->> 'parent_name') = 'SO.Mixed.Case',
+  'والمطابقة لا تتأثّر بحالة الأحرف');
+
+select pg_temp.ok(
+  (public.parent_evidence('so.parent.that.never.existed') ->> 'found')::boolean = false,
+  'أبٌ غير موجود يُقال صراحةً لا يُخترع');
+
+-- تداخل المشتركين: واقعةٌ في البيانات تُعرض شاهداً.
+select pg_temp.ok(
+  exists (
+    select 1 from jsonb_array_elements(public.parent_evidence('so.office') -> 'related_parents') r
+    where r ->> 'parent_name' = 'so.ofice'
+      and (r ->> 'shared_subscribers')::bigint = 1),
+  'الأب المتقاسِم للمشتركين يظهر في الشواهد');
+
+-- ولا يُصنَّف شيء بناءً عليه: التصنيف بعد القراءة كما كان قبلها.
+select pg_temp.ok(
+  public.parent_ownership_type('so.ofice') = 'NEEDS_REVIEW',
+  'قراءة الشواهد لا تُصنِّف الأب المتقاسِم تلقائياً');
+
+select pg_temp.ok(
+  (public.parent_evidence('so.ofice') -> 'exposure' ->> 'meaning') = 'AWAITING_DECISION',
+  'معنى المبلغ يتبع التصنيف ويُقال صراحةً');
+
+select pg_temp.ok(
+  (public.parent_evidence('so.office') -> 'volume' ->> 'subscribers')::bigint >= 1
+  and jsonb_array_length(public.parent_evidence('so.office') -> 'samples') >= 1,
+  'الحجم والعيّنة الخام حاضران قبل القرار');
+
+-- العيّنة تحمل الاسم كما ورد، لا مُطبَّعاً.
+select pg_temp.ok(
+  exists (
+    select 1 from jsonb_array_elements(public.parent_evidence('so.mixed.case') -> 'samples') s
+    where s ->> 'raw_parent' = 'SO.Mixed.Case'),
+  'العيّنة تعرض الأب كما كُتب في المصدر');
+
+-- والوكلاء المعروضون للاختيار فعّالون فقط.
+select pg_temp.ok(
+  not exists (
+    select 1 from jsonb_array_elements(public.list_agents_for_pick(null, 200)) a
+    where a ->> 'status' <> 'ACTIVE'),
+  'قائمة الاختيار لا تعرض وكيلاً غير فعّال');
+
 reset role;
 
 rollback;

@@ -51,6 +51,11 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
+    key: 'master', label: 'البيانات المرجعية', items: [
+      { label: 'الآباء', path: '/master/parents', icon: '⌂', capability: 'agent.view' },
+    ],
+  },
+  {
     key: 'work', label: 'العمل', items: [
       { label: 'الاستثناءات', path: '/exceptions', icon: '⚠', capability: 'commission.view' },
     ],

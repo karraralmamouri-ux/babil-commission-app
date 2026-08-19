@@ -121,7 +121,7 @@ export const home: Route = {
         return `<section style="margin-top:16px">
           <h2 style="font-size:14px;color:var(--navy);margin:0 0 10px">مشتركو الشركة</h2>
           <div class="grid2">
-            <a class="card kpi-primary" href="${esc(href('/installation/subscribers', { ownership: 'DIRECT_COMPANY' }))}"
+            <a class="card kpi-primary" href="${esc(href('/master/parents', { ownership: 'DIRECT_COMPANY' }))}"
                style="text-decoration:none">
               <div class="label">تابعون للشركة مباشرةً</div>
               <div class="value">${total === null ? '—' : count(total)}</div>
@@ -131,7 +131,7 @@ export const home: Route = {
               <h3>حسب الأب — بالأسماء الأصلية</h3>
               ${parents.length
                 ? parents.map((p) => `<a class="minirow" style="text-decoration:none;color:inherit"
-                    href="${esc(href('/installation/subscribers', { parent: String(p['parent_name'] ?? '') }))}">
+                    href="${esc(href("/master/parents/" + encodeURIComponent(String(p['parent_name'] ?? ''))))}">
                     <span class="num" style="direction:ltr;text-align:left">${esc(String(p['parent_name'] ?? ''))}</span>
                     <b>${count(Number(p['subscribers'] || 0))}</b></a>`).join('')
                 : '<p class="muted">لا آباء مصنَّفين للشركة بعد</p>'}
