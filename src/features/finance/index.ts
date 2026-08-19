@@ -13,6 +13,7 @@ import { money, count } from '../../domain/money';
 import {
   esc, loading, empty, pageHeader, table, pager, chip, kpiRow, type Column,
 } from '../../components/ui';
+import { routes as installationBatchRoutes } from './installation-batches';
 
 type Row = Record<string, unknown>;
 const num = (r: Row, k: string) => Number(r[k] || 0);
@@ -109,4 +110,4 @@ export const batchDetail: Route = {
   },
 };
 
-export const routes: Route[] = [batches, batchDetail];
+export const routes: Route[] = [batches, batchDetail, ...installationBatchRoutes];

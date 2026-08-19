@@ -55,6 +55,7 @@ export const NAV: NavGroup[] = [
   {
     key: 'finance', label: 'المالية', items: [
       { label: 'دفعات الصرف', path: '/finance/payment-batches', icon: '◈', capability: 'payment.view' },
+      { label: 'دفعات التنصيب', path: '/finance/installation-batches', icon: '⊟', capability: 'payment.view' },
     ],
   },
   {
