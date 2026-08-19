@@ -154,7 +154,7 @@ test('حالة المنع تُسمّي القدرة ولا تُخفي وجود �
 
 test('الخطأ لا يعرض أثر مكدّس ولا تفاصيل داخلية', () => {
   const api = read('src/services/api.ts');
-  assert.match(api, /تعذّر الاتصال بالخادم/);
+  assert.match(api, /تعذّر الاتصال/);
   assert.match(api, /لا صلاحية لهذا الإجراء/);
   assert.match(api, /message\.slice\(0, 200\)/);
   assert.doesNotMatch(api, /error\.stack/);
@@ -447,4 +447,23 @@ test('الصفحة خارج المدى تُقال ولا تُقرأ صفراً',
 test('الشاشات تمرّر إشارة الإلغاء إلى الشبكة', () => {
   const s = read('src/features/installation/index.ts');
   assert.match(s, /pageRpc<Row>\('page_installation_subscribers', args, view\.signal\)/);
+});
+
+test('الخطأ يُقرأ مهما كان شكل ما رُفض به', () => {
+  // «[object Object]» ظهرت فعلاً على الشاشة المنشورة: الطبقة القديمة ترفض
+  // بكائن عادي، وString() عليه لا تقول شيئاً إطلاقاً.
+  const api = read('src/services/api.ts');
+  const { messageOf } = evalTs(api.replace('function messageOf', 'export function messageOf'), ['messageOf']);
+  assert.equal(messageOf(new Error('boom')), 'boom');
+  assert.equal(messageOf('plain'), 'plain');
+  assert.equal(messageOf({ message: 'من الخادم' }), 'من الخادم');
+  assert.equal(messageOf({ error_description: 'انتهت الجلسة' }), 'انتهت الجلسة');
+  assert.equal(messageOf({ hint: 'تلميح' }), 'تلميح');
+  assert.match(messageOf({ code: 'PGRST301' }), /PGRST301/);
+  assert.equal(messageOf({}), 'خطأ غير متوقّع');
+  assert.equal(messageOf(null), 'خطأ غير متوقّع');
+  // ولا يظهر «[object Object]» في أي حالة
+  [{}, { a: 1 }, [], null, undefined, 0].forEach((e) => {
+    assert.doesNotMatch(messageOf(e), /\[object/, `شكل غير مقروء: ${JSON.stringify(e)}`);
+  });
 });
