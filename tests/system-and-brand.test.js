@@ -153,3 +153,30 @@ test('حقول الدخول موصولة بتسمياتها', () => {
   }
   assert.match(html, /id="monthSelect"[^>]*aria-label=/);
 });
+
+/* ---- المستودع يحمل ما يبنيه ---------------------------------------------- */
+
+test('كل وحدة يستوردها التطبيق متعقَّبة في git', () => {
+  // «work/» في .gitignore كان بلا جذر، فطابق src/features/work/ وابتلع مركز
+  // العمل. البناء المحلّي يمرّ لأن الملفّ على القرص، وأوّل استنساخ نظيف يسقط.
+  const { execFileSync } = require('node:child_process');
+  const tracked = new Set(
+    execFileSync('git', ['ls-files', 'src'], { cwd: root, encoding: 'utf8' })
+      .split('\n').filter(Boolean).map((f) => f.split('\\').join('/')));
+
+  const main = read('src/main.ts');
+  const specs = [...main.matchAll(/from '(\.\/[^']+)'/g)].map((m) => m[1]);
+  const missing = specs.filter((spec) => {
+    const base = 'src/' + spec.replace(/^\.\//, '');
+    return !tracked.has(base + '.ts') && !tracked.has(base + '/index.ts');
+  });
+  assert.deepEqual(missing, [], `وحدات مستورَدة وغير متعقَّبة: ${missing.join(', ')}`);
+});
+
+test('أنماط التجاهل مجذورة، فلا تبتلع مجلّداً في العمق', () => {
+  const ignore = read('.gitignore');
+  for (const pattern of ['work/', 'backups/', 'exports/', 'coverage/']) {
+    assert.ok(ignore.includes('/' + pattern),
+      `نمط بلا جذر يطابق أيّ عمق: ${pattern}`);
+  }
+});
