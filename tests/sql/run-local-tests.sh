@@ -216,6 +216,15 @@ fi
 echo "$out24" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out24" | grep -c "            ok ")))
 
+echo "== master write domains =="
+out26=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/master-write-domains.sql 2>&1)
+if echo "$out26" | grep -qE "FAILED|ERROR"; then
+  echo "$out26" | grep -E "FAILED|ERROR" || true
+  echo "MASTER WRITE TESTS FAILED" >&2; exit 1
+fi
+echo "$out26" | grep -E "^ {12,14}(ok|==) " || true
+passed=$((passed + $(echo "$out26" | grep -c "             ok ")))
+
 echo "== payout end to end =="
 out25=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/payout-end-to-end.sql 2>&1)
 if echo "$out25" | grep -qE "FAILED|ERROR"; then

@@ -48,12 +48,21 @@ test('report totals are never recomputed in the page', () => {
 });
 
 test('payout posting goes through the server RPC and confirms first', () => {
-  assert.ok(html.includes('/rest/v1/rpc/post_commission_batch'), 'post RPC missing');
-  assert.ok(html.includes('/rest/v1/rpc/revalidate_commission_batch'), 'revalidate RPC missing');
-  const post = html.slice(html.indexOf('async function postPayout'),
-    html.indexOf('function initReporting'));
-  assert.ok(post.includes('confirm('), 'posting money without confirmation');
-  assert.ok(post.includes('createRequestId()'), 'posting without an idempotency key');
+  // Posting moved to the payment-batches screen. Money still may not leave
+  // without a confirmation and an idempotency key, so the test follows it.
+  const finance = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'src/features/finance/index.ts'), 'utf8');
+
+  assert.ok(finance.includes('post_commission_batch'), 'post RPC missing');
+  assert.ok(finance.includes('revalidate_commission_batch'), 'revalidate RPC missing');
+
+  const post = finance.slice(finance.indexOf("post?.addEventListener"));
+  assert.ok(post.includes('window.confirm('), 'posting money without confirmation');
+  assert.ok(post.includes('crypto.randomUUID()'), 'posting without an idempotency key');
+
+  // The legacy page no longer posts — one place moves the money.
+  assert.ok(!html.includes('/rest/v1/rpc/post_commission_batch'),
+    'two screens still post payment batches');
 });
 
 test('export buttons are hidden without the export capability', () => {

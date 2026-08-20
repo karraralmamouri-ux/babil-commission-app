@@ -145,13 +145,26 @@ test('the historical import keeps its own state and never reuses the monthly slo
 });
 
 test('the two import flows call different server functions', () => {
-  const source = require('node:fs')
-    .readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  // Import execution moved out of the legacy page into its own screen. The
+  // rule this test guards did not change, so it follows the code: the two
+  // flows must still reach two different server functions, because the
+  // historical one carries an as-of date the entitlement one has no business
+  // inventing.
+  const fsMod = require('node:fs');
+  const legacy = fsMod.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const screen = fsMod.readFileSync(
+    path.join(__dirname, '..', 'src/features/system/import-run.ts'), 'utf8');
 
-  assert.ok(source.includes('/rest/v1/rpc/import_installation_entitlements'));
-  assert.ok(source.includes('/rest/v1/rpc/import_installation_history'));
-  // The historical call must send the reviewer's chosen date, not a derived one.
-  assert.ok(source.includes('p_as_of_date:preview.asOfDate'));
-  // Both confirm paths stay behind the same role gate.
-  assert.ok(source.includes("if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}"));
+  assert.ok(screen.includes('import_installation_entitlements'));
+  assert.ok(screen.includes('import_installation_history'));
+  // The historical call sends the reviewer's chosen date, not a derived one.
+  assert.ok(screen.includes('p_as_of_date'));
+  assert.match(screen, /asOf/);
+  // And the confirm path is gated on the import capability, which the server
+  // function checks again for itself.
+  assert.match(screen, /can\('saas\.import'\)/);
+
+  // The legacy page no longer performs either import.
+  assert.ok(!legacy.includes('/rest/v1/rpc/import_installation_entitlements'));
+  assert.ok(!legacy.includes('/rest/v1/rpc/import_installation_history'));
 });

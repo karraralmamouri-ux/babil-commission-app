@@ -93,9 +93,102 @@ export const cycleList: Route = {
     view.write(loading());
     const list = await cycles();
     view.write(pageHeader('دورات العمولة', `${list.length} دورة`)
+      + openCyclePanel(list)
       + (list.length ? table<Cycle>(cycleColumns(), list, (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`) : empty('لا دورات')));
+    wireOpenCycle(view);
   },
 };
+
+/* ---- فتح دورة ------------------------------------------------------------ */
+
+/**
+ * الفترة تُقترح من نهاية آخر دورة: الشهر الذي يليها كاملاً. والاقتراح لا
+ * يُلزم — يبقى الحقلان قابلين للتعديل، فدورةٌ استثنائية بفترةٍ غير شهرية واردة.
+ *
+ * والتقاطع يرفضه الخادم بقيدٍ لا بفحصٍ وحده: دورتان على الفترة نفسها تحسبان
+ * الحدث الواحد مرّتين.
+ */
+function openCyclePanel(list: Cycle[]): string {
+  if (!can('commission.manage_cycle')) return '';
+  const last = list.map((c) => c.period_end).sort().at(-1);
+  let start = '';
+  let end = '';
+  let name = '';
+  if (last) {
+    const next = new Date(`${last}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    const first = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth(), 1));
+    const lastDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0));
+    start = first.toISOString().slice(0, 10);
+    end = lastDay.toISOString().slice(0, 10);
+    name = start.slice(0, 7);
+  }
+  return `<div class="box" style="margin-top:12px" id="openCycleBox">
+    <h3>افتح دورة</h3>
+    <p class="muted" style="font-size:11px;margin:0 0 10px">
+      تُفتح مسودّةً، ثم تُحسب فتصير قيد المراجعة. والاعتماد له شاشته وشرطه.
+      ${last ? `آخر دورة تنتهي ${esc(last)}، والمقترَح الشهر الذي يليها.` : ''}</p>
+    <div class="toolbar">
+      <input class="search" id="ocName" placeholder="اسم الدورة"
+        aria-label="اسم الدورة" value="${esc(name)}">
+      <input class="search" type="date" id="ocStart" aria-label="بداية الفترة" value="${esc(start)}">
+      <input class="search" type="date" id="ocEnd" aria-label="نهاية الفترة" value="${esc(end)}">
+      <input class="search" id="ocNotes" placeholder="ملاحظة (اختياري)" aria-label="ملاحظة">
+      <button class="btn gold" id="ocOpen">افتح</button>
+    </div>
+    <div id="ocResult"></div>
+  </div>`;
+}
+
+function wireOpenCycle(view: View): void {
+  const box = view.el.querySelector<HTMLElement>('#openCycleBox');
+  if (!box) return;
+  const name = box.querySelector<HTMLInputElement>('#ocName');
+  const start = box.querySelector<HTMLInputElement>('#ocStart');
+  const end = box.querySelector<HTMLInputElement>('#ocEnd');
+  const notes = box.querySelector<HTMLInputElement>('#ocNotes');
+  const open = box.querySelector<HTMLButtonElement>('#ocOpen');
+  const out = box.querySelector<HTMLElement>('#ocResult');
+  if (!name || !start || !end || !open || !out) return;
+
+  open.addEventListener('click', async () => {
+    if (!name.value.trim()) { out.innerHTML = insight('warn', 'اسم الدورة إلزامي'); return; }
+    if (!start.value || !end.value) {
+      out.innerHTML = insight('warn', 'الفترة إلزامية', 'بدايةً ونهايةً');
+      return;
+    }
+    if (end.value < start.value) {
+      out.innerHTML = insight('warn', 'الفترة معكوسة', 'النهاية قبل البداية');
+      return;
+    }
+    open.disabled = true;
+    out.innerHTML = loading('جارٍ فتح الدورة…');
+    try {
+      const res = await rpc<Record<string, unknown>>('open_commission_cycle', {
+        p_name: name.value.trim(),
+        p_period_start: start.value,
+        p_period_end: end.value,
+        p_notes: notes?.value.trim() || null,
+        p_request_id: crypto.randomUUID(),
+      });
+      if (!view.live) return;
+      out.innerHTML = insight('good', 'فُتحت الدورة',
+        'مسودّة — تُحسب من شاشتها فتصير قيد المراجعة.');
+      const id = String(res['cycle_id'] || '');
+      window.setTimeout(() => {
+        if (!view.live) return;
+        if (id) window.location.hash = href(`/commissions/cycles/${id}`).slice(1);
+        else window.location.reload();
+      }, 1200);
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'لم تُفتح الدورة',
+        error instanceof Error ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      open.disabled = false;
+    }
+  });
+}
 
 /* ---- ورشة الدورة -------------------------------------------------------- */
 
@@ -164,13 +257,14 @@ async function renderCycle(view: View, m: RouteMatch, tab: string): Promise<void
   const body = view.el.querySelector<HTMLElement>('#cycleTabBody');
   if (!body) return;
   try {
-    await renderCycleTab(view, id, tab, m);
+    await renderCycleTab(view, cycle, tab, m);
   } catch (error) {
     view.writeInto('#cycleTabBody', errorState(error instanceof Error ? error.message : 'خطأ غير متوقّع'));
   }
 }
 
-async function renderCycleTab(view: View, id: string, tab: string, m: RouteMatch): Promise<void> {
+async function renderCycleTab(view: View, cycle: Cycle, tab: string, m: RouteMatch): Promise<void> {
+  const id = cycle.id;
   if (tab === 'scopes') {
     const rows = (await select<Snapshot[]>(`commission_cycle_snapshots?select=*&cycle_id=eq.${encodeURIComponent(id)}&order=gross_commission.desc`)) || [];
     view.writeInto('#cycleTabBody', rows.length ? scopeTable(rows) : empty('لا نطاقات محسوبة في هذه الدورة'));
@@ -201,22 +295,28 @@ async function renderCycleTab(view: View, id: string, tab: string, m: RouteMatch
     const page = toPage(rows as never, limit, offset);
     view.writeInto('#cycleTabBody', `<p class="muted" style="font-size:11px">الاستثناء يُحسم في شاشته، ثم تُعاد حسبة الدورة.</p>`
       + (page.rows.length ? table(exceptionColumns(), page.rows as Array<Record<string, unknown>>) : empty('لا استثناءات مفتوحة'))
-      + pager(page.total, limit, offset, `/commissions/cycles/${id}/exceptions`, m.query));
+      + pager(page.total, limit, offset, `/commissions/cycles/${id}/exceptions`, m.query)
+      + resolvePanel());
+    wireResolve(view);
     return;
   }
 
   if (tab === 'review') {
     const blockers = await rpc<Array<Record<string, unknown>>>('commission_finalization_blockers', { p_cycle_id: id });
-    if (!blockers || !blockers.length) {
-      view.writeInto('#cycleTabBody', `<div class="insight good"><span class="insight-dot"></span><span>
-        <b>لا مانع من الاعتماد</b><small>لا استثناء حاجب مفتوح في هذه الدورة.</small></span></div>`);
-      return;
-    }
-    const total = blockers.reduce((a, b) => a + Number(b['indicative_amount'] || 0), 0);
-    view.writeInto('#cycleTabBody', `<div class="insight danger" style="margin-bottom:12px"><span class="insight-dot"></span><span>
-        <b>الاعتماد محجوب</b>
-        <small>${blockers.length} سبباً · أثر مؤشِّر ${money(total)}. تُحسم الأسباب ثم يُعاد الحساب.</small></span></div>`
-      + table(blockerColumns(), blockers));
+    const open = blockers || [];
+    const total = open.reduce((a, b) => a + Number(b['indicative_amount'] || 0), 0);
+
+    view.writeInto('#cycleTabBody',
+      (open.length
+        ? `<div class="insight danger" style="margin-bottom:12px"><span class="insight-dot"></span><span>
+            <b>الاعتماد محجوب</b>
+            <small>${open.length} سبباً · أثر مؤشِّر ${money(total)}. تُحسم الأسباب ثم يُعاد الحساب.</small></span></div>`
+        : `<div class="insight good" style="margin-bottom:12px"><span class="insight-dot"></span><span>
+            <b>لا مانع من الاعتماد</b><small>لا استثناء حاجب مفتوح في هذه الدورة.</small></span></div>`)
+      + workflowPanel(cycle, open.length)
+      + (open.length ? table(blockerColumns(), open) : ''));
+
+    wireWorkflow(view, cycle, open.length);
     return;
   }
 
@@ -285,18 +385,114 @@ function exceptionColumns(): Array<Column<Record<string, unknown>>> {
     { key: 'fdt', label: 'الكابينة', cell: (r) => esc(r['fdt_code'] ?? '—') },
     { key: 'amount', label: 'أثر مؤشِّر', cell: (r) => money(num(r, 'indicative_amount')), numeric: true },
     { key: 'blocking', label: 'حاجب', cell: (r) => r['blocks_finalization'] ? chip('حاجب', 'critical') : chip('للمراجعة', 'warning') },
-    { key: 'go', label: '', cell: (r) => actionLink(String(r['reason_code'] || ''), r) },
+    { key: 'go', label: '', cell: (r) => actionLink(String(r['reason_code'] || ''), r)
+      + (can('commission.review_exception') && String(r['status'] || 'OPEN') === 'OPEN'
+        ? ` <button class="smallbtn exc-resolve"
+             data-id="${esc(String(r['id'] ?? ''))}"
+             data-reason="${esc(String(r['reason_code'] ?? ''))}">احسم</button>`
+        : '') },
   ];
+}
+
+/**
+ * حسم الاستثناء.
+ *
+ * حكمان لا واحد: «مُعالَج» يعني أن سببه زال فعلاً — صُنِّفت الكابينة أو
+ * عُرِف الوكيل. و«مُتجاوَز» يعني أنه باقٍ وقُرِّر ألّا يحجب. الخلط بينهما
+ * يجعل سجلّ الحسم بلا معنى بعد شهر، فيُفصلان ويُشترط لكلٍّ سببه.
+ *
+ * والحسم لا يُصلح البيانات: كابينةٌ مجهولة تبقى مجهولة بعد التجاوز. ولذلك
+ * تبقى إلى جانبه وصلةُ شاشة الحسم الحقيقي.
+ */
+function wireResolve(view: View): void {
+  const host = view.el.querySelector<HTMLElement>('#excResolve');
+  const buttons = view.el.querySelectorAll<HTMLButtonElement>('.exc-resolve');
+  if (!host || !buttons.length) return;
+
+  const status = host.querySelector<HTMLSelectElement>('#exStatus');
+  const note = host.querySelector<HTMLInputElement>('#exNote');
+  const apply = host.querySelector<HTMLButtonElement>('#exApply');
+  const label = host.querySelector<HTMLElement>('#exTarget');
+  const out = host.querySelector<HTMLElement>('#exResult');
+  if (!status || !note || !apply || !label || !out) return;
+
+  let target = '';
+  for (const btn of buttons) {
+    btn.addEventListener('click', () => {
+      target = btn.dataset['id'] || '';
+      label.textContent = btn.dataset['reason'] || target;
+      out.innerHTML = '';
+      note.focus();
+    });
+  }
+
+  apply.addEventListener('click', async () => {
+    if (!target) { out.innerHTML = insight('warn', 'اختر استثناءً من الجدول'); return; }
+    if (!status.value) { out.innerHTML = insight('warn', 'اختر الحكم'); return; }
+    const why = note.value.trim();
+    if (!why) {
+      out.innerHTML = insight('warn', 'السبب إلزامي',
+        'حسمٌ بلا سبب لا يُقرأ بعد شهر');
+      return;
+    }
+    apply.disabled = true;
+    out.innerHTML = loading('جارٍ الحسم…');
+    try {
+      await rpc('resolve_commission_exception', {
+        p_exception_id: target,
+        p_status: status.value,
+        p_note: why,
+        p_request_id: crypto.randomUUID(),
+      });
+      if (!view.live) return;
+      out.innerHTML = insight('good', 'حُسم الاستثناء',
+        status.value === 'WAIVED'
+          ? 'تُجووِز ولم يزل سببه — البيانات كما هي.'
+          : 'سُجِّل أن سببه عولج. تُعاد حسبة الدورة ليظهر الأثر.');
+      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1400);
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'لم يُحسم الاستثناء',
+        error instanceof Error ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      apply.disabled = false;
+    }
+  });
+}
+
+function resolvePanel(): string {
+  if (!can('commission.review_exception')) return '';
+  return `<div class="box" style="margin-top:12px" id="excResolve">
+    <h3>حسم استثناء</h3>
+    <p class="muted" style="font-size:11px;margin:0 0 10px">
+      اختر «احسم» من الجدول ثم الحكم والسبب.
+      <b>مُعالَج</b> يعني أن السبب زال فعلاً، و<b>مُتجاوَز</b> يعني أنه باقٍ
+      وقُرِّر ألّا يحجب. التجاوز لا يُصلح بيانات.</p>
+    <div class="toolbar">
+      <span class="muted">المحدَّد: <b id="exTarget">—</b></span>
+      <select class="select" id="exStatus" aria-label="الحكم">
+        <option value="">— الحكم —</option>
+        <option value="RESOLVED">مُعالَج — زال السبب</option>
+        <option value="WAIVED">مُتجاوَز — باقٍ ولا يحجب</option>
+      </select>
+      <input class="search" id="exNote" placeholder="السبب (إلزامي)" aria-label="سبب الحسم">
+      <button class="btn gold" id="exApply">احسم</button>
+    </div>
+    <div id="exResult"></div>
+  </div>`;
 }
 
 /** الاستثناء يقود إلى شاشة حسمه — لا إلى رسالة عامة. */
 function actionLink(reason: string, row: Record<string, unknown>): string {
   const fdt = String(row['fdt_code'] || '');
+  // مساران هنا كانا يشيران إلى ما لا وجود له: `/master/fdt` بلا جمع
+  // و`/imports` بلا بادئة النظام. الزرّ كان يفتح «الصفحة غير موجودة» —
+  // وهو أسوأ من غيابه، لأنه يَعِد بحسمٍ ثم يخذل.
   const map: Record<string, string> = {
-    UNKNOWN_FDT: href('/master/fdt', fdt ? { code: fdt } : undefined),
+    UNKNOWN_FDT: fdt ? href(`/master/fdts/${encodeURIComponent(fdt)}`) : href('/master/fdts/unknown'),
     UNKNOWN_AGENT: href('/master/agents'),
     UNKNOWN_PACKAGE: href('/master/packages'),
-    SOURCE_INCOMPLETE: href('/imports'),
+    SOURCE_INCOMPLETE: href('/system/imports'),
     IDENTITY_CONFLICT: href('/installation/subscribers'),
   };
   const target = map[reason];
@@ -460,11 +656,231 @@ export const exceptionsQueue: Route = {
       + `<div class="muted" style="font-size:11px;margin-bottom:8px">
           ${count(page.total)} استثناءً · أثر الصفحة المؤشِّر ${money(impact)}</div>`
       + (page.rows.length ? table(exceptionColumns(), page.rows as Array<Record<string, unknown>>) : empty('لا استثناءات مطابقة'))
-      + pager(page.total, limit, offset, '/exceptions', m.query);
+      + pager(page.total, limit, offset, '/exceptions', m.query)
+      + resolvePanel();
 
     wireFilters(view.el);
+    wireResolve(view);
   },
 };
+
+/* ---- انتقالات الدورة ------------------------------------------------------ */
+
+/**
+ * الحساب والاعتماد والإغلاق وإعادة الفتح.
+ *
+ * الشاشة تُظهر ما يسمح به الخادم فقط، لكن العكس ليس صحيحاً: إخفاء الزرّ
+ * راحة، ورفض الطلب حراسة. الخادم يُعيد الفحص في كل نداء مهما أظهرت الشاشة —
+ * `calculate_commission_cycle` يشترط `commission.finalize` عند الاعتماد،
+ * و`close_commission_cycle` يرفض إغلاق دورةٍ لم تُعتمد.
+ *
+ * وحاجبٌ واحدٌ مفتوح يمنع الاعتماد. لا تُوهَن الحواجب لتمرّ الدورة — تُحسم
+ * في شاشاتها ثم يُعاد الحساب.
+ */
+function workflowPanel(cycle: Cycle, blockers: number): string {
+  const finalized = cycle.finalized_at !== null;
+  const closed = cycle.status === 'CLOSED';
+  const rows: string[] = [];
+
+  // مساران للحساب على الخادم: الأعمّ يفحص `fdt.manage` ويردّ الفرق قبل وبعد،
+  // والأبسط لا يردّه. يُختار الأعمّ لمن يملكه لأن الفرق هو جواب السؤال الذي
+  // يُعاد الحساب لأجله: ماذا غيّر تصنيفي؟
+  const delta = can('fdt.manage');
+  if ((delta || can('commission.manage_cycle')) && !finalized) {
+    rows.push(`<div class="minirow">
+      <span><b>أعد الحساب</b>
+        <div class="muted" style="font-size:11px">يُعيد بناء النطاقات والاستثناءات من البيانات الحالية.
+          لا يعتمد ولا يدفع.${delta ? ' ويُظهر الفرق قبل وبعد.' : ''}</div></span>
+      <button class="btn" id="wfRecalc">احسب</button></div>`);
+  }
+
+  if (can('commission.view')) {
+    rows.push(`<div class="minirow">
+      <span><b>صدِّر الدورة</b>
+        <div class="muted" style="font-size:11px">لقطةٌ من الخادم بأرقامها كما هي، ويُسجَّل التصدير.</div></span>
+      <button class="btn" id="wfExport">صدِّر</button></div>`);
+  }
+
+  if (can('commission.finalize') && !finalized) {
+    rows.push(`<div class="minirow">
+      <span><b>اعتمد الدورة</b>
+        <div class="muted" style="font-size:11px">${blockers
+          ? `محجوب بـ${count(blockers)} سبباً — يُحسم أوّلاً.`
+          : 'يُثبِّت النطاقات لقطةً نهائية، وبعدها لا تُعاد الحسبة.'}</div></span>
+      <button class="btn gold" id="wfFinalize" ${blockers ? 'disabled' : ''}>اعتمد</button></div>`);
+  }
+
+  if (can('commission.manage_cycle') && finalized && !closed) {
+    rows.push(`<div class="minirow">
+      <span><b>أقفل الدورة</b>
+        <div class="muted" style="font-size:11px">بعد اكتمال الصرف. الإقفال يُنهي عمل الدورة.</div></span>
+      <button class="btn" id="wfClose">أقفل</button></div>`);
+  }
+
+  if (can('commission.reopen') && finalized) {
+    rows.push(`<div class="minirow">
+      <span><b>أعد الفتح</b>
+        <div class="muted" style="font-size:11px">يحتاج سبباً مكتوباً — الدورة المعتمدة تُفتح ولا يُمحى أثر اعتمادها.</div></span>
+      <button class="btn" id="wfReopen">أعد الفتح</button></div>`);
+  }
+
+  if (!rows.length) {
+    return `<div class="box" style="margin-bottom:12px">
+      <p class="muted">لا إجراء متاح لك على هذه الدورة في حالتها الحالية.</p></div>`;
+  }
+
+  return `<div class="box" style="margin-bottom:12px" id="wfBox">
+    <h3>إجراءات الدورة</h3>
+    ${rows.join('')}
+    <div class="toolbar" style="margin-top:10px">
+      <input class="search" id="wfReason" placeholder="السبب — إلزامي للإقفال وإعادة الفتح"
+        aria-label="سبب الإجراء">
+    </div>
+    <div id="wfResult"></div>
+  </div>`;
+}
+
+function wireWorkflow(view: View, cycle: Cycle, blockers: number): void {
+  const box = view.el.querySelector<HTMLElement>('#wfBox');
+  if (!box) return;
+  const reason = box.querySelector<HTMLInputElement>('#wfReason');
+  const out = box.querySelector<HTMLElement>('#wfResult');
+  if (!out) return;
+
+  const run = async (
+    button: HTMLButtonElement,
+    label: string,
+    needsReason: boolean,
+    confirmText: string,
+    call: (why: string) => Promise<unknown>,
+    done: string,
+  ) => {
+    const why = reason?.value.trim() || '';
+    if (needsReason && !why) {
+      out.innerHTML = insight('warn', 'السبب إلزامي', `${label} يُقرأ لاحقاً في سجلّ التدقيق`);
+      return;
+    }
+    if (!window.confirm(confirmText)) return;
+    button.disabled = true;
+    out.innerHTML = loading(`جارٍ ${label}…`);
+    try {
+      await call(why);
+      if (!view.live) return;
+      out.innerHTML = insight('good', done);
+      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1300);
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', `لم يتم ${label}`,
+        error instanceof Error ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      button.disabled = false;
+    }
+  };
+
+  const recalc = box.querySelector<HTMLButtonElement>('#wfRecalc');
+  recalc?.addEventListener('click', async () => {
+    if (!window.confirm(
+      `إعادة حساب «${cycle.name}»؟ تُبنى النطاقات والاستثناءات من جديد، ولا يُعتمد شيء.`)) return;
+    recalc.disabled = true;
+    out.innerHTML = loading('جارٍ إعادة الحساب…');
+    try {
+      if (can('fdt.manage')) {
+        const res = await rpc<Record<string, unknown>>('recalculate_cycle_after_master_change', {
+          p_cycle_id: cycle.id, p_request_id: crypto.randomUUID(),
+        });
+        if (!view.live) return;
+        const g0 = Number(res['gross_before'] || 0);
+        const g1 = Number(res['gross_after'] || 0);
+        const b0 = Number(res['blocking_before'] || 0);
+        const b1 = Number(res['blocking_after'] || 0);
+        out.innerHTML = insight('good', 'أُعيد الحساب',
+          `المحسوب ${money(g0)} ← ${money(g1)} · الحواجب ${count(b0)} ← ${count(b1)}`);
+      } else {
+        await rpc('calculate_commission_cycle', {
+          p_cycle_id: cycle.id, p_finalize: false, p_request_id: crypto.randomUUID(),
+        });
+        if (!view.live) return;
+        out.innerHTML = insight('good', 'أُعيد الحساب');
+      }
+      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1800);
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'لم يتم إعادة الحساب',
+        error instanceof Error ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      recalc.disabled = false;
+    }
+  });
+
+  const exportBtn = box.querySelector<HTMLButtonElement>('#wfExport');
+  exportBtn?.addEventListener('click', async () => {
+    exportBtn.disabled = true;
+    out.innerHTML = loading('جارٍ تجهيز التصدير…');
+    try {
+      const res = await rpc<Record<string, unknown>>('export_commission_cycle', {
+        p_cycle_id: cycle.id, p_request_id: crypto.randomUUID(),
+      });
+      if (!view.live) return;
+      downloadJson(`${cycle.name}.json`, res);
+      out.innerHTML = insight('good', 'نُزِّل التصدير', 'وسُجِّل في سجلّ التدقيق.');
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'لم يتم التصدير',
+        error instanceof Error ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      exportBtn.disabled = false;
+    }
+  });
+
+  const finalize = box.querySelector<HTMLButtonElement>('#wfFinalize');
+  finalize?.addEventListener('click', () => {
+    if (blockers) {
+      out.innerHTML = insight('danger', 'الاعتماد محجوب',
+        'تُحسم الأسباب في شاشاتها ثم يُعاد الحساب. لا يُوهَن حاجبٌ ليمرّ الاعتماد.');
+      return;
+    }
+    return run(finalize, 'الاعتماد', false,
+      `اعتماد «${cycle.name}» نهائياً؟ تُثبَّت النطاقات لقطةً لا تُعاد حسبتها.`,
+      () => rpc('calculate_commission_cycle', {
+        p_cycle_id: cycle.id, p_finalize: true, p_request_id: crypto.randomUUID(),
+      }),
+      'اعتُمدت الدورة');
+  });
+
+  const close = box.querySelector<HTMLButtonElement>('#wfClose');
+  close?.addEventListener('click', () => run(close, 'الإقفال', true,
+    `إقفال «${cycle.name}»؟`,
+    (why) => rpc('close_commission_cycle', {
+      p_cycle_id: cycle.id, p_reason: why, p_request_id: crypto.randomUUID(),
+    }),
+    'أُقفلت الدورة'));
+
+  const reopen = box.querySelector<HTMLButtonElement>('#wfReopen');
+  reopen?.addEventListener('click', () => run(reopen, 'إعادة الفتح', true,
+    `إعادة فتح «${cycle.name}»؟ الأثر المسجَّل لاعتمادها يبقى.`,
+    (why) => rpc('reopen_commission_cycle', {
+      p_cycle_id: cycle.id, p_reason: why, p_request_id: crypto.randomUUID(),
+    }),
+    'أُعيد فتح الدورة'));
+}
+
+/** التصدير يُنزَّل كما ردّه الخادم، دون إعادة تشكيلٍ في المتصفّح. */
+function downloadJson(filename: string, payload: unknown): void {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: 'application/json;charset=utf-8',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function insight(tone: 'good' | 'warn' | 'danger', title: string, detail = ''): string {
+  return `<div class="insight ${tone}" style="margin-top:10px"><span class="insight-dot"></span><span>
+    <b>${esc(title)}</b>${detail ? `<small>${esc(detail)}</small>` : ''}</span></div>`;
+}
 
 export const routes: Route[] = [
   overview, cycleList, cycleDetail, cycleTab, agentList, agentDetail, exceptionsQueue,

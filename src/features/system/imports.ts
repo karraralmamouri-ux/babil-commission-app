@@ -110,6 +110,11 @@ export const imports: Route = {
           ينقصه نصف صفوفه. تبقى الحالة «غير مُثبَت» حتى يُعلنها إنسان بشاهد،
           ولا تُمنح جِدّةُ مشترك من مصدرٍ غير مُثبَت.</small></span></div>`
 
+      + (can('saas.import')
+        ? `<div class="actions" style="margin:12px 0">
+            <a class="btn gold" href="${esc(href('/system/imports/new'))}">استورد ملفاً</a>
+          </div>`
+        : '')
       + filterBar([
         { key: 'search', label: 'بحث بالاسم أو البصمة', type: 'search' },
         { key: 'kind', label: 'النوع', type: 'select',

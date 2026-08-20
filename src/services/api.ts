@@ -49,6 +49,31 @@ export async function rpc<T>(name: string, args: Record<string, unknown> = {}): 
   }
 }
 
+/**
+ * استدعاء دالة حافة.
+ *
+ * لا تُستعمل إلا لما يحتاج صلاحية خدمةٍ فعلاً — إنشاء حسابٍ في نظام المصادقة
+ * وتعيين كلمة مرور. المفتاح يبقى في الدالّة على الخادم، والمتصفّح يرسل رمز
+ * جلسة المستخدم لا أكثر. وما عدا ذلك يمرّ بدوالّ القاعدة المحروسة بالقدرة.
+ */
+export async function edge<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  try {
+    const result = await bridge()(`/functions/v1/${encodeURIComponent(name)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    // الدالّة تردّ أحياناً بـ200 وفي جسمها خطأ، فلا يكفي أن الجسر لم يرمِ.
+    const asRecord = (result || {}) as Record<string, unknown>;
+    if (typeof asRecord['error'] === 'string') {
+      throw new ApiError(asRecord['error']);
+    }
+    return result as T;
+  } catch (error) {
+    throw asApiError(error);
+  }
+}
+
 /** قراءة جدول عبر PostREST — للقوائم الصغيرة المحدودة أصلاً. */
 export async function select<T>(path: string): Promise<T> {
   try {

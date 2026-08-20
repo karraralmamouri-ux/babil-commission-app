@@ -256,7 +256,69 @@ test('إخفاء الزر لا يُغني عن حارس الخادم', () => {
   // تسجيل الكابينات انتقل إلى التطبيق الجديد، فيُفحص حارسه حيث صار.
   const fdts = fs.readFileSync(path.join(root, 'src/features/master/fdts.ts'), 'utf8');
   assert.ok(fdts.includes(String.fromCharCode(39) + 'register_fdt' + String.fromCharCode(39)), 'حارس التسجيل مفقود');
-  assert.match(html, /rpc\/recalculate_cycle_after_master_change/);
+  const commissions = fs.readFileSync(path.join(root, 'src/features/commissions/index.ts'), 'utf8');
+  assert.ok(commissions.includes('recalculate_cycle_after_master_change'), 'إعادة الحساب لم تنتقل');
+});
+
+/* ---------------------------------------------------------------------------
+   الشاشات السابقة: للقراءة التاريخية لا للكتابة
+   ------------------------------------------------------------------------ */
+
+test('لا كتابة باقية في الشاشات السابقة', () => {
+  // السلطة المزدوجة هي أن تكتب شاشتان على الحقيقة نفسها. وعلاجها ليس إخفاء
+  // إحداهما بل إيقاف كتابتها، فيبقى للرقم مصدرٌ واحد.
+  const WRITES = [
+    'import_installation_entitlements', 'import_installation_history',
+    'publish_commission_month', 'record_installation_payment', 'save_import_settings',
+    'record_commission_payment', 'set_user_permission', 'resolve_commission_exception',
+    'calculate_commission_cycle', 'reopen_commission_cycle', 'close_commission_cycle',
+    'export_commission_cycle', 'revalidate_commission_batch', 'post_commission_batch',
+    'recalculate_cycle_after_master_change', 'register_fdt', 'register_fdt_bulk',
+    'audit_installation_invoice', 'upsert_agent', 'upsert_package', 'update_user_profile',
+    'open_commission_cycle',
+  ];
+  const found = WRITES.filter((name) => html.includes('rpc/' + name));
+  assert.deepStrictEqual(found, [], 'كتابات باقية في الشاشات السابقة');
+
+  // والقائمة أعلاه تُعدّ يدوياً، فلا يكفي أن تمرّ: كل نداءٍ باقٍ يجب أن
+  // يبدو قراءةً باسمه. اسمٌ لا ينطبق عليه ذلك يسقط الاختبار حتى لو كان
+  // بريئاً — ومراجعته أرخص من كتابةٍ تعود من حيث لا يُنتبَه.
+  const called = [...html.matchAll(/rpc\/([a-z_]+)/g)].map((m) => m[1]);
+  const notRead = [...new Set(called)].filter((name) =>
+    !/^(report_|list_|page_)/.test(name)
+    && !/(_profile|_summary|_detail|_financials|_eligibility|_capabilities|_state)$/.test(name));
+  assert.deepStrictEqual(notRead, [], 'نداءٌ لا يبدو قراءة');
+
+  // ودالّة الحافة لا تُستدعى من هناك إلا بالقراءة.
+  const actions = [...html.matchAll(/callAdminUsers\('([a-z]+)'/g)].map((m) => m[1]);
+  assert.deepStrictEqual([...new Set(actions)], ['list']);
+});
+
+test('أهداف اللمس تتبع نوع المؤشِّر لا عرض الشاشة', () => {
+  // كانت قواعد اللمس داخل حدّ 720px، فكان اللوح ذو 768 يقع خارجها ويرث
+  // مقاسات الفأرة: 22px في جدول المستخدمين على شاشةٍ تُلمس بالإصبع. والعرض
+  // لم يكن يوماً هو السؤال — السؤال أإصبعٌ أم مؤشِّر.
+  const block = css.slice(css.indexOf('@media (pointer: coarse)'));
+  assert.ok(block.startsWith('@media (pointer: coarse)'), 'لا قاعدة مبنيّة على نوع المؤشِّر');
+
+  const body = block.slice(0, block.indexOf('\n}\n', block.indexOf('{')) + 3);
+  for (const selector of ['.btn', '.smallbtn', '.search', '.select']) {
+    assert.ok(body.includes(selector), `هدف اللمس ${selector} خارج القاعدة`);
+  }
+  assert.match(body, /min-height:\s*44px/);
+
+  // ولا تعود القاعدة إلى حدّ العرض: رقمٌ دون 44 داخل كتلة 720px يُسقط الاختبار.
+  const narrow = css.slice(css.indexOf('@media (max-width: 720px)'));
+  const narrowBody = narrow.slice(0, narrow.indexOf('\n}\n'));
+  const shortTargets = [...narrowBody.matchAll(/min-height:\s*(\d+)px/g)]
+    .map((m) => Number(m[1])).filter((n) => n > 0 && n < 44);
+  assert.deepStrictEqual(shortTargets, [], 'هدف لمسٍ دون 44px عاد إلى قاعدة العرض');
+});
+
+test('الشاشات السابقة تُعلن أنها للعرض التاريخي', () => {
+  // رقمٌ صحيحٌ تاريخياً يُقرأ كأنه اليوم ما لم يُقل غير ذلك.
+  assert.match(html, /id="legacyBanner"/);
+  assert.match(html, /نسخة قديمة — للعرض التاريخي فقط/);
 });
 
 test('طيّ الشريط والمجموعات يُحفظ بأمان', () => {
@@ -298,9 +360,12 @@ test('الأزرار الأيقونية تحمل تسميةً لقارئ الش�
 });
 
 test('مساحة اللمس كافية على الجوّال', () => {
-  const mobile = css.slice(css.indexOf('@media (max-width: 720px)'));
-  assert.match(mobile, /\.btn \{[^}]*min-height: 42px/);
-  assert.match(mobile, /\.smallbtn \{[^}]*min-height: 38px/);
+  // كان هذا الاختبار يثبّت 42 للزرّ و38 للصغير، فيحرس الرقم الخاطئ: كلاهما
+  // دون 44، وهي أصغر مساحةٍ يُصيبها الإبهام دون خطأ. القاعدة صارت مبنيّة
+  // على نوع المؤشِّر، ويحرسها اختبارٌ مستقلّ أعلاه.
+  const coarse = css.slice(css.indexOf('@media (pointer: coarse)'));
+  assert.match(coarse, /min-height:\s*44px/);
+  assert.ok(coarse.includes('.btn') && coarse.includes('.smallbtn'));
 });
 
 test('الحركة تُحترم لمن يطلب تقليلها', () => {

@@ -40,20 +40,33 @@ test('the commission block never computes a tier or an amount in the browser', (
     'the page derives the tier basis from the event count');
 });
 
+const cycleScreen = fs.readFileSync(
+  path.join(ROOT, 'src/features/commissions/index.ts'), 'utf8');
+
 test('finalization and reopen go through the audited server RPCs', () => {
-  assert.ok(html.includes('/rest/v1/rpc/calculate_commission_cycle'), 'calculation RPC missing');
-  assert.ok(html.includes('/rest/v1/rpc/reopen_commission_cycle'), 'reopen RPC missing');
-  assert.ok(html.includes('/rest/v1/rpc/resolve_commission_exception'), 'exception RPC missing');
-  // لا كتابة مباشرة على جداول العمولة الجديدة.
+  // هذه الانتقالات كانت تجري من الشاشة السابقة وانتقلت إلى شاشة الدورة.
+  // الاختبار يتبعها إلى حيث صارت بدل أن يُحذف: الحكم الذي يحرسه لم يتغيّر.
+  assert.ok(cycleScreen.includes('calculate_commission_cycle'), 'calculation RPC missing');
+  assert.ok(cycleScreen.includes('reopen_commission_cycle'), 'reopen RPC missing');
+  assert.ok(cycleScreen.includes('resolve_commission_exception'), 'exception RPC missing');
+  assert.ok(cycleScreen.includes('close_commission_cycle'), 'close RPC missing');
+
+  // لا كتابة مباشرة على جداول العمولة — لا من هنا ولا من هناك.
   assert.ok(!/commission_cycle_snapshots\?[^"']*method:\s*"(POST|PATCH|DELETE)"/.test(html),
     'the page writes snapshots directly');
+  assert.doesNotMatch(cycleScreen, /commission_cycle_snapshots\?[^`'"]*(POST|PATCH|DELETE)/);
 });
 
 test('the reopen and exception paths demand a written reason', () => {
-  const reopen = html.slice(html.indexOf('async function reopenCommissionCycle'),
-    html.indexOf('async function loadCommissionConfig'));
-  assert.ok(reopen.includes('prompt('), 'reopen does not ask for a reason');
-  assert.ok(/if\(!reason\)return/.test(reopen), 'reopen proceeds without a reason');
+  // السبب يُشترط قبل النداء، ويشترطه الخادم أيضاً. الشرطان مقصودان:
+  // الواجهة تمنع الرحلة الضائعة، والخادم يمنع الالتفاف عليها.
+  const workflow = cycleScreen.slice(cycleScreen.indexOf('function wireWorkflow'));
+  assert.ok(workflow.includes("'إعادة الفتح', true"), 'reopen does not demand a reason');
+  assert.ok(workflow.includes("'الإقفال', true"), 'close does not demand a reason');
+  assert.match(cycleScreen, /السبب إلزامي/);
+
+  const resolve = cycleScreen.slice(cycleScreen.indexOf('function wireResolve'));
+  assert.ok(resolve.includes('السبب إلزامي'), 'exception resolution does not demand a reason');
 });
 
 test('the two metrics are labelled distinctly wherever they are shown', () => {

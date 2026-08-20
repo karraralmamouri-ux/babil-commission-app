@@ -7,7 +7,14 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const roles = new Set(["admin", "accountant", "monitor", "viewer"]);
+// This function keeps only what genuinely needs the auth admin API: creating
+// an account and setting a password. Role and activation used to be changed
+// here as well, which meant two places could write profiles.role — this one
+// with a service key and a self-only lockout check, and the capability-guarded
+// update_user_profile RPC with the full one. Two writable authorities over the
+// same money-adjacent field is the thing the migration is trying to end, so
+// those fields now belong to the RPC alone and are refused here.
+const PROFILE_FIELDS_MOVED_TO_RPC = ["role", "is_active", "full_name"];
 
 function reply(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -80,9 +87,22 @@ Deno.serve(async (req) => {
       const password = String(body.password || "");
       const role = String(body.role || "viewer");
 
-      if (!full_name || !email || password.length < 8 || !roles.has(role)) {
+      if (!full_name || !email || password.length < 8) {
         return reply({ error: "Invalid account data" }, 400);
       }
+
+      // The role catalogue lives in role_templates. A copy of it here would
+      // drift the day a role is added, and the drift would show up as an
+      // account that cannot be created for no visible reason.
+      const { data: template, error: templateError } = await admin
+        .from("role_templates")
+        .select("key")
+        .eq("key", role)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (templateError) throw templateError;
+      if (!template) return reply({ error: `Unknown role ${role}` }, 400);
 
       const { data: created, error: createError } =
         await admin.auth.admin.createUser({
@@ -156,94 +176,36 @@ Deno.serve(async (req) => {
       if (targetError) throw targetError;
       if (!targetProfile) return reply({ error: "User not found" }, 404);
 
-      const profilePatch: Record<string, unknown> = {};
+      const movedFields = PROFILE_FIELDS_MOVED_TO_RPC.filter(
+        (field) => body[field] !== undefined,
+      );
 
-      if (body.role !== undefined) {
-        const role = String(body.role);
-
-        if (!roles.has(role)) {
-          return reply({ error: "Invalid role" }, 400);
-        }
-
-        profilePatch.role = role;
-      }
-
-      if (body.is_active !== undefined) {
-        profilePatch.is_active = Boolean(body.is_active);
-      }
-
-      const hasProfileChange = Object.keys(profilePatch).length > 0;
-      const hasPasswordChange = body.password !== undefined;
-
-      if (hasProfileChange && hasPasswordChange) {
+      if (movedFields.length > 0) {
         return reply(
-          { error: "Profile and password changes must be separate requests" },
+          {
+            error:
+              `Changing ${movedFields.join(", ")} moved to the ` +
+              `update_user_profile RPC, which requires the permission.manage ` +
+              `capability, a stated reason, and passes the full lockout guard.`,
+          },
           400,
         );
       }
 
-      if (hasPasswordChange && String(body.password).length < 8) {
+      const hasPasswordChange = body.password !== undefined;
+
+      if (!hasPasswordChange) {
+        return reply({ error: "Nothing to update" }, 400);
+      }
+
+      if (String(body.password).length < 8) {
         return reply(
           { error: "Password must be at least 8 characters" },
           400,
         );
       }
 
-      if (
-        id === userData.user.id &&
-        (profilePatch.is_active === false ||
-          (profilePatch.role !== undefined &&
-            profilePatch.role !== "admin"))
-      ) {
-        return reply(
-          { error: "You cannot remove your own admin access" },
-          400,
-        );
-      }
-
-      if (hasProfileChange) {
-        const { data: updatedProfile, error } = await admin
-          .from("profiles")
-          .update(profilePatch)
-          .eq("id", id)
-          .select("id, full_name, email, role, is_active")
-          .single();
-
-        if (error) throw error;
-
-        const { error: auditError } = await admin.from("audit_logs").insert({
-          actor_id: userData.user.id,
-          action: "user.permissions.updated",
-          entity_type: "profile",
-          entity_id: id,
-          before_data: {
-            role: targetProfile.role,
-            is_active: targetProfile.is_active,
-          },
-          after_data: {
-            role: updatedProfile.role,
-            is_active: updatedProfile.is_active,
-          },
-          request_id: crypto.randomUUID(),
-        });
-
-        if (auditError) {
-          const { error: rollbackError } = await admin
-            .from("profiles")
-            .update({
-              role: targetProfile.role,
-              is_active: targetProfile.is_active,
-            })
-            .eq("id", id);
-
-          if (rollbackError) {
-            console.error("User update rollback failed", rollbackError);
-          }
-          throw auditError;
-        }
-      }
-
-      if (hasPasswordChange) {
+      {
         const password = String(body.password);
 
         const { error: requestAuditError } = await admin
