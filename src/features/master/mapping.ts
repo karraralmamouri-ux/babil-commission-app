@@ -82,10 +82,17 @@ export const mapping: Route = {
           ? `<b>${esc(str(r, 'agent_name'))}</b>
              <div class="muted" dir="ltr">${esc(str(r, 'agent_code'))}</div>`
           : chip('غير مربوطة', 'critical') },
-      { key: 'subs', label: 'مشتركون', cell: (r) => count(num(r, 'subscribers')), numeric: true },
-      { key: 'events', label: 'أحداث', cell: (r) => count(num(r, 'events')), numeric: true },
+      // ثلاثة أرقام لا رقم واحد. كان العمود يقول «أحداث» ويعرض مجموع كل ما
+      // وصل منذ أوّل ملفّ، فيُقرأ في شاشةٍ تشغيلية على أنه تفعيلات الشهر.
+      { key: 'cycle', label: 'تفعيلات الدورة', cell: (r) =>
+        `<b>${count(num(r, 'cycle_events'))}</b>`, numeric: true },
+      { key: 'cycleSubs', label: 'مشتركون فريدون للدورة', cell: (r) =>
+        count(num(r, 'cycle_subscribers')), numeric: true },
+      { key: 'lifetime', label: 'إجمالي تاريخي', cell: (r) =>
+        `<span class="muted">${count(num(r, 'lifetime_events'))}</span>`, numeric: true },
       { key: 'go', label: '', cell: (r) =>
-        `<a class="smallbtn" href="${esc(href(`/master/fdts/${encodeURIComponent(str(r, 'code'))}`))}">الملفّ</a>`
+        `<a class="smallbtn" href="${esc(href(`/master/fdts/${encodeURIComponent(str(r, 'code'))}/events`))}">الأحداث</a>
+         <a class="smallbtn" href="${esc(href(`/master/fdts/${encodeURIComponent(str(r, 'code'))}`))}">الملفّ</a>`
         + (can('fdt.manage')
           ? ` <button class="smallbtn map-edit"
                data-code="${esc(str(r, 'code'))}"

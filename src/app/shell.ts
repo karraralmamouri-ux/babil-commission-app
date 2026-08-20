@@ -63,6 +63,7 @@ export const NAV: NavGroup[] = [
     key: 'work', label: 'تحتاج إجراء', items: [
       { label: 'مركز العمل', path: '/work', icon: '◉', capability: 'report.view' },
       { label: 'الاستثناءات', path: '/exceptions', icon: '◬', capability: 'commission.view' },
+      { label: 'تصحيح التفعيلات', path: '/commissions/corrections', icon: '⊗', capability: 'commission.view' },
     ],
   },
   {
