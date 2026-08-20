@@ -216,6 +216,15 @@ fi
 echo "$out24" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out24" | grep -c "            ok ")))
 
+echo "== activation corrections =="
+out28=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/activation-corrections.sql 2>&1)
+if echo "$out28" | grep -qE "FAILED|ERROR"; then
+  echo "$out28" | grep -E "FAILED|ERROR" || true
+  echo "ACTIVATION CORRECTION TESTS FAILED" >&2; exit 1
+fi
+echo "$out28" | grep -E "^ {14,16}(ok|==) " || true
+passed=$((passed + $(echo "$out28" | grep -c "ok " || true)))
+
 echo "== hot path call counts =="
 out27=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/hot-path-call-counts.sql 2>&1)
 if echo "$out27" | grep -qE "FAILED|ERROR"; then
