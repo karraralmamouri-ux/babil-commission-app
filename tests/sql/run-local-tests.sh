@@ -216,6 +216,15 @@ fi
 echo "$out24" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out24" | grep -c "            ok ")))
 
+echo "== hot path call counts =="
+out27=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/hot-path-call-counts.sql 2>&1)
+if echo "$out27" | grep -qE "FAILED|ERROR"; then
+  echo "$out27" | grep -E "FAILED|ERROR" || true
+  echo "HOT PATH TESTS FAILED" >&2; exit 1
+fi
+echo "$out27" | grep -E "^ {13,15}(ok|==) " || true
+passed=$((passed + $(echo "$out27" | grep -c "              ok ")))
+
 echo "== master write domains =="
 out26=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/master-write-domains.sql 2>&1)
 if echo "$out26" | grep -qE "FAILED|ERROR"; then

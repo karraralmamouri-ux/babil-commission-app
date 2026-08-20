@@ -236,6 +236,73 @@ test('الدفع لا يُقرَّر في الواجهة', () => {
   assert.doesNotMatch(s, /canPay|allowPayment|isPayable\s*=/);
 });
 
+/* ---------------------------------------------------------------------------
+   سلطة ملاحة واحدة
+   ------------------------------------------------------------------------ */
+
+test('لا زرّ في الشريط يقصد شاشةً مخفيّة', () => {
+  // كانت كتلة «تجهيز الشهر» تقع بعد #appNav داخل <aside> المشترك، فتظهر على
+  // كل مسار. وفيها زرّان ينادِيان openSettingsSection على أقسامٍ تعيش في
+  // #legacyWorkspace — وهو مخفيّ خارج #/legacy. فكان الضغط يفتح <details>
+  // لا يراه أحد ويمرّر الصفحة إلى عنصرٍ غير مرئي: زرٌّ لا يفعل شيئاً وهو
+  // يبدو صالحاً. وهذا أسوأ من زرٍّ غائب.
+  const page = read('index.html');
+  // التعليقات تُنزع: التعليق الذي يشرح لماذا أُزيلت الكتلة يذكر أسماءها،
+  // وذكرُ الاسم ليس زرّاً.
+  const aside = page.slice(page.indexOf('<aside'), page.indexOf('</aside>'))
+    .replace(/<!--[\s\S]*?-->/g, '');
+
+  assert.doesNotMatch(aside, /openSettingsSection/,
+    'زرٌّ في الشريط ما زال يقصد قسماً في الشاشة السابقة');
+  assert.doesNotMatch(aside, /تجهيز الشهر/,
+    'كتلة تجهيز الشهر ما زالت في الشريط');
+
+  // ولا يبقى في الشريط استدعاءٌ لدالّةٍ من محرّك الشهر المتقاعد.
+  for (const retired of ['saveCurrentMonth', 'publishCurrentMonth', 'startNewMonth',
+    'toggleCentralPreview', 'focusMonthPicker', 'importFile']) {
+    assert.ok(!aside.includes(retired + '('), `الشريط ما زال ينادي ${retired}`);
+  }
+});
+
+test('كل عنصر ملاحة يقصد مساراً مسجَّلاً', () => {
+  // الشريط يُبنى من NAV وحدها، وكل مسار فيها يجب أن يوجد في الموجِّه.
+  const shell = read('src/app/shell.ts');
+  const navPaths = [...shell.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1]);
+  assert.ok(navPaths.length >= 15, `expected a populated NAV, found ${navPaths.length}`);
+
+  const featureFiles = fs.readdirSync(path.join(root, 'src/features'), { recursive: true })
+    .filter((f) => String(f).endsWith('.ts'))
+    .map((f) => read(path.join('src/features', String(f))));
+  const patterns = new Set(
+    featureFiles.flatMap((s) => [...s.matchAll(/pattern:\s*'([^']+)'/g)].map((m) => m[1])));
+  patterns.add('/legacy');
+
+  for (const p of navPaths) {
+    assert.ok(patterns.has(p), `عنصر ملاحة يقصد مساراً غير مسجَّل: ${p}`);
+  }
+});
+
+test('الزرّان الميّتان صار لهما مساران حقيقيان', () => {
+  const shell = read('src/app/shell.ts');
+  assert.match(shell, /أسعار العمولات والتير/);
+  assert.match(shell, /ربط الوكلاء والكابينات/);
+  assert.match(shell, /'\/master\/commission-schemes'/);
+  assert.match(shell, /'\/master\/mapping'/);
+
+  // وكلٌّ منهما يرسم شاشته من الخادم لا من حالةٍ محليّة.
+  const schemes = read('src/features/master/commission-schemes.ts');
+  assert.match(schemes, /commission_scheme_detail/);
+  assert.doesNotMatch(schemes, /localStorage/);
+
+  const mapping = read('src/features/master/mapping.ts');
+  assert.match(mapping, /page_fdt_mapping/);
+  assert.match(mapping, /register_fdt/);
+  assert.doesNotMatch(mapping, /localStorage/);
+
+  // ولا يعود نموذج المدَيات: الرقم ليس حقيقةً مالية.
+  assert.doesNotMatch(mapping, /cabinetRange|rawImportConfig|ownerId/);
+});
+
 test('الاستثناء يقود إلى شاشة حسمه', () => {
   const s = read('src/features/commissions/index.ts');
   assert.match(s, /UNKNOWN_FDT:/);

@@ -188,7 +188,10 @@ insert into public.saas_activation_events
 values
   ('b1111111-1111-1111-1111-111111111111','EV-N1','nsub1','P-35000',false,'r.new','2026-08-03','900'),
   ('b1111111-1111-1111-1111-111111111111','EV-N2','nsub1','P-65000',false,'r.new','2026-08-15','900'),
-  ('b1111111-1111-1111-1111-111111111111','EV-N3','nsub2','P-35000',false,'r.new','2026-08-18','900')
+  ('b1111111-1111-1111-1111-111111111111','EV-N3','nsub2','P-35000',false,'r.new','2026-08-18','900'),
+  -- تابعٌ مباشر للشركة على الكابينة نفسها: لا يرفع أساس الشريحة ولا
+  -- تنشأ عنه عمولة وكيل. وجوده هنا هو ما يجعل الرقمين أعلاه دليلاً.
+  ('b1111111-1111-1111-1111-111111111111','EV-N4','nsub3','P-35000',false,'r.new','2026-08-19','900')
 on conflict do nothing;
 
 insert into public.subscriber_identities (username, identity_status, match_method, source_classification, effective_agent_id)
@@ -197,7 +200,8 @@ values ('sub1','MATCHED','EXACT_USERNAME','RESELLER','a1111111-1111-1111-1111-11
        ('sub3','MATCHED','EXACT_USERNAME','RESELLER','a1111111-1111-1111-1111-111111111111'),
        ('sub5','MATCHED','EXACT_USERNAME','RESELLER','a1111111-1111-1111-1111-111111111111'),
        ('nsub1','MATCHED','EXACT_USERNAME','RESELLER','a2222222-2222-2222-2222-222222222222'),
-       ('nsub2','MATCHED','EXACT_USERNAME','RESELLER','a2222222-2222-2222-2222-222222222222')
+       ('nsub2','MATCHED','EXACT_USERNAME','RESELLER','a2222222-2222-2222-2222-222222222222'),
+       ('nsub3','MATCHED','EXACT_USERNAME','DIRECT_COMPANY',null)
 on conflict do nothing;
 
 insert into public.commission_cycles (id, name, period_start, period_end, created_by)
@@ -255,10 +259,25 @@ select pg_temp.ok(
   'الباقة المجهولة تُسجَّل استثناءً ولا تُسقَط بصمت');
 
 -- §7: نطاق المنطقة الجديدة هو الكابينة.
+--
+-- على الكابينة 900 ثلاثة مشتركين: nsub1 وnsub2 لوكيل، وnsub3 تابعٌ مباشر
+-- للشركة. فالرقم 2 أدناه ليس عدّاً للصفوف بل حكم: التابع المباشر لا يرفع
+-- أساس الشريحة. ولو احتُسب لصار 3، ولانتقل الوكيل إلى شريحةٍ أعلى بمشتركٍ
+-- لا يعود عليه منه شيء.
 select pg_temp.ok(
   (select unique_activated_subscribers from public.commission_cycle_snapshots
    where scope_type='FDT' and scope_id='900') = 2,
-  'المنطقة الجديدة: الأساس يُحسب داخل الكابينة');
+  'المنطقة الجديدة: الأساس يُحسب داخل الكابينة، والتابع المباشر لا يرفعه');
+
+select pg_temp.ok(
+  not exists (select 1 from public.commission_event_entitlements
+              where subscriber_key = 'nsub3'),
+  'التابع المباشر للشركة لا تنشأ عنه عمولة وكيل');
+
+select pg_temp.ok(
+  (select scope_type from public.commission_cycle_snapshots
+   where scope_id = '900') = 'FDT',
+  'نطاق المنطقة الجديدة يبقى الكابينة');
 
 select pg_temp.ok(
   (select qualifying_event_count from public.commission_cycle_snapshots

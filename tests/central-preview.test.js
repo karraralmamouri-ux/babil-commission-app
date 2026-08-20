@@ -71,13 +71,15 @@ test('central preview rejects invalid financial rows before rendering', () => {
 test('central workspace is default, allows only audited payments, and preserves admin preparation state', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
-  assert.match(html, /id="centralPreviewButton"/);
+  // كتلة «تجهيز الشهر» غادرت الشريط: كانت تظهر على كل مسار لأنها تقع بعد
+  // #appNav داخل <aside> المشترك، وفيها زرّان يقصدان شاشةً مخفيّة. ومحرّك
+  // الشهر نفسه متقاعد. فما يبقى فحصه هنا حالتُه لا واجهتُه في الشريط.
+  assert.doesNotMatch(html, /id="centralPreviewButton"/);
   assert.match(html, /البيانات المركزية/);
   assert.match(html, /class="sidebar"/);
-  assert.match(html, /وضع تجهيز الشهر/);
-  assert.match(html, /العرض والمتابعة/);
-  assert.match(html, /تجهيز الشهر/);
-  assert.match(html, /عرض البيانات المركزية/);
+
+  // ولا يُبنى إلا عند فتح #/legacy، لا في كل دخول.
+  assert.match(html, /async function ensureLegacyWorkspace\(\)/);
   assert.match(html, /await enterCentralPreview\(true\)/);
   assert.doesNotMatch(html, /النسخة المحلية/);
   assert.match(html, /if\(p==='payment'\)return centralPreview\.active&&roleAllows\(p\)/);
@@ -90,6 +92,32 @@ test('central workspace is default, allows only audited payments, and preserves 
   assert.doesNotMatch(html, /\/rest\/v1\/rpc\/record_commission_payment/);
   assert.doesNotMatch(html, /\/rest\/v1\/rpc\/publish_commission_month/);
   assert.doesNotMatch(html, /method:\s*['"](?:POST|PATCH|PUT|DELETE)['"][\s\S]{0,200}commission_(?:months|rows)/i);
+});
+
+test('the retired month engine does not run on ordinary routes', () => {
+  // العَرَض الذي رآه المستخدم: طرفيّة مُغرَقة بـ«Skipping row for hidden or
+  // unavailable month» وهو في /system/users. والسبب أن الدخول كان يُشغّل
+  // load(); renderMonths(); renderAll(); enterCentralPreview(true) أياً كان
+  // المسار — فيقرأ commission_months وكل commission_rows بلا ترشيح، ثم
+  // يُحذّر لكل صفٍّ يخصّ شهراً غير مرئي.
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+
+  // البناء صار خلف بوّابةٍ واحدة تُنادى من المسار.
+  assert.match(html, /async function ensureLegacyWorkspace\(\)/);
+  assert.match(html, /window\.ensureLegacyWorkspace\s*=\s*ensureLegacyWorkspace/);
+
+  // ولا يُنادى شيء منه في مسار الدخول أو استعادة الجلسة.
+  const loginArea = html.slice(html.indexOf('showApp();'));
+  const beforeGate = loginArea.slice(0, loginArea.indexOf('ensureLegacyWorkspace.pending'));
+  for (const call of ['load();', 'renderMonths();', 'renderAll();', 'enterCentralPreview(']) {
+    assert.ok(!beforeGate.includes(call),
+      `${call} ما زال يعمل عند الدخول على كل مسار`);
+  }
+
+  // والموجِّه هو من يفتحها، عند #/legacy وحده.
+  const main = fs.readFileSync(path.join(__dirname, '..', 'src/main.ts'), 'utf8');
+  const legacy = main.slice(main.indexOf("pattern: '/legacy'"), main.indexOf('const ROUTES'));
+  assert.match(legacy, /ensureLegacyWorkspace/);
 });
 
 test('central audit rows expose a readable shared payment action', () => {

@@ -298,18 +298,22 @@ test('أهداف اللمس تتبع نوع المؤشِّر لا عرض الش�
   // كانت قواعد اللمس داخل حدّ 720px، فكان اللوح ذو 768 يقع خارجها ويرث
   // مقاسات الفأرة: 22px في جدول المستخدمين على شاشةٍ تُلمس بالإصبع. والعرض
   // لم يكن يوماً هو السؤال — السؤال أإصبعٌ أم مؤشِّر.
-  const block = css.slice(css.indexOf('@media (pointer: coarse)'));
+  // نهايات الأسطر تختلف في هذا المستودع، فتُوحَّد قبل القصّ.
+  const LF = String.fromCharCode(10);
+  const CR = String.fromCharCode(13);
+  const flat = css.split(CR + LF).join(LF);
+  const block = flat.slice(flat.indexOf('@media (pointer: coarse)'));
   assert.ok(block.startsWith('@media (pointer: coarse)'), 'لا قاعدة مبنيّة على نوع المؤشِّر');
 
-  const body = block.slice(0, block.indexOf('\n}\n', block.indexOf('{')) + 3);
+  const body = block.slice(0, block.indexOf(LF + '}' + LF, block.indexOf('{')) + 3);
   for (const selector of ['.btn', '.smallbtn', '.search', '.select']) {
     assert.ok(body.includes(selector), `هدف اللمس ${selector} خارج القاعدة`);
   }
   assert.match(body, /min-height:\s*44px/);
 
   // ولا تعود القاعدة إلى حدّ العرض: رقمٌ دون 44 داخل كتلة 720px يُسقط الاختبار.
-  const narrow = css.slice(css.indexOf('@media (max-width: 720px)'));
-  const narrowBody = narrow.slice(0, narrow.indexOf('\n}\n'));
+  const narrow = flat.slice(flat.indexOf('@media (max-width: 720px)'));
+  const narrowBody = narrow.slice(0, narrow.indexOf(LF + '}' + LF));
   const shortTargets = [...narrowBody.matchAll(/min-height:\s*(\d+)px/g)]
     .map((m) => Number(m[1])).filter((n) => n > 0 && n < 44);
   assert.deepStrictEqual(shortTargets, [], 'هدف لمسٍ دون 44px عاد إلى قاعدة العرض');

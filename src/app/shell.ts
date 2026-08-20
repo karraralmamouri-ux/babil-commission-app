@@ -71,6 +71,8 @@ export const NAV: NavGroup[] = [
       { label: 'الوكلاء', path: '/master/agents', icon: '◇', capability: 'agent.view' },
       { label: 'الباقات', path: '/master/packages', icon: '▥', capability: 'agent.view' },
       { label: 'الكابينات', path: '/master/fdts', icon: '⊡', capability: 'commission.view' },
+      { label: 'ربط الوكلاء والكابينات', path: '/master/mapping', icon: '⋈', capability: 'commission.view' },
+      { label: 'أسعار العمولات والتير', path: '/master/commission-schemes', icon: '⊜', capability: 'commission.view' },
     ],
   },
   {
