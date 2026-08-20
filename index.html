@@ -143,20 +143,19 @@
  </div>
  <div id="centralStatus" class="central-status"><span class="status-dot"></span><span><b>جاري الاتصال</b><small>تحميل البيانات المركزية...</small></span></div>
  <div id="appNav"></div>
- <div class="side-section" data-role-permission="edit">
-  <div class="side-label">تجهيز الشهر</div>
-  <div class="side-actions">
-   <button id="centralPreviewButton" class="side-btn accent" onclick="toggleCentralPreview()"><span class="ico" aria-hidden="true">⚙</span><span class="txt">فتح وضع تجهيز الشهر</span></button>
-   <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" hidden onchange="importFile(event)">
-   <button class="side-btn" data-permission="edit" onclick="document.getElementById('fileInput').click()"><span class="ico" aria-hidden="true">📥</span><span class="txt">استيراد ملف التفعيلات</span></button>
-   <button class="side-btn" data-permission="edit" onclick="saveCurrentMonth()"><span class="ico" aria-hidden="true">💾</span><span class="txt">حفظ بيانات الشهر</span></button>
-   <button class="side-btn gold" data-permission="edit" onclick="publishCurrentMonth()"><span class="ico" aria-hidden="true">✓</span><span class="txt">اعتماد الشهر مركزياً</span></button>
-   <button class="side-btn" data-permission="edit" onclick="focusMonthPicker()"><span class="ico" aria-hidden="true">🗓</span><span class="txt">اختيار شهر محفوظ</span></button>
-   <button class="side-btn" data-permission="edit" onclick="startNewMonth()"><span class="ico" aria-hidden="true">✨</span><span class="txt">إنشاء الشهر التالي</span></button>
-   <button class="side-btn" data-permission="rates" onclick="openSettingsSection('ratesDetails')"><span class="ico" aria-hidden="true">⚖</span><span class="txt">أسعار العمولات والتير</span></button>
-   <button class="side-btn" data-permission="rates" onclick="openSettingsSection('rawImportSettingsDetails')"><span class="ico" aria-hidden="true">🔗</span><span class="txt">ربط الوكلاء والكابينات</span></button>
-  </div>
- </div>
+ <!--
+   كتلة «تجهيز الشهر» أُزيلت من الشريط.
+
+   كانت تقع بعد #appNav مباشرةً داخل <aside> المشترك، فتظهر على كل مسار
+   من مسارات التطبيق لا على #/legacy وحده. وأسوأ ما فيها زرّان كانا
+   ينادِيان openSettingsSection() على أقسامٍ تعيش داخل #legacyWorkspace،
+   وهو مخفيّ خارج #/legacy: فالضغط يفتح <details> لا يراه أحد ثم يمرّر
+   الصفحة إلى عنصرٍ غير مرئي. زرٌّ لا يفعل شيئاً وهو يبدو صالحاً.
+
+   بديلاهما مساران مسجَّلان في NAV: /master/commission-schemes و
+   /master/mapping. وبقيّة أزرار الكتلة تخصّ محرّك الشهر المتقاعد، وقد
+   توقّفت كتابته أصلاً في 269924f.
+ -->
  <div class="side-section">
   <div class="side-actions">
    <button id="languageButton" class="side-btn" onclick="toggleLanguage()"><span class="ico" aria-hidden="true">EN</span><span class="txt">English</span></button>
@@ -697,7 +696,7 @@ function showApp(){
  applyPermissions();
  initOperationsWorkspace();
  updateCentralPreviewUI();
- loadRawImportConfig().then(renderRawImportSettings).catch(error=>console.error('Raw import config:',error));
+ // إعدادات القراءة الخام تتبع الاستيراد المتقاعد، فانتقلت إلى ensureLegacyWorkspace.
  applyLanguage();
 }
 function applyPermissions(){
@@ -865,6 +864,25 @@ function renderHeaderUser(){
 
 function toggleMobileMenu(force){const sidebar=document.querySelector('.sidebar'),overlay=document.getElementById('sidebarOverlay'),button=document.getElementById('mobileMenuButton'),open=force===undefined?!sidebar.classList.contains('open'):!!force;sidebar.classList.toggle('open',open);overlay.classList.toggle('show',open);button.setAttribute('aria-expanded',String(open))}
 function scrollToSection(id,button){document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'});toggleMobileMenu(false);if(button){document.querySelectorAll('[data-nav-target]').forEach(item=>item.classList.toggle('active',item===button))}}
+/* بناء مساحة الشهر السابقة عند الطلب.
+
+   تُنادى من مسار #/legacy وحده. `pending` تُرفع عند الدخول لتقول إن الحالة
+   لم تُحمَّل بعد؛ وأول فتحٍ للمساحة يُحمِّلها ثم يُنزلها، فلا يتكرّر التحميل
+   مع كل زيارة. والخروج يرفعها ثانيةً ليبدأ المستخدم التالي من صفحةٍ نظيفة. */
+async function ensureLegacyWorkspace(){
+ if(!ensureLegacyWorkspace.pending)return;
+ ensureLegacyWorkspace.pending=false;
+ try{
+  load();renderMonths();renderAll();
+  await enterCentralPreview(true);
+  loadRawImportConfig().then(renderRawImportSettings).catch(error=>console.error("Raw import config:",error));
+ }catch(error){
+  ensureLegacyWorkspace.pending=true;
+  console.error("legacy workspace:",error);
+ }
+}
+ensureLegacyWorkspace.pending=false;
+window.ensureLegacyWorkspace=ensureLegacyWorkspace;
 function openSettingsSection(id){const section=document.getElementById(id);if(!section)return;section.open=true;section.scrollIntoView({behavior:'smooth',block:'start'})}
 function focusMonthPicker(){scrollToSection('monthSection');setTimeout(()=>document.getElementById('monthInput')?.focus(),350)}
 function authError(msg){const e=document.getElementById('loginError');e.textContent=msg;e.style.display='block'}
@@ -954,10 +972,16 @@ async function login(){
    await loadProfile(data.user);
 
    showApp();
-   load();
-   renderMonths();
-   renderAll();
-   await enterCentralPreview(true);
+   // مساحة الشهر السابقة تُبنى عند فتحها لا عند الدخول.
+   //
+   // كانت هذه الأسطر تعمل في كل دخولٍ وكل استعادة جلسة، أياً كان المسار:
+   // تقرأ commission_months وكل commission_rows بلا ترشيح، ثم تُعيد رسم
+   // جداول الشهر ولوحاته. وصفوف شهرٍ غير مرئي تُطرح واحداً واحداً بتحذير
+   // في الطرفية — 41 تحذيراً في كل مرّة على بيانات اليوم.
+   //
+   // ولا يحتاجها التطبيق الجديد في شيء: بياناته من دوالّه. فصارت تُنادى
+   // من مسار #/legacy وحده، مرّةً واحدة عند أول فتح.
+   ensureLegacyWorkspace.pending = true;
  }catch(e){
    console.error(e);
 
@@ -1028,10 +1052,16 @@ async function initAuth(){
    try{
      await loadProfile(session.user);
      showApp();
-     load();
-     renderMonths();
-     renderAll();
-     await enterCentralPreview(true);
+     // مساحة الشهر السابقة تُبنى عند فتحها لا عند الدخول.
+     //
+     // كانت هذه الأسطر تعمل في كل دخولٍ وكل استعادة جلسة، أياً كان المسار:
+     // تقرأ commission_months وكل commission_rows بلا ترشيح، ثم تُعيد رسم
+     // جداول الشهر ولوحاته. وصفوف شهرٍ غير مرئي تُطرح واحداً واحداً بتحذير
+     // في الطرفية — 41 تحذيراً في كل مرّة على بيانات اليوم.
+     //
+     // ولا يحتاجها التطبيق الجديد في شيء: بياناته من دوالّه. فصارت تُنادى
+     // من مسار #/legacy وحده، مرّةً واحدة عند أول فتح.
+     ensureLegacyWorkspace.pending = true;
    }catch(e){
      console.error(e);
      authUser=null;

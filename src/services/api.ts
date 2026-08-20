@@ -15,6 +15,8 @@ declare global {
     sbRequest?: (path: string, init?: RequestInit) => Promise<unknown>;
     opsCan?: (capability: string) => boolean;
     opsCapabilities?: Map<string, boolean>;
+    /** يبني مساحة الشهر السابقة عند فتح #/legacy، لا عند الدخول. */
+    ensureLegacyWorkspace?: () => Promise<void>;
   }
 }
 

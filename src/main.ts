@@ -18,6 +18,8 @@ import { routes as installationRoutes } from './features/installation';
 import { routes as financeRoutes } from './features/finance';
 import { routes as masterRoutes } from './features/master';
 import { routes as agentRoutes } from './features/master/agents';
+import { routes as schemeRoutes } from './features/master/commission-schemes';
+import { routes as mappingRoutes } from './features/master/mapping';
 import { routes as workRoutes } from './features/work';
 import { routes as auditRoutes } from './features/audit';
 import { routes as systemRoutes } from './features/system/users';
@@ -30,9 +32,14 @@ const legacyRoute: Route = {
   title: 'مساحة العمل السابقة',
   breadcrumb: () => [{ label: 'الرئيسية', href: '#/' }, { label: 'مساحة العمل السابقة' }],
   render(view) {
-    // الشاشات التي لم تُهاجَر بعد تبقى تعمل كما هي، ولا تُحذف قبل بديلها.
+    // المحتوى التاريخي يبقى للقراءة، ولا يُحذف قبل أن يُقرأ منه ما يُحتاج.
     view.write('');
     document.body.classList.add('legacy-visible');
+
+    // ويُبنى هنا لا عند الدخول: كان بناؤه يجري في كل دخولٍ وكل استعادة
+    // جلسة، فيقرأ جداول الشهر كلّها ويُغرق الطرفية بتحذيرٍ لكل صفٍّ يخصّ
+    // شهراً غير مرئي — على مساراتٍ لا علاقة لها بالشهر أصلاً.
+    void window.ensureLegacyWorkspace?.();
   },
 };
 
@@ -43,6 +50,8 @@ const ROUTES: Route[] = [
   ...financeRoutes,
   ...masterRoutes,
   ...agentRoutes,
+  ...schemeRoutes,
+  ...mappingRoutes,
   ...workRoutes,
   ...auditRoutes,
   ...systemRoutes,
