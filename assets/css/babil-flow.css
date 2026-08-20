@@ -1033,8 +1033,8 @@ th[aria-sort="descending"]::after { content: "↓"; opacity: 1; color: var(--gol
   .cards, .cards-4, .settings, .detailgrid, .formgrid, .split-money { grid-template-columns: 1fr; }
   .mast { align-items: flex-start; }
   .controls, .month-controls { width: 100%; }
-  .btn { padding: 9px 12px; min-height: 42px; }
-  .smallbtn { min-height: 38px; padding: 8px 11px; font-size: 11px; }
+  .btn { padding: 10px 12px; }
+  .smallbtn { padding: 10px 11px; font-size: 11px; }
   .card { min-height: 82px; }
   .wrap { padding: 0 var(--s3) var(--s7); }
   .workspace-header { padding: var(--s2) var(--s3); padding-inline-end: 62px; min-height: 0; }
@@ -1108,6 +1108,20 @@ th[aria-sort="descending"]::after { content: "↓"; opacity: 1; color: var(--gol
 body.legacy-visible #legacyWorkspace { display: block; }
 body.legacy-visible #appOutlet { display: none; }
 
+/* الشريط يقول ما هي هذه الشاشة قبل أن يُقرأ رقمٌ فيها: أرقامها صحيحة
+   تاريخياً وأزرارها لم تعد تكتب. لونٌ محايد لا تحذيريّ — ليست خطأً. */
+#legacyBanner {
+  background: var(--paper-2, #f3f1ec);
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--navy);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
 /* الزرّ المعطَّل في الترقيم رابطٌ بلا وجهة: يُقرأ معطَّلاً ولا يُنقر. */
 .btn.is-disabled {
   opacity: .45; pointer-events: none; cursor: not-allowed;
@@ -1130,4 +1144,24 @@ tbody tr[onclick]:hover td { background: var(--gold-100); }
   letter-spacing: 0;
   unicode-bidi: isolate;
   word-break: break-all;
+}
+
+/* ---------------------------------------------------------------------------
+   أهداف اللمس
+   ---------------------------------------------------------------------------
+   الشرط هنا نوع المؤشِّر لا عرض الشاشة. كانت هذه القواعد داخل حدّ 720px،
+   فكان اللوح ذو 768 يقع خارجها: شاشةُ لمسٍ بأهدافٍ مقاسة للفأرة — 22px في
+   جدول المستخدمين. والعرض لم يكن يوماً هو السؤال؛ السؤال أإصبعٌ أم مؤشِّر.
+
+   و44px ليست رقماً مستحسَناً بل أصغر ما يُصاب بالإبهام دون خطأ، وخطأ
+   الإصابة في جدولٍ صفوفه متلاصقة يعني فتح صفٍّ غير الذي قُصد — أو أسوأ.
+   ------------------------------------------------------------------------ */
+
+@media (pointer: coarse) {
+  .btn, .smallbtn, .search, .select, .tab,
+  input[type="date"], input[type="text"], input[type="email"],
+  input[type="password"], input[type="search"], input[type="file"] {
+    min-height: 44px;
+  }
+  .smallbtn { padding-block: 10px; }
 }

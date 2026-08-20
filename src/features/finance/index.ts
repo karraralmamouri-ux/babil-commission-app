@@ -6,9 +6,9 @@
  * يُستبَق بمنطق في الواجهة.
  */
 
-import type { Route } from '../../app/router';
+import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, select, toPage } from '../../services/api';
+import { rpc, select, toPage, can } from '../../services/api';
 import { money, count } from '../../domain/money';
 import {
   esc, loading, empty, pageHeader, table, pager, chip, kpiRow, type Column,
@@ -106,8 +106,119 @@ export const batchDetail: Route = {
             <b>${count(blocked.length)} سطراً مرفوضاً</b>
             <small>الخادم رفضها عند التحقّق. لا يُرحَّل سطر مرفوض مهما ظهر في الشاشة.</small></span></div>`
         : '')
+      + postPanel(batch, blocked.length)
       + (lines.length ? table(columns, lines) : empty('لا سطور في هذه الدفعة')));
+
+    wirePost(view, id, str(batch, 'name') || 'الدفعة');
   },
 };
+
+/* ---- الترحيل ------------------------------------------------------------- */
+
+/**
+ * التحقّق ثم الترحيل — خطوتان لا واحدة.
+ *
+ * الترحيل يُنشئ مالاً في الدفتر، فلا يُدمج مع التحقّق في زرٍّ واحد: بين
+ * تجهيز الدفعة وترحيلها قد يتغيّر ما يجعل سطراً غير مستحقّ، والتحقّق يُظهر
+ * ذلك قبل أن يصير قيداً.
+ *
+ * والمرجع إلزامي: قيدٌ في الدفتر بلا مرجع بنكيّ لا يُطابَق لاحقاً بشيء.
+ */
+function postPanel(batch: Row, blocked: number): string {
+  const status = str(batch, 'status');
+  if (status === 'POSTED' || status === 'PAID') {
+    return `<div class="insight good" style="margin-bottom:12px"><span class="insight-dot"></span><span>
+      <b>رُحِّلت هذه الدفعة</b>
+      <small>المرجع ${esc(str(batch, 'payment_reference') || '—')} ·
+        ${esc(str(batch, 'posted_at').slice(0, 10) || '—')}. الترحيل لا يُعاد.</small></span></div>`;
+  }
+  if (status === 'CANCELLED') {
+    return `<div class="insight warn" style="margin-bottom:12px"><span class="insight-dot"></span><span>
+      <b>أُلغيت هذه الدفعة</b><small>لا تُرحَّل.</small></span></div>`;
+  }
+  if (!can('commission.execute_payment')) {
+    return `<div class="box" style="margin-bottom:12px">
+      <p class="muted">العرض فقط — الترحيل يحتاج صلاحية
+      <code dir="ltr">commission.execute_payment</code>.</p></div>`;
+  }
+  return `<div class="box" style="margin-bottom:12px" id="postBox">
+    <h3>التحقّق والترحيل</h3>
+    <p class="muted" style="font-size:11px;margin:0 0 10px">
+      التحقّق يُعيد فحص كل سطر عند الخادم ويُحدِّث المرفوض.
+      ${blocked ? `يوجد ${count(blocked)} سطراً مرفوضاً — الخادم لا يُرحّلها.` : ''}
+      والترحيل يُنشئ القيد في الدفتر ولا يُعاد.</p>
+    <div class="toolbar">
+      <button class="btn" id="pbCheck">تحقّق</button>
+      <input class="search" id="pbRef" placeholder="المرجع البنكي (إلزامي للترحيل)"
+        aria-label="المرجع البنكي" dir="ltr">
+      <button class="btn gold" id="pbPost">رحِّل</button>
+    </div>
+    <div id="pbResult"></div>
+  </div>`;
+}
+
+function wirePost(view: View, id: string, name: string): void {
+  const box = view.el.querySelector<HTMLElement>('#postBox');
+  if (!box) return;
+  const check = box.querySelector<HTMLButtonElement>('#pbCheck');
+  const ref = box.querySelector<HTMLInputElement>('#pbRef');
+  const post = box.querySelector<HTMLButtonElement>('#pbPost');
+  const out = box.querySelector<HTMLElement>('#pbResult');
+  if (!out) return;
+
+  check?.addEventListener('click', async () => {
+    check.disabled = true;
+    out.innerHTML = loading('جارٍ إعادة التحقّق…');
+    try {
+      const res = await rpc<Row>('revalidate_commission_batch', { p_batch_id: id });
+      if (!view.live) return;
+      const stillBlocked = num(res, 'blocked');
+      out.innerHTML = insight(stillBlocked ? 'warn' : 'good',
+        stillBlocked ? `${count(stillBlocked)} سطراً ما زال مرفوضاً` : 'كل السطور مقبولة',
+        stillBlocked ? 'الخادم لن يُرحّل المرفوض.' : '');
+      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1500);
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'تعذّر التحقّق',
+        error instanceof Error ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      check.disabled = false;
+    }
+  });
+
+  post?.addEventListener('click', async () => {
+    const reference = ref?.value.trim() || '';
+    if (!reference) {
+      out.innerHTML = insight('warn', 'المرجع إلزامي',
+        'قيدٌ في الدفتر بلا مرجع لا يُطابَق لاحقاً');
+      return;
+    }
+    if (!window.confirm(
+      `ترحيل «${name}» بالمرجع ${reference}؟ يُنشئ قيداً في الدفتر ولا يُعاد.`)) return;
+    post.disabled = true;
+    out.innerHTML = loading('جارٍ الترحيل…');
+    try {
+      await rpc<Row>('post_commission_batch', {
+        p_batch_id: id,
+        p_payment_reference: reference,
+        p_request_id: crypto.randomUUID(),
+      });
+      if (!view.live) return;
+      out.innerHTML = insight('good', 'رُحِّلت الدفعة');
+      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1500);
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'لم تُرحَّل الدفعة',
+        error instanceof Error ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      post.disabled = false;
+    }
+  });
+}
+
+function insight(tone: 'good' | 'warn' | 'danger', title: string, detail = ''): string {
+  return `<div class="insight ${tone}" style="margin-top:10px"><span class="insight-dot"></span><span>
+    <b>${esc(title)}</b>${detail ? `<small>${esc(detail)}</small>` : ''}</span></div>`;
+}
 
 export const routes: Route[] = [batches, batchDetail, ...installationBatchRoutes];

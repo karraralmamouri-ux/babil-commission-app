@@ -238,10 +238,29 @@ test('الدفع لا يُقرَّر في الواجهة', () => {
 
 test('الاستثناء يقود إلى شاشة حسمه', () => {
   const s = read('src/features/commissions/index.ts');
-  assert.match(s, /UNKNOWN_FDT: href/);
-  assert.match(s, /UNKNOWN_AGENT: href/);
-  assert.match(s, /SOURCE_INCOMPLETE: href/);
+  assert.match(s, /UNKNOWN_FDT:/);
+  assert.match(s, /UNKNOWN_AGENT:/);
+  assert.match(s, /SOURCE_INCOMPLETE:/);
   assert.doesNotMatch(s, /مطوّر|developer/i);
+
+  // ولا يكفي وجود الرابط: كان اثنان منها يشيران إلى ما لا وجود له، فيفتح
+  // الزرّ «الصفحة غير موجودة». وزرٌّ يَعِد بحسمٍ ثم يخذل أسوأ من غيابه.
+  const patterns = new Set(
+    ['src/features/master/fdts.ts', 'src/features/master/agents.ts',
+      'src/features/master/index.ts', 'src/features/system/imports.ts',
+      'src/features/installation/index.ts']
+      .flatMap((f) => [...read(f).matchAll(/pattern:\s*'([^']+)'/g)].map((m) => m[1])));
+
+  const map = s.slice(s.indexOf('const map: Record<string, string>'));
+  const targets = [...map.slice(0, map.indexOf('};')).matchAll(/href\(`?'?([^`'$)]+)/g)]
+    .map((m) => m[1]).filter((t) => t.startsWith('/'));
+  assert.ok(targets.length >= 4, `expected mapped targets, found ${targets.length}`);
+
+  for (const target of targets) {
+    const known = [...patterns].some((p) =>
+      p === target || p.replace(/\/:[^/]+/g, '') === target.replace(/\/$/, ''));
+    assert.ok(known, `الاستثناء يقود إلى مسارٍ غير مسجَّل: ${target}`);
+  }
 });
 
 /* ---------------------------------------------------------------------------

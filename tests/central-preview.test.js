@@ -85,7 +85,10 @@ test('central workspace is default, allows only audited payments, and preserves 
   assert.match(html, /centralPreview\.localState=clone\(state\)/);
   assert.match(html, /state=clone\(centralPreview\.localState\)/);
   assert.match(html, /function fetchCentralPages\(path,pageSize=500\)/);
-  assert.match(html, /\/rest\/v1\/rpc\/record_commission_payment/);
+  // محرّك الشهر السابق تقاعد: بياناته تُقرأ ولا تُكتب. الصرف صار يجري من
+  // دفعات الصرف — ومحرّكان يكتبان المال نفسه ينتهيان إلى رقمين مختلفين.
+  assert.doesNotMatch(html, /\/rest\/v1\/rpc\/record_commission_payment/);
+  assert.doesNotMatch(html, /\/rest\/v1\/rpc\/publish_commission_month/);
   assert.doesNotMatch(html, /method:\s*['"](?:POST|PATCH|PUT|DELETE)['"][\s\S]{0,200}commission_(?:months|rows)/i);
 });
 
@@ -108,18 +111,15 @@ test('central audit rows expose a readable shared payment action', () => {
   assert.equal(logs[0].newValue, '1000 / 2026-09-10');
 });
 
-test('payment is sent to the atomic RPC with concurrency and idempotency values', async () => {
-  let request;
+test('the retired month engine no longer reaches the network to record a payment', async () => {
+  // كان هذا الاختبار يتحقّق من أن الصرف يمرّ بدالّة ذرّية بمعرّف طلبٍ
+  // وطابعِ تزامن. الحكم لم يسقط، بل انتقل: الصرف صار من دفعات الصرف،
+  // وهنا يبقى التحقّق من أن الطريق القديم لم يعد يصل إلى الشبكة أصلاً.
+  let called = false;
   const app = loadCurrentApp({
-    fetch: async (url, options) => {
-      request = { url, options };
-      return {
-        ok: true,
-        status: 200,
-        async text() {
-          return JSON.stringify({ row: { id: 'row-1' }, replayed: false });
-        },
-      };
+    fetch: async () => {
+      called = true;
+      return { ok: true, status: 200, async text() { return '{}'; } };
     },
   });
   app.setSbSession({ access_token: 'access', refresh_token: 'refresh', expires_at: Math.floor(Date.now() / 1000) + 3600 });
@@ -131,13 +131,17 @@ test('payment is sent to the atomic RPC with concurrency and idempotency values'
     'request-1',
   );
 
-  assert.match(request.url, /\/rest\/v1\/rpc\/record_commission_payment$/);
-  assert.equal(request.options.headers.Authorization, 'Bearer access');
-  assert.deepEqual(JSON.parse(request.options.body), {
-    p_row_id: 'row-1',
-    p_expected_updated_at: '2026-09-10T00:00:00.000Z',
-    p_paid: 1000,
-    p_payment_date: '2026-09-10',
-    p_request_id: 'request-1',
-  });
+  assert.equal(called, false, 'الطريق المتقاعد ما زال يكتب');
+});
+
+test('commission payment posting keeps its request id and its reference', () => {
+  // وهنا يُتحقَّق من الحكم في موضعه الجديد: الترحيل يحمل معرّف طلبٍ يمنع
+  // تكراره، ومرجعاً بنكياً بلا استثناء.
+  const finance = fs.readFileSync(
+    path.join(__dirname, '..', 'src/features/finance/index.ts'), 'utf8');
+  const post = finance.slice(finance.indexOf("rpc<Row>('post_commission_batch'"));
+
+  assert.match(post, /p_request_id: crypto\.randomUUID\(\)/);
+  assert.match(post, /p_payment_reference: reference/);
+  assert.match(finance, /المرجع إلزامي/);
 });

@@ -196,6 +196,7 @@
 <nav id="appCrumbs" class="crumbs" aria-label="مسار التنقّل"></nav>
 <div id="appOutlet"></div>
 <div id="legacyWorkspace">
+<div id="legacyBanner" role="status">نسخة قديمة — للعرض التاريخي فقط. كل كتابة انتقلت إلى التطبيق.</div>
 <header id="monthSection" class="mast section-anchor">
  <div>
   <div class="eyebrow">BABIL FLOW • RESELLER FINANCIAL OPERATIONS</div>
@@ -1464,18 +1465,19 @@ function renderManagedUsers(){
    return `<tr id="managed-user-${esc(u.id)}"><td><b>${esc(u.full_name||'—')}</b>${self?' <span class="badge bpartial">حسابك</span>':''}</td><td dir="ltr">${esc(u.email||'—')}</td><td><select id="role-draft-${esc(u.id)}" class="tier">${roleOptions(u.role)}</select><div class="muted" style="font-size:9px;margin-top:3px">${esc(describeRole(u.role))}</div></td><td><span class="${u.is_active?'status-active':'status-disabled'}">${u.is_active?'● مفعل':'● معطل'}</span></td><td><div class="user-actions"><button class="smallbtn gold" onclick="saveManagedUserRole('${esc(u.id)}','${esc(u.role)}')">حفظ الدور</button><button class="smallbtn ${u.is_active?'danger':''}" onclick="toggleManagedUser('${esc(u.id)}',${!!u.is_active})" ${self?'disabled title="لا يمكنك تعطيل حسابك"':''}>${u.is_active?'تعطيل':'تفعيل'}</button><button class="smallbtn" onclick="resetManagedUserPassword('${esc(u.id)}','${esc(u.email||'')}')">تغيير كلمة المرور</button></div></td></tr>`
  }).join('')||'<tr><td colspan="5" class="muted">لا توجد حسابات مطابقة.</td></tr>';applyLanguage();
 }
-async function createManagedUser(){
- const full_name=document.getElementById('newUserName').value.trim(),email=document.getElementById('newUserEmail').value.trim(),password=document.getElementById('newUserPassword').value,role=document.getElementById('newUserRole').value,b=document.getElementById('createUserButton');
- if(!full_name||!email||!password){toast('أدخل الاسم والبريد وكلمة المرور');return}if(password.length<8){toast('كلمة المرور يجب ألا تقل عن 8 أحرف');return}
- b.disabled=true;b.textContent='جارِ الإنشاء...';
- try{await callAdminUsers('create',{full_name,email,password,role});document.getElementById('newUserName').value='';document.getElementById('newUserEmail').value='';document.getElementById('newUserPassword').value='';toast('تم إنشاء الحساب');await loadManagedUsers()}
- catch(e){console.error(e);toast(`تعذر إنشاء الحساب: ${e.message||''}`)}finally{b.disabled=false;b.textContent='إنشاء الحساب'}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function createManagedUser(){
+ toast("انتقل إنشاء الحسابات إلى شاشة المستخدمين");
+ location.hash = "#/system/users";
 }
-async function updateManagedUser(id,changes){
- const row=document.getElementById(`managed-user-${id}`);row?.classList.add('user-row-busy');
- try{await callAdminUsers('update',{id,...changes});toast('تم تحديث صلاحيات الحساب');await loadManagedUsers()}
- catch(e){console.error(e);toast(`تعذر تحديث الحساب: ${e.message||''}`);renderManagedUsers()}
- finally{row?.classList.remove('user-row-busy')}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function updateManagedUser(id,changes){
+ toast("انتقل تعديل الحسابات إلى شاشة المستخدمين");
+ location.hash = "#/system/users";
 }
 async function saveManagedUserRole(id,currentRole){const select=document.getElementById(`role-draft-${id}`),nextRole=select?.value;if(!nextRole||nextRole===currentRole){toast('لم يتغير دور الحساب');return}const user=managedUsers.find(item=>item.id===id),name=user?.full_name||user?.email||'الحساب';if(!confirm(`تغيير دور ${name} من ${ROLE_LABELS[currentRole]||currentRole} إلى ${ROLE_LABELS[nextRole]||nextRole}؟`)){select.value=currentRole;return}await updateManagedUser(id,{role:nextRole})}
 async function toggleManagedUser(id,isActive){
@@ -1484,7 +1486,13 @@ async function toggleManagedUser(id,isActive){
 function resetManagedUserPassword(id,email){managedPasswordTarget={id,email};document.getElementById('passwordAccountLabel').textContent=`الحساب: ${email||'—'}`;document.getElementById('managedPassword').value='';document.getElementById('managedPasswordConfirm').value='';document.getElementById('managedPasswordError').textContent='';document.getElementById('showManagedPassword').checked=false;toggleManagedPasswordVisibility();document.getElementById('passwordModal').classList.add('open');setTimeout(()=>document.getElementById('managedPassword')?.focus(),0)}
 function closePasswordModal(){document.getElementById('passwordModal').classList.remove('open');managedPasswordTarget=null}
 function toggleManagedPasswordVisibility(){const type=document.getElementById('showManagedPassword').checked?'text':'password';document.getElementById('managedPassword').type=type;document.getElementById('managedPasswordConfirm').type=type}
-async function saveManagedUserPassword(){const password=document.getElementById('managedPassword').value,confirmation=document.getElementById('managedPasswordConfirm').value,error=document.getElementById('managedPasswordError'),button=document.getElementById('saveManagedPasswordButton');error.textContent='';if(password.length<8){error.textContent='كلمة المرور يجب ألا تقل عن 8 أحرف';return}if(password!==confirmation){error.textContent='كلمتا المرور غير متطابقتين';return}if(!managedPasswordTarget)return;button.disabled=true;try{await callAdminUsers('update',{id:managedPasswordTarget.id,password});toast('تم تغيير كلمة المرور');closePasswordModal()}catch(e){console.error(e);error.textContent=`تعذر تغيير كلمة المرور: ${e.message||''}`}finally{button.disabled=false}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function saveManagedUserPassword(){
+ toast("انتقل تعيين كلمة المرور إلى شاشة المستخدم");
+ location.hash = "#/system/users";
+}
 let hasUnsavedChanges=false;
 function updateUnsavedIndicator(){document.getElementById('unsavedIndicator')?.classList.toggle('show',hasUnsavedChanges)}
 function markUnsaved(){hasUnsavedChanges=true;updateUnsavedIndicator()}
@@ -1584,7 +1592,11 @@ function addRawAgentConfig(){if(!roleAllows('rates'))return;const id=`agent-${Da
 function removeRawAgentConfig(index){if(!roleAllows('rates')||!confirm('حذف هذا الوكيل من إعدادات القراءة؟'))return;const id=rawImportConfig.agents[index]?.id;rawImportConfig.agents.splice(index,1);rawImportConfig.cabinetRanges=rawImportConfig.cabinetRanges.filter(range=>range.ownerId!==id);renderRawImportSettings()}
 function addRawCabinetRange(){if(!roleAllows('rates'))return;rawImportConfig.cabinetRanges.push({id:`range-${Date.now()}`,from:1,to:1,ownerId:rawImportConfig.agents[0]?.id||''});renderRawImportSettings()}
 function removeRawCabinetRange(index){if(!roleAllows('rates'))return;rawImportConfig.cabinetRanges.splice(index,1);renderRawImportSettings()}
-async function saveRawImportConfig(){if(!(await ensurePermission('rates')))return;try{validateRawImportConfig(rawImportConfig);localStorage.setItem(RAW_IMPORT_CONFIG_STORAGE,JSON.stringify(rawImportConfig));try{await sbRequest('/rest/v1/rpc/save_import_settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_value:rawImportConfig,p_request_id:createRequestId()})});toast('تم حفظ إعدادات الربط مركزياً')}catch(error){if(error?.status===404||error?.status===400)toast('تم حفظ الإعدادات للتجربة؛ يلزم تطبيق تحديث قاعدة البيانات للمشاركة المركزية');else throw error}}catch(error){alert(error.message)}}
+/* محرّك الشهر السابق تقاعد. بياناته تبقى للقراءة التاريخية، وكتابته
+   توقّفت: محرّكان يكتبان المال نفسه ينتهيان إلى رقمين. */
+function saveRawImportConfig(){
+ toast("إعدادات القراءة الخام تتبع الاستيراد السابق، وقد توقّفت كتابته");
+}
 async function resetRawImportConfig(){if(!(await ensurePermission('rates'))||!confirm('استعادة إعدادات قراءة الملف الخام الافتراضية؟'))return;localStorage.removeItem(RAW_IMPORT_CONFIG_STORAGE);await loadRawImportConfig(true);renderRawImportSettings();toast('تمت استعادة الإعدادات الافتراضية')}
 function filtered(zone){
  const q=(document.getElementById('searchInput').value||'').trim().toLowerCase(),zf=document.getElementById('zoneFilter').value,sf=document.getElementById('statusFilter').value;
@@ -1829,19 +1841,10 @@ function paymentRequestId(row,paid,paymentDate){
  if(existing?.signature===signature)return existing.requestId;
  const requestId=createRequestId();pendingPaymentRequests.set(row.centralId,{signature,requestId});return requestId;
 }
-async function recordCentralPayment(row,paid,paymentDate,requestId){
- if(!row?.centralId||!row?.centralUpdatedAt)throw new Error('بيانات الصف المركزي غير مكتملة. حدّث البيانات وحاول مرة أخرى.');
- return sbRequest('/rest/v1/rpc/record_commission_payment',{
-   method:'POST',
-   headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({
-     p_row_id:row.centralId,
-     p_expected_updated_at:row.centralUpdatedAt,
-     p_paid:paid,
-     p_payment_date:paymentDate||null,
-     p_request_id:requestId
-   })
- });
+/* محرّك الشهر السابق تقاعد. بياناته تبقى للقراءة التاريخية، وكتابته
+   توقّفت: محرّكان يكتبان المال نفسه ينتهيان إلى رقمين. */
+function recordCentralPayment(row,paid,paymentDate,requestId){
+ toast("تسجيل الدفع يجري من دفعات الصرف — محرّك الشهر السابق للقراءة فقط");
 }
 function applyCentralPaymentResult(row,result){
  const after=result?.row;
@@ -1901,7 +1904,7 @@ async function savePayment(z,i){
 function details(z,i){const r=state.data[z][i],c=calc(r),prev=getPreviousRow(z,r.name);openModal(`📋 ${r.name}`,`<div class="detailgrid"><div class="detailcard">المنطقة<b>${z==='old'?'OLD':'NEW'}</b></div><div class="detailcard">الفئة<b>${c.t?c.t.label:'-'}</b></div><div class="detailcard">إجمالي الكمية<b>${fmt(c.qty)}</b></div><div class="detailcard">المستحق<b class="money">${fmt(c.total)}</b></div><div class="detailcard">المدفوع<b>${fmt(c.paid)}</b></div><div class="detailcard">المتبقي<b class="money">${fmt(c.remaining)}</b></div><div class="detailcard">P35<b>${fmt(c.p35)}</b></div><div class="detailcard">P45 / P65<b>${fmt(c.p45)} / ${fmt(c.p65)}</b></div></div><div style="margin-top:14px" class="box"><h3>📈 مقارنة سريعة</h3>${prev?`<div class="minirow"><span>الشهر السابق</span><b>${fmt(prev.total)} د.ع</b></div><div class="minirow"><span>التغيير</span><b>${fmt(c.total-prev.total)} د.ع</b></div>`:'<span class="muted">لا توجد بيانات للشهر السابق</span>'}</div>`)}
 function getPreviousRow(z,name){const current=monthOrder(state.month),key=Object.keys(state.archive).filter(k=>monthOrder(k)<current).sort(compareMonthKeys).pop();if(!key)return null;const snap=state.archive[key],r=(snap.data?.[z]||[]).find(x=>x.name===name);if(!r)return null;const backup=state.tiers;state.tiers=snap.tiers||state.tiers;const c=calc(r);state.tiers=backup;return c}
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.add('open')}
-function closeModal(){document.getElementById('modal').classList.remove('open')}
+function closeModal(){document.getElementById('modal').classList.remove('open')}
 /* ---- العمليات المالية -------------------------------------------------- */
 /* القدرة تُفحص على الخادم قبل كل RPC. ما هنا إخفاءُ ما لا فائدة من عرضه. */
 let opsCapabilities=new Map(),opsQueues=[],opsSchemes=[],opsUsers=[],opsPermTarget=null;
@@ -2026,14 +2029,13 @@ async function renderPermissionWorkspace(){
      `<button class="smallbtn" onclick="setPermission('${esc(c.key)}','DENY')">منع</button> `+
      `<button class="smallbtn" onclick="setPermission('${esc(c.key)}','INHERIT')">وراثة</button></td></tr>`}).join("")+"</tbody></table>";
  }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
-async function setPermission(capability,effect){
- if(!opsPermTarget)return;
- if(!confirm(`تأكيد تغيير «${capability}» إلى ${effect}؟`))return;
- try{
-  await sbRequest("/rest/v1/rpc/set_user_permission",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({p_user_id:opsPermTarget,p_capability:capability,p_effect:effect,p_scope_type:"GLOBAL",p_scope_id:null,p_reason:"تغيير من واجهة الإدارة",p_request_id:createRequestId()})});
-  toast("تم تحديث الصلاحية");renderPermissionWorkspace()}
- catch(error){alert(error?.message||"تعذّر التغيير")}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function setPermission(capability,effect){
+ toast("انتقلت إدارة الصلاحيات إلى شاشة المستخدمين");
+ location.hash = "#/system/users";
+}
 
 async function loadCorrections(){
  const host=document.getElementById("opsCorrectionList");if(!host)return;
@@ -2139,36 +2141,37 @@ function jumpToExceptionAction(target){
  if(panel&&panel.id.startsWith("panel-")&&typeof switchTab==="function")switchTab(panel.id.slice(6));
  el.scrollIntoView({behavior:"smooth",block:"center"})}
 
-async function resolveCxException(id){
- const note=prompt("سبب الحسم (يُسجَّل في التدقيق):");if(!note)return;
- try{await sbRequest("/rest/v1/rpc/resolve_commission_exception",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({p_exception_id:id,p_status:"WAIVED",p_note:note,p_request_id:createRequestId()})});
-  toast("تم حسم الاستثناء");loadCommissionExceptions()}
- catch(error){alert(error?.message||"تعذّر الحسم")}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function resolveCxException(id){
+ toast("انتقل حسم الاستثناءات إلى شاشة الاستثناءات");
+ location.hash = "#/exceptions";
+}
 
-async function recalculateCommissionCycle(){
- if(!cxCurrentCycle)return;
- try{const res=await sbRequest("/rest/v1/rpc/calculate_commission_cycle",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({p_cycle_id:cxCurrentCycle.id,p_finalize:false})});
-  toast(`حساب متوقَّع: ${res?.unique_activated_subscribers??0} مشترك · ${res?.qualifying_events??0} حدث`);
-  loadCommissionCycle()}
- catch(error){alert(error?.message||"تعذّر الحساب")}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function recalculateCommissionCycle(){
+ toast("انتقلت إعادة الحساب إلى شاشة الدورة");
+ location.hash = "#/commissions/cycles";
+}
 
-async function finalizeCommissionCycle(){
- if(!cxCurrentCycle)return;
- if(!confirm(`اعتماد «${cxCurrentCycle.name}» نهائياً؟ النتيجة تُحفظ ولا يُعاد حسابها.`))return;
- try{const res=await sbRequest("/rest/v1/rpc/calculate_commission_cycle",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({p_cycle_id:cxCurrentCycle.id,p_finalize:true,p_request_id:createRequestId()})});
-  toast(`اعتُمدت الدورة: ${res?.gross_commission??0} د.ع`);loadCommissionCycles()}
- catch(error){alert(error?.message||"تعذّر الاعتماد")}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function finalizeCommissionCycle(){
+ toast("انتقل اعتماد الدورة إلى شاشة الدورة");
+ location.hash = "#/commissions/cycles";
+}
 
-async function reopenCommissionCycle(){
- if(!cxCurrentCycle)return;
- const reason=prompt("سبب إعادة الفتح (يُسجَّل في التدقيق):");if(!reason)return;
- try{await sbRequest("/rest/v1/rpc/reopen_commission_cycle",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({p_cycle_id:cxCurrentCycle.id,p_reason:reason,p_request_id:createRequestId()})});
-  toast("أُعيد فتح الدورة");loadCommissionCycles()}
- catch(error){alert(error?.message||"تعذّرت إعادة الفتح")}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function reopenCommissionCycle(){
+ toast("انتقلت إعادة فتح الدورة إلى شاشة الدورة");
+ location.hash = "#/commissions/cycles";
+}
 
 async function loadCommissionConfig(){
  const host=document.getElementById("cxConfig");if(!host)return;
@@ -2278,14 +2281,13 @@ async function loadCycleReport(){
   loadExecutiveOverview();
  }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
 
-async function exportCycleReport(){
- const select=document.getElementById("rpCycleSelect");if(!select?.value)return;
- try{
-  const res=await sbRequest("/rest/v1/rpc/export_commission_cycle",{method:"POST",headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({p_cycle_id:select.value,p_request_id:createRequestId()})});
-  downloadCsv("commission-cycle.csv",Reporting.toCsv(res?.rows||[],Reporting.COMMISSION_EXPORT_COLUMNS));
-  toast(`صُدِّر ${res?.row_count??0} صفاً`)}
- catch(error){alert(error?.message||"تعذّر التصدير")}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function exportCycleReport(){
+ toast("انتقل تصدير الدورة إلى شاشة الدورة");
+ location.hash = "#/commissions/cycles";
+}
 
 async function loadAgentStatementList(){
  const select=document.getElementById("rpAgentSelect");if(!select)return;
@@ -2368,18 +2370,21 @@ function payoutButtons(id){
  return `<button class="smallbtn" onclick="revalidatePayout(&quot;${safe}&quot;)">تحقق</button> `
   +`<button class="smallbtn" onclick="postPayout(&quot;${safe}&quot;)">ترحيل</button>`}
 
-async function revalidatePayout(id){
- try{const r=await sbRequest("/rest/v1/rpc/revalidate_commission_batch",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({p_batch_id:id})});
-  toast(`قابل للدفع ${r?.payable??0} · محجوب ${r?.blocked??0}`);loadPayoutBatches()}
- catch(error){alert(error?.message||"تعذّر التحقق")}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function revalidatePayout(id){
+ toast("انتقل التحقّق إلى شاشة دفعات الصرف");
+ location.hash = "#/finance/payment-batches";
+}
 
-async function postPayout(id){
- const ref=prompt("مرجع الدفع (اختياري):");
- if(!confirm("ترحيل الدفعة؟ يُكتب قيد في الدفتر لكل بند."))return;
- try{const r=await sbRequest("/rest/v1/rpc/post_commission_batch",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({p_batch_id:id,p_payment_reference:ref||null,p_request_id:createRequestId()})});
-  toast(`رُحِّل ${r?.paid_items??0} بند بمبلغ ${fmt(r?.total_amount??0)}`);loadPayoutBatches();loadExecutiveOverview()}
- catch(error){alert(error?.message||"تعذّر الترحيل")}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function postPayout(id){
+ toast("انتقل الترحيل إلى شاشة دفعات الصرف");
+ location.hash = "#/finance/payment-batches";
+}
 
 function initReporting(){
  if(typeof Reporting==="undefined")return;
@@ -2442,17 +2447,13 @@ function submitFdtBulk(){
  location.hash = "#/master/fdts/unknown";
 }
 
-async function recalcAfterFdt(){
- const sel=document.getElementById("fdtCycleSelect");
- if(!sel?.value){alert("اختر دورة");return}
- if(!confirm("إعادة حساب الدورة بعد تغيير البيانات الرئيسية؟"))return;
- try{
-  const res=await sbRequest("/rest/v1/rpc/recalculate_cycle_after_master_change",{method:"POST",
-   headers:{"Content-Type":"application/json"},
-   body:JSON.stringify({p_cycle_id:sel.value,p_request_id:createRequestId()})});
-  toast(`الإجمالي ${fmt(res?.gross_before??0)} ← ${fmt(res?.gross_after??0)} · المحجوب ${fmt(res?.blocking_before??0)} ← ${fmt(res?.blocking_after??0)}`);
-  loadUnregisteredFdts();if(typeof loadCommissionCycle==="function")loadCommissionCycle()}
- catch(error){alert(error?.message||"تعذّرت إعادة الحساب")}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function recalcAfterFdt(){
+ toast("انتقلت إعادة الحساب إلى شاشة الدورة");
+ location.hash = "#/commissions/cycles";
+}
 
 function switchTab(z){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.zone===z));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+z))}
 function monthKey(date=new Date()){return String(date.getMonth()+1).padStart(2,'0')+'/'+date.getFullYear()}
@@ -2494,19 +2495,10 @@ async function saveCurrentMonth(){
    القديمة الخاطئة ويجعل تقريباً قديماً يبدو موثوقاً.
    المرجع: docs/engineering/risk-and-open-decisions.md — R-01 وD-03. */
 function rowsForCentralPublish(){return ['old','new'].flatMap(zone=>state.data[zone].map(row=>{const calculated=calc(row);if(!calculated.t)throw new Error(`تعذر تحديد التير للسجل ${row.name}`);const sourceBreakdown=normalizeSourceBreakdown(row.sourceBreakdown||[],row,`${zone}.${row.name}.sourceBreakdown`);return{zone,name:row.name,p35:calculated.p35,p45:calculated.p45,p65:calculated.p65,tier_mode:row.customTier||'auto',applied_tier:calculated.t.key,tier_basis_qty:calculated.tierQty,tier_group_id:row.tierGroupId||null,tier_group_name:row.tierGroupName||null,source_account:row.sourceAccount||null,source_breakdown:sourceBreakdown,owner_name:row.owner||null}}))}
-async function publishCurrentMonth(){
- if(!(await ensurePermission('edit')))return;
- if(centralPreview.active){toast('افتح وضع تجهيز الشهر أولاً');return}
- if(!state.data.old.length&&!state.data.new.length){toast('لا توجد بيانات لاعتمادها');return}
- if(!confirm(`اعتماد شهر ${state.month} مركزياً؟ سيتم تحديث بيانات الشهر لجميع المستخدمين مع الاحتفاظ بعمليات الصرف المسجلة.`))return;
- const rows=rowsForCentralPublish(),button=document.querySelector('[onclick="publishCurrentMonth()"]');if(button){button.disabled=true;button.textContent='جاري الاعتماد...'}
- try{
-  const result=await sbRequest('/rest/v1/rpc/publish_commission_month',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({p_month_key:state.month,p_tiers:state.tiers,p_rows:rows,p_request_id:createRequestId()})});
-  state.archive[state.month]={data:clone(state.data),tiers:clone(state.tiers),savedAt:new Date().toISOString()};save(true);renderMonths();
-  toast(result?.replayed?'الشهر معتمد مركزياً مسبقاً':'تم اعتماد الشهر مركزياً وأصبح متاحاً للجميع');
-  await enterCentralPreview(true);
- }catch(error){console.error('Central month publish error:',error);if(error?.status===404||String(error?.message||'').includes('publish_commission_month'))toast('ميزة الاعتماد جاهزة في التطبيق وتحتاج تطبيق تحديث قاعدة البيانات على بيئة التجربة');else toast(`تعذر اعتماد الشهر مركزياً: ${error.message||''}`)}
- finally{if(button){button.disabled=false;button.textContent='✓ اعتماد الشهر مركزياً'}}
+/* محرّك الشهر السابق تقاعد. بياناته تبقى للقراءة التاريخية، وكتابته
+   توقّفت: محرّكان يكتبان المال نفسه ينتهيان إلى رقمين. */
+function publishCurrentMonth(){
+ toast("اعتماد الشهر يجري من دورات العمولة — محرّك الشهر السابق للقراءة فقط");
 }
 function renderMonths(){const s=document.getElementById('monthSelect'),keys=[...new Set([state.month,...Object.keys(state.archive)])].sort(compareMonthKeys);s.innerHTML=keys.map(k=>`<option value="${k}" ${k===state.month?'selected':''}>${k}${state.archive[k]?' — محفوظ':''}</option>`).join('');syncMonthInput()}
 async function loadSelectedMonth(){
@@ -2816,17 +2808,12 @@ function submitInstallationInvoiceAudit(){
  toast("انتقلت هذه العملية إلى مراجعة الفواتير");
  location.hash = "#/installation/invoices";
 }
-async function payInstallationEntitlement(id){
- const row=installationRowById(id);if(!row)return;
- if(!roleAllows('payment')){toast('لا تملك صلاحية الصرف');return}
- if(row.invoice_status!=='approved'){toast('لا يمكن الصرف قبل اعتماد الفاتورة');return}
- if(!confirm(`صرف ${fmt(row.amount)} د.ع للمشترك ${row.subscriber_id} (${INSTALLATION_STAGE_LABELS[row.stage]||row.stage})؟`))return;
- try{
-   /* المبلغ لا يُرسل من المتصفح؛ الخادم يشتقه من الدفعة المعتمدة. */
-   await sbRequest('/rest/v1/rpc/record_installation_payment',{method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({p_entitlement_id:id,p_expected_updated_at:row.updated_at||null,p_request_id:createRequestId()})});
-   await refreshInstallation(true);toast('تم تسجيل الصرف مركزياً');
- }catch(error){console.error(error);toast(`تعذر تسجيل الصرف: ${error?.message||''}`)}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function payInstallationEntitlement(id){
+ toast("انتقل الصرف إلى دفعات التنصيب");
+ location.hash = "#/finance/installation-batches";
 }
 /* مراجعة صرف وكيل: تعرض المؤهل والمحجوب وسببه قبل أي تأكيد. */
 function installationPaymentReview(rows,reseller){
@@ -2914,29 +2901,12 @@ function showInstallationImportPreview(preview,fileName){
 }
 /* اعتماد الاستيراد: تُرسل الصفوف الخام كما قُرئت، والخادم يتحقق ويشتق الدفعة
    والمبلغ ويمنع التكرار ويعيد الأعداد المعتمدة. الواجهة لا تُدخل صفوفاً بحرية. */
-async function confirmInstallationImport(){
- const preview=installationState.lastPreview;
- if(!preview){toast('لا توجد معاينة لاعتمادها');return}
- if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}
- const button=document.getElementById('installationConfirmButton');
- const statusBox=document.getElementById('installationImportStatus');
- if(button){button.disabled=true;button.textContent='جاري الاعتماد المركزي...'}
- if(statusBox)statusBox.innerHTML='<div class="insight warn" style="display:block"><span class="insight-dot"></span><span><b>جاري كتابة الاستحقاقات مركزياً</b><small>لا تغلق النافذة حتى تظهر النتيجة.</small></span></div>';
- try{
-   const rows=preview.mappedRows.map(row=>({subscriber_id:row.subscriberId,subscriber_name:row.subscriberName,reseller:row.reseller,zone:row.zone||null,fdt:row.fdt||null,remaining:row.remaining}));
-   const result=await sbRequest('/rest/v1/rpc/import_installation_entitlements',{method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({p_period:preview.period,p_file_name:preview.fileName||'',p_file_checksum:null,p_rows:rows,p_request_id:createRequestId()})});
-   const batch=(result&&result.batch)||{};
-   installationState.lastPreview=null;
-   /* المصدر الرسمي بعد الاعتماد هو قاعدة البيانات، لا ناتج قراءة الملف. */
-   await refreshInstallation(true);
-   if(statusBox)statusBox.innerHTML='<div class="insight good" style="display:block"><span class="insight-dot"></span><span><b>تم الاعتماد المركزي</b><small>مقبول '+fmt(batch.accepted||0)+' • مكرر '+fmt(batch.duplicates||0)+' • مرفوض '+fmt(batch.rejected||0)+' • من '+fmt(batch.source_rows||0)+' صف</small></span></div>';
-   if(button)button.style.display='none';
-   toast('تم استيراد '+fmt(batch.accepted||0)+' استحقاقاً');
- }catch(error){
-   console.error(error);
-   if(statusBox)statusBox.innerHTML='<div class="insight danger" style="display:block"><span class="insight-dot"></span><span><b>تعذر اعتماد الاستيراد</b><small>'+esc((error&&error.message)||'')+'</small></span></div>';
- }finally{if(button&&button.style.display!=='none'){button.disabled=false;button.textContent='✓ اعتماد الاستيراد مركزياً'}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function confirmInstallationImport(){
+ toast("انتقل تنفيذ الاستيراد إلى شاشة الاستيراد");
+ location.hash = "#/system/imports/new";
 }
 /* ------------------------------------------------------------------ الاستيراد التاريخي الابتدائي --
    ملف المتابعة يحمل لكل مشترك دفعاته الأربع بتواريخها. هذا المسار منفصل عن
@@ -3034,30 +3004,12 @@ function installationHistoryPreviewHtml(preview){
  return html;
 }
 /* الاعتماد يرسل ما قُرئ من الملف فقط؛ المرحلة والمبلغ يشتقهما الخادم. */
-async function confirmInstallationHistoryImport(){
- const preview=installationState.historyPreview;
- if(!preview){toast('لا توجد معاينة لاعتمادها');return}
- if(!preview.asOfDateProvided){toast('اختر تاريخ اللقطة أولاً');return}
- if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}
- const button=document.getElementById('installationHistoryConfirm');
- const statusBox=document.getElementById('installationHistoryStatus');
- if(button){button.disabled=true;button.textContent='جاري بناء خط الأساس...'}
- if(statusBox)statusBox.innerHTML='<div class="insight warn" style="display:block"><span class="insight-dot"></span><span><b>جاري كتابة المشتركين وتاريخ دفعاتهم</b><small>لا تغلق النافذة حتى تظهر النتيجة.</small></span></div>';
- try{
-   const rows=installationFees().buildHistoricalImportRows(preview);
-   const result=await sbRequest('/rest/v1/rpc/import_installation_history',{method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({p_as_of_date:preview.asOfDate,p_file_name:installationState.historyFileName||'',p_file_checksum:null,p_rows:rows,p_request_id:createRequestId()})});
-   const batch=(result&&result.batch)||{};
-   installationState.historyPreview=null;
-   installationState.historySheets=null;
-   await refreshInstallation(true);
-   if(statusBox)statusBox.innerHTML='<div class="insight good" style="display:block"><span class="insight-dot"></span><span><b>تم بناء خط الأساس التاريخي</b><small>مشتركون جدد '+fmt(batch.new_subscribers||0)+' • محدَّثون '+fmt(batch.updated_subscribers||0)+' • دفعات مسجَّلة '+fmt(batch.payments_recorded||0)+' • غير محسوم '+fmt(batch.unresolved||0)+' • مرفوض '+fmt(batch.rejected||0)+'</small></span></div>';
-   if(button)button.style.display='none';
-   toast('تم استيراد '+fmt(batch.new_subscribers||0)+' مشتركاً جديداً');
- }catch(error){
-   console.error(error);
-   if(statusBox)statusBox.innerHTML='<div class="insight danger" style="display:block"><span class="insight-dot"></span><span><b>تعذر اعتماد الاستيراد التاريخي</b><small>'+esc((error&&error.message)||'')+'</small></span></div>';
- }finally{if(button&&button.style.display!=='none'){button.disabled=false;button.textContent='✓ اعتماد الاستيراد التاريخي'}}
+/* انتقلت هذه العملية إلى التطبيق.
+   الكتابة من مكانين على الحقيقة نفسها تعني سلطتين تتباعدان، فتُحوَّل
+   هنا إلى بديلها بدل أن تبقى تكتب بالتوازي. */
+function confirmInstallationHistoryImport(){
+ toast("انتقل تنفيذ الاستيراد إلى شاشة الاستيراد");
+ location.hash = "#/system/imports/new";
 }
 function installationExportRows(){return installationFees().buildExportRows(filteredInstallationRows())}
 function exportInstallationCsv(){

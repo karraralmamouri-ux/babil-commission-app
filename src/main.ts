@@ -17,10 +17,12 @@ import { routes as commissionRoutes } from './features/commissions';
 import { routes as installationRoutes } from './features/installation';
 import { routes as financeRoutes } from './features/finance';
 import { routes as masterRoutes } from './features/master';
+import { routes as agentRoutes } from './features/master/agents';
 import { routes as workRoutes } from './features/work';
 import { routes as auditRoutes } from './features/audit';
 import { routes as systemRoutes } from './features/system/users';
 import { routes as importRoutes } from './features/system/imports';
+import { routes as importRunRoutes } from './features/system/import-run';
 import { routes as reportRoutes } from './features/reports';
 
 const legacyRoute: Route = {
@@ -40,9 +42,11 @@ const ROUTES: Route[] = [
   ...installationRoutes,
   ...financeRoutes,
   ...masterRoutes,
+  ...agentRoutes,
   ...workRoutes,
   ...auditRoutes,
   ...systemRoutes,
+  ...importRunRoutes,
   ...importRoutes,
   ...reportRoutes,
   legacyRoute,

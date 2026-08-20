@@ -338,12 +338,17 @@ test('the preview refuses a confirm action when nothing new would be written', (
 });
 
 test('the confirm action is gated on the edit permission, not just on the preview', () => {
+  // The screen this guarded moved; the gate did not. Confirm stays behind the
+  // capability, is offered only after a preview exists, and sends only the
+  // rows the parser accepted — never the raw file.
   const fsMod = require('node:fs');
-  const html = fsMod.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  // Rendered only when the preview is importable AND the role allows editing.
-  assert.ok(html.includes("preview.importable&&roleAllows('edit')?"));
-  // The server call re-checks the permission before sending anything.
-  assert.ok(html.includes("if(!roleAllows('edit')){toast('الاستيراد متاح للإدارة فقط');return}"));
-  // The payload is built from the mapped rows only.
-  assert.ok(html.includes('preview.mappedRows.map('));
+  const screen = fsMod.readFileSync(
+    path.join(__dirname, '..', 'src/features/system/import-run.ts'), 'utf8');
+
+  assert.match(screen, /capability: 'saas\.import'/);
+  assert.match(screen, /can\('saas\.import'\)/);
+  // No preview, no confirm — the confirm handler refuses before the network.
+  assert.match(screen, /عايِن أولاً|لا معاينة/);
+  // The payload is built from the accepted rows of the shared parser.
+  assert.match(screen, /accepted/);
 });

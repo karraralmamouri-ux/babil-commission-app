@@ -18,15 +18,42 @@ test('deployed Edge Function sources are tracked without embedded keys', () => {
   assert.match(adminUsers, /callerProfile\.role !== "admin"/);
   assert.match(adminUsers, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(adminUsers, /action: "user\.created"/);
-  assert.match(adminUsers, /action: "user\.permissions\.updated"/);
   assert.match(adminUsers, /action: "user\.password\.update\.requested"/);
   assert.match(adminUsers, /action: "user\.password\.updated"/);
   assert.doesNotMatch(adminUsers, /after_data:\s*\{\s*full_name,\s*email/);
-  assert.match(adminUsers, /Profile and password changes must be separate requests/);
-  assert.match(adminUsers, /User update rollback failed/);
   assert.doesNotMatch(combined, /sbp_[a-zA-Z0-9_-]{20,}/);
   assert.doesNotMatch(combined, /sb_secret_[a-zA-Z0-9_-]{20,}/);
   assert.doesNotMatch(combined, /eyJ[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}/);
+});
+
+test('only one authority may write profiles.role and profiles.is_active', () => {
+  // The Edge Function holds a service key, so anything it writes bypasses RLS
+  // and every capability check. Role and activation are guarded elsewhere —
+  // update_user_profile checks permission.manage, demands a stated reason, and
+  // refuses to strip the last active administrator. While both could write the
+  // field, the weaker path was the one that decided. It no longer writes it.
+  const adminUsers = read('supabase/functions/admin-users/index.ts');
+  const update = adminUsers.slice(adminUsers.indexOf('action === "update"'));
+
+  assert.match(update, /PROFILE_FIELDS_MOVED_TO_RPC/);
+  assert.match(update, /update_user_profile RPC/);
+  assert.doesNotMatch(update, /profilePatch/);
+  assert.doesNotMatch(update, /\.from\("profiles"\)\s*\.update\(/);
+
+  // And the RPC still carries the guard the Edge Function gave up.
+  const rpc = read('supabase/migrations/20260918090000_master_and_admin_writes.sql');
+  const body = rpc.slice(rpc.indexOf('function public.update_user_profile'));
+
+  assert.match(body, /require_capability\('permission\.manage'\)/);
+  assert.match(body, /last active administrator/);
+  assert.match(body, /A profile change must state its reason/);
+});
+
+test('the role catalogue is read from role_templates, not copied', () => {
+  const adminUsers = read('supabase/functions/admin-users/index.ts');
+
+  assert.match(adminUsers, /from\("role_templates"\)/);
+  assert.doesNotMatch(adminUsers, /new Set\(\["admin", "accountant"/);
 });
 
 test('admin-users verifies bearer tokens inside the function', () => {

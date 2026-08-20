@@ -43,9 +43,19 @@ test('sensitive workspaces are hidden behind a capability, not shown to everyone
 });
 
 test('permission changes go through the audited RPC, never a direct table write', () => {
-  assert.ok(html.includes('/rest/v1/rpc/set_user_permission'), 'permission RPC not called');
-  assert.ok(!/from\("user_permission_overrides"\)|user_permission_overrides\?.*method:"(POST|PATCH|DELETE)"/
-    .test(html), 'the page writes permission overrides directly');
+  // Permission editing moved to the users screen; the rule moved with it.
+  const users = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'src/features/system/users.ts'), 'utf8');
+
+  assert.ok(users.includes('set_user_permission'), 'permission RPC not called');
+  assert.ok(users.includes('update_user_profile'), 'profile RPC not called');
+  // Neither screen writes the override table or the profile table directly.
+  const direct = /(user_permission_overrides|profiles)\?[^`'"]*(POST|PATCH|DELETE)/;
+  assert.ok(!direct.test(html), 'the legacy page writes permissions directly');
+  assert.ok(!direct.test(users), 'the users screen writes permissions directly');
+  // And the legacy page no longer calls the RPC either — one authority only.
+  assert.ok(!html.includes('/rest/v1/rpc/set_user_permission'),
+    'two screens still change permissions');
 });
 
 test('eligibility is read from the server, never recomputed in the page', () => {
