@@ -226,3 +226,72 @@ this is UI-only. Then §23 agent profile, then §25 installation control centre.
 11. **`CONTEXTUAL_ROUTES` is not dead code** — those routes stay registered and
     are reached from context. A test enforces this.
 12. **July stays UNDER_REVIEW**, 0 paid, `v1.0.0` = `75f9b356…` untouched.
+
+---
+
+# Continuation from `3ecfe0d` — frontend-safe scope
+
+Date: 2026-08-21
+Branch: `feat/remaining-results-decisions-actions`
+Starting checkpoint: `3ecfe0d221d4fe3f7352112a64e1999d787d78e5`
+
+## Completed and verified locally
+
+- Focused Invoice Review drawer: explicit empty decision, evidence-first, no page reload, preserves current page/filters, previous/next, row state updates after save.
+- Commission cycle consumes `commission_cycle_result` once; old TABLE-as-object calls removed from this surface. Financial result and operational volumes are separate.
+- Commission events prioritize subscriber/package/tier/commission/Baghdad time; event ID is technical detail. Existing scope filters are exposed.
+- Exception/blocker codes have human business labels; raw codes remain under technical details.
+- Agent profile fixes raw status HTML escaping, prioritizes server rows and decisions, demotes aliases/UUID, and fixes FDT deep links.
+- Installation Control Center uses existing authoritative reads for subscribers, historical paid, candidates, ready, holds, P1–P4 amounts, DONE, and the five unresolved historical cases.
+- Commission result report shows known allocation and unresolved ownership as separate reconciliation lines; export uses the same displayed rows and authoritative totals.
+- Archive separates `CLOSED` cycles from old-date cycles that are still unfinished.
+- Audit is human-first and Baghdad-time; technical identifiers/JSON are collapsed.
+- Meaningful silent `catch(() => null/[]/0)` patterns removed from executable TypeScript. Failures no longer look like valid empty data.
+- BABIL FLOW browser title, theme colour and favicon use the existing approved identity.
+
+Logical commits before documentation:
+
+- `de96b64` focused invoice review workflow
+- `766a79c` commission result presentation
+- `8533472` installation control center
+- `f6ef387` reports, archive and audit readability
+- `ee313a4` read failure visibility and branding
+
+No migration added. No SQL, RLS, ownership, payment, finalization or production data changed.
+
+## Financial invariants preserved
+
+```text
+Commission gross          21,969,500 IQD
+Known allocation          21,950,750 IQD
+Unresolved ownership          18,750 IQD
+Reconciliation            21,969,500 IQD
+Status                    UNDER_REVIEW
+Paid                      0
+DIRECT_COMPANY blockers   0
+
+Installation subscribers  5,693
+Historical rows           17,117
+Historical paid           54,828,000 IQD
+Candidates                2,196
+Candidate amount          7,278,000 IQD
+Ready                     0
+Historical unresolved     5
+```
+
+These are the accepted anchors from the merged handoff. This frontend-only branch does not mutate or rederive them. Live production verification remains pending deployment.
+
+## BLOCKED — DB REGRESSION ENVIRONMENT REQUIRED
+
+1. Agent-level unified calculated/approved/ready/paid/remaining summary. Current `agent_financial_profile` returns scope rows and ledger rows, not one authoritative summary; the frontend does not aggregate a replacement.
+2. Commission event Agent/FDT/source columns and Subscriber/Agent/FDT/Package/Tier/Date filters. Current event page RPC returns subscriber/package/tier/amount/time but not agent, FDT or source and accepts only scope filters.
+3. Commission report FDT/Tier/P35/P45/P65/Ready columns in one export-safe contract.
+4. Cycle-scoped audit. Current audit read accepts entity type but not entity ID; the cycle tab refuses to present all commission audit rows as if scoped.
+5. Any new Work Center decision groups not already returned by `action_center`.
+6. Local 801 database assertions and independent live migration-ledger parity verification. Docker/PostgreSQL is unavailable in this workspace.
+
+Required order when the environment exists: regression first → minimal read-contract migration → all 801+ DB assertions → JS/type/build → PR/CI → review → merge → production migration → live verification.
+
+## Safety statement
+
+No payment posted. No July finalization. No fabricated ownership. No fabricated FDT classification. No fabricated invoice verification. No raw source mutation.

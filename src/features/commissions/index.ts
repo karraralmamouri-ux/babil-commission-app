@@ -160,7 +160,7 @@ function reconciliationBox(r: CycleResult, known: number, u: UnresolvedOwnership
       <span><b>إجمالي الدورة</b></span>
       <b class="money">${money(r.totals.gross)}</b></div>
     <p class="muted" style="font-size:11px;margin:8px 0 0">
-      المبلغ المعلّق مستحقٌّ ومحسوب، ولم يُنسب إلى وكيل لأن عائديته لم تُحسم.
+      المبلغ المعلّق محسوب ضمن الدورة، ولم يُنسب إلى وكيل لأن عائديته لم تُحسم.
       لا يُوزَّع بلا دليل.</p>
     <div class="actions" style="margin-top:10px">
       <a class="btn gold" href="${esc(href('/work'))}">افتح قرار الملكية</a>
@@ -789,10 +789,10 @@ export const exceptionsQueue: Route = {
       + filterBar([
         { key: 'search', label: 'بحث', type: 'search' },
         { key: 'reason', label: 'الأسباب', type: 'select', options: [
-          { value: 'UNKNOWN_FDT', label: 'كابينة غير مسجَّلة' },
+          { value: 'UNKNOWN_FDT', label: 'كابينة تحتاج تصنيف' },
           { value: 'UNKNOWN_AGENT', label: 'وكيل غير معروف' },
           { value: 'UNKNOWN_PACKAGE', label: 'باقة غير معروفة' },
-          { value: 'SOURCE_INCOMPLETE', label: 'مصدر غير مكتمل' },
+          { value: 'SOURCE_INCOMPLETE', label: 'بيانات المصدر غير مكتملة' },
           { value: 'IDENTITY_CONFLICT', label: 'تعارض هوية' },
         ] },
         { key: 'blocking', label: 'الحجب', type: 'select', options: [{ value: 'true', label: 'الحاجب فقط' }] },
