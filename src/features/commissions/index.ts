@@ -329,9 +329,21 @@ async function renderCycle(view: View, m: RouteMatch, tab: string): Promise<void
   const cycle = list.find((c) => c.id === id);
   if (!cycle) { view.write(empty('الدورة غير موجودة', 'قد تكون أُغلقت أو حُذف رابطها')); return; }
 
-  const detail = await rpc<Record<string, unknown>>('report_commission_cycle_detail', { p_cycle_id: id }).catch(() => null);
-  const totals = (detail?.['totals'] || {}) as Record<string, number>;
-  const projected = isProjected(cycle.status);
+  let result: CycleResult | null;
+  try {
+    result = await readCycleResult(id);
+  } catch (error) {
+    if (!view.live) return;
+    view.write(pageHeader(cycle.name, `${cycle.period_start} → ${cycle.period_end}`)
+      + errorState(error instanceof Error ? error.message : 'تعذّر تحميل نتيجة الدورة', 'location.reload()'));
+    return;
+  }
+  if (!result) {
+    view.write(pageHeader(cycle.name, `${cycle.period_start} → ${cycle.period_end}`)
+      + empty('لا نتيجة محسوبة لهذه الدورة بعد', 'تُحسب الدورة من تبويب المراجعة والاعتماد'));
+    return;
+  }
+  const projected = isProjectedStatus(result.cycle.status);
 
   const tabs = CYCLE_TABS.map((t) =>
     `<a class="tab${t.key === tab ? ' active' : ''}" href="${esc(href(`/commissions/cycles/${id}/${t.key}`))}">${esc(t.label)}</a>`).join('');
@@ -340,23 +352,30 @@ async function renderCycle(view: View, m: RouteMatch, tab: string): Promise<void
     `${cycle.period_start} → ${cycle.period_end}`,
     `${chip(statusLabel(cycle.status), statusTone(cycle.status))}${projected ? ' ' + projectedTag() : ''}`)
     + kpiRow([
-      { label: 'المحسوب', value: money(totals['gross'] ?? null), tone: 'primary' },
-      { label: 'أساس الشريحة', value: count(totals['unique_activated_subscribers'] ?? null), sub: 'مشتركون فريدون', tone: 'blue' },
-      { label: 'الأحداث المؤهَّلة', value: count(totals['qualifying_events'] ?? null), sub: 'ليست أساس الشريحة', tone: 'green' },
-      { label: 'النطاقات', value: count(totals['scopes'] ?? null), tone: 'gold' },
+      { label: 'عمولة محسوبة', value: money(result.totals.gross), tone: 'primary',
+        sub: projected ? 'قيد المراجعة — ليست مستحقاً معتمداً' : 'نتيجة معتمدة' },
+      { label: 'معتمد', value: money(result.totals.approved), tone: 'green' },
+      { label: 'مدفوع', value: money(result.totals.paid), tone: 'blue' },
+      { label: 'قرارات تمنع الاعتماد', value: count(result.blockers.length),
+        tone: result.blockers.length ? 'red' : 'green', link: href(`/commissions/cycles/${id}/review`) },
     ])
+    + `<div class="box cycle-operational-result"><h3>النتيجة التشغيلية</h3>
+        <div class="minirow"><span>التفعيلات المؤهَّلة</span><b>${count(result.volumes.qualifying_events)}</b></div>
+        <div class="minirow"><span>أساس التير — مشتركون فريدون</span><b>${count(result.volumes.tier_basis)}</b></div>
+        <div class="minirow"><span>النطاقات المالية</span><b>${count(result.totals.scopes)}</b></div>
+      </div>`
     + `<div class="tabs">${tabs}</div><div class="panel active" id="cycleTabBody">${loading()}</div>`);
 
   const body = view.el.querySelector<HTMLElement>('#cycleTabBody');
   if (!body) return;
   try {
-    await renderCycleTab(view, cycle, tab, m);
+    await renderCycleTab(view, cycle, result, tab, m);
   } catch (error) {
     view.writeInto('#cycleTabBody', errorState(error instanceof Error ? error.message : 'خطأ غير متوقّع'));
   }
 }
 
-async function renderCycleTab(view: View, cycle: Cycle, tab: string, m: RouteMatch): Promise<void> {
+async function renderCycleTab(view: View, cycle: Cycle, result: CycleResult, tab: string, m: RouteMatch): Promise<void> {
   const id = cycle.id;
   if (tab === 'scopes') {
     const rows = (await select<Snapshot[]>(`commission_cycle_snapshots?select=*&cycle_id=eq.${encodeURIComponent(id)}&order=gross_commission.desc`)) || [];
@@ -372,10 +391,18 @@ async function renderCycleTab(view: View, cycle: Cycle, tab: string, m: RouteMat
       p_limit: limit, p_offset: offset,
     });
     const page = toPage(rows as never, limit, offset);
-    view.writeInto('#cycleTabBody', (page.rows.length
+    view.writeInto('#cycleTabBody', filterBar([
+      { key: 'scope_type', label: 'نوع النطاق', type: 'select', options: [
+        { value: 'AGENT', label: 'وكيل — المنطقة القديمة' },
+        { value: 'FDT', label: 'كابينة — المنطقة الجديدة' },
+      ] },
+      { key: 'scope_id', label: 'رمز الوكيل أو الكابينة', type: 'search' },
+    ], `/commissions/cycles/${id}/events`, m.query)
+      + (page.rows.length
       ? table(eventColumns(), page.rows as Array<Record<string, unknown>>)
       : empty('لا أحداث مؤهَّلة'))
       + pager(page.total, limit, offset, `/commissions/cycles/${id}/events`, m.query));
+    wireFilters(view.el);
     return;
   }
 
@@ -418,28 +445,22 @@ async function renderCycleTab(view: View, cycle: Cycle, tab: string, m: RouteMat
     view.writeInto('#cycleTabBody', `<div class="insight warn" style="margin-bottom:12px"><span class="insight-dot"></span><span>
         <b>الصرف يتبع الاعتماد</b>
         <small>لا نطاق يصير قابلاً للدفع قبل اعتماد الدورة. الخادم يُعيد التحقّق عند الترحيل مهما أظهرت الشاشة.</small></span></div>`
-      + (rows.length ? table(payoutColumns(), rows) : empty('لا نطاقات')));
+      + (rows.length ? table(payoutColumns(cycle), rows) : empty('لا نطاقات')));
     return;
   }
 
   if (tab === 'audit') {
-    const rows = await rpc<Array<Record<string, unknown>>>('list_audit_events', {
-      p_action_prefix: 'commission.', p_limit: 50, p_offset: 0,
-    }).catch(() => null);
-    view.writeInto('#cycleTabBody', rows && rows.length ? table(auditColumns(), rows) : empty('لا سجلّات تدقيق'));
+    view.writeInto('#cycleTabBody', `<div class="insight warn"><span class="insight-dot"></span><span>
+        <b>تدقيق الدورة يحتاج عقد قراءة مقيّداً بالدورة</b>
+        <small>عقد التدقيق الحالي يرشّح بنوع الكيان ولا يقبل معرّف الدورة؛ لن نعرض سجلّ كل الدورات هنا كأنه سجلّ هذه الدورة.</small></span>
+        <a class="btn" href="${esc(href('/audit'))}">افتح تدقيق النظام</a></div>`);
     return;
   }
 
-  // overview
-  const zones = (detailZones(await rpc<Record<string, unknown>>('report_commission_cycle_detail', { p_cycle_id: id }).catch(() => null)));
-  view.writeInto('#cycleTabBody', zones.length
-    ? `<div class="box"><h3>حسب المنطقة</h3>${table(zoneColumns(), zones)}</div>`
+  // overview — نفس عقد النتيجة المقروء مرة واحدة في رأس الشاشة.
+  view.writeInto('#cycleTabBody', result.zones.length
+    ? `<div class="box"><h3>حسب المنطقة</h3>${table(zoneColumns(), result.zones as unknown as Array<Record<string, unknown>>)}</div>`
     : empty('لا تفصيل متاح'));
-}
-
-function detailZones(detail: Record<string, unknown> | null): Array<Record<string, unknown>> {
-  const byZone = detail?.['by_zone'];
-  return Array.isArray(byZone) ? byZone as Array<Record<string, unknown>> : [];
 }
 
 const num = (r: Record<string, unknown>, k: string) => Number(r[k] || 0);
@@ -462,18 +483,35 @@ function scopeTable(rows: Snapshot[]): string {
 
 function eventColumns(): Array<Column<Record<string, unknown>>> {
   return [
-    { key: 'event', label: 'الحدث', cell: (r) => esc(r['activation_event_id'] ?? r['saas_event_id'] ?? '—') },
+    { key: 'subscriber', label: 'المشترك', cell: (r) => `<b>${esc(r['subscriber_key'] ?? '—')}</b>
+      <details class="technical-detail"><summary>تفاصيل تقنية</summary>
+        <span dir="ltr">Event: ${esc(r['activation_event_id'] ?? r['saas_event_id'] ?? '—')}</span></details>` },
     { key: 'pkg', label: 'الباقة', cell: (r) => esc(r['package_code'] ?? '—') },
     { key: 'tier', label: 'الشريحة', cell: (r) => esc(String(r['tier_code'] ?? '—').toUpperCase()), numeric: true },
-    { key: 'amount', label: 'المبلغ', cell: (r) => `<span class="money">${money(num(r, 'amount'))}</span>`, numeric: true },
-    { key: 'at', label: 'التاريخ', cell: (r) => esc(String(r['event_at'] ?? '').slice(0, 10)) },
+    { key: 'amount', label: 'العمولة', cell: (r) => `<span class="money">${money(num(r, 'amount'))}</span>`, numeric: true },
+    { key: 'at', label: 'تاريخ التفعيل', cell: (r) => `${esc(dateTime(r['event_at']))}<div class="muted table-hint">بتوقيت بغداد</div>` },
   ];
+}
+
+const EXCEPTION_LABELS: Record<string, string> = {
+  UNKNOWN_FDT: 'كابينة تحتاج تصنيف',
+  UNKNOWN_AGENT: 'الوكيل غير معروف',
+  UNKNOWN_PACKAGE: 'باقة تحتاج تصنيف',
+  SOURCE_INCOMPLETE: 'بيانات المصدر غير مكتملة',
+  IDENTITY_CONFLICT: 'هوية تحتاج حسم',
+  UNRESOLVED_OWNERSHIP: 'ملكية تحتاج حسم',
+};
+
+function exceptionLabel(code: unknown): string {
+  const key = String(code || '');
+  return EXCEPTION_LABELS[key] || key || 'قرار يحتاج مراجعة';
 }
 
 function exceptionColumns(): Array<Column<Record<string, unknown>>> {
   return [
-    { key: 'reason', label: 'السبب', cell: (r) => `<b>${esc(r['reason_code'])}</b>
-      <div class="muted" style="font-size:10px">${esc(r['detail'] ?? '')}</div>` },
+    { key: 'reason', label: 'المشكلة', cell: (r) => `<b>${esc(exceptionLabel(r['reason_code']))}</b>
+      <div class="muted table-hint">${esc(r['detail'] ?? '')}</div>
+      <details class="technical-detail"><summary>تفاصيل تقنية</summary><code>${esc(r['reason_code'])}</code></details>` },
     { key: 'event', label: 'الحدث', cell: (r) => esc(r['activation_event_id'] ?? '—') },
     { key: 'fdt', label: 'الكابينة', cell: (r) => esc(r['fdt_code'] ?? '—') },
     { key: 'amount', label: 'أثر مؤشِّر', cell: (r) => money(num(r, 'indicative_amount')), numeric: true },
@@ -594,7 +632,8 @@ function actionLink(reason: string, row: Record<string, unknown>): string {
 
 function blockerColumns(): Array<Column<Record<string, unknown>>> {
   return [
-    { key: 'reason', label: 'السبب', cell: (r) => `<b>${esc(r['reason_code'])}</b>` },
+    { key: 'reason', label: 'المشكلة', cell: (r) => `<b>${esc(exceptionLabel(r['reason_code']))}</b>
+      <details class="technical-detail"><summary>تفاصيل تقنية</summary><code>${esc(r['reason_code'])}</code></details>` },
     { key: 'events', label: 'أحداث', cell: (r) => count(num(r, 'events')), numeric: true },
     { key: 'subs', label: 'مشتركون', cell: (r) => count(num(r, 'subscribers')), numeric: true },
     { key: 'amount', label: 'أثر مؤشِّر', cell: (r) => money(num(r, 'indicative_amount')), numeric: true },
@@ -603,20 +642,14 @@ function blockerColumns(): Array<Column<Record<string, unknown>>> {
   ];
 }
 
-function payoutColumns(): Array<Column<Snapshot>> {
+function payoutColumns(cycle: Cycle): Array<Column<Snapshot>> {
+  const approved = cycle.finalized_at !== null;
   return [
     { key: 'scope', label: 'النطاق', cell: (r) => esc(r.scope_label || r.scope_id) },
     { key: 'gross', label: 'الإجمالي', cell: (r) => `<span class="money">${money(r.gross_commission)}</span>`, numeric: true },
-    { key: 'state', label: 'قابلية الدفع', cell: () => chip('غير قابل — الدورة لم تُعتمد', 'warning') },
-  ];
-}
-
-function auditColumns(): Array<Column<Record<string, unknown>>> {
-  return [
-    { key: 'at', label: 'التاريخ', cell: (r) => esc(String(r['created_at'] ?? '').slice(0, 19).replace('T', ' ')) },
-    { key: 'action', label: 'الفعل', cell: (r) => esc(r['action'] ?? '') },
-    { key: 'field', label: 'الحقل', cell: (r) => esc(r['field'] ?? '—') },
-    { key: 'new', label: 'القيمة', cell: (r) => esc(r['new_value'] ?? '—') },
+    { key: 'state', label: 'حالة التجهيز', cell: () => approved
+      ? chip('بانتظار تجهيز الصرف', 'info')
+      : chip('غير جاهز — الدورة لم تُعتمد', 'warning') },
   ];
 }
 
@@ -624,8 +657,8 @@ function zoneColumns(): Array<Column<Record<string, unknown>>> {
   return [
     { key: 'zone', label: 'المنطقة', cell: (r) => chip(r['zone'] === 'new' ? 'جديدة (بالكابينة)' : 'قديمة (بالوكيل)', r['zone'] === 'new' ? 'success' : 'info') },
     { key: 'scopes', label: 'النطاقات', cell: (r) => count(num(r, 'scopes')), numeric: true },
-    { key: 'subs', label: 'مشتركون', cell: (r) => count(num(r, 'unique_activated_subscribers')), numeric: true },
-    { key: 'events', label: 'أحداث', cell: (r) => count(num(r, 'qualifying_events')), numeric: true },
+    { key: 'subs', label: 'أساس التير', cell: (r) => count(num(r, 'tier_basis') || num(r, 'unique_activated_subscribers')), numeric: true },
+    { key: 'events', label: 'تفعيلات مؤهَّلة', cell: (r) => count(num(r, 'events') || num(r, 'qualifying_events')), numeric: true },
     { key: 'gross', label: 'الإجمالي', cell: (r) => `<span class="money">${money(num(r, 'gross'))}</span>`, numeric: true },
   ];
 }
@@ -677,37 +710,55 @@ export const agentDetail: Route = {
     const aliases = (profile['aliases'] || []) as string[];
     const cycleRows = (profile['commission_cycles'] || []) as Array<Record<string, unknown>>;
 
-    const calc = cycleRows.reduce((a, c) => a + Number(c['gross_commission'] || 0), 0);
     const stages = (inst['stage_distribution'] || {}) as Record<string, number>;
 
     view.innerHTML = pageHeader(String(agent['name'] || agent['code'] || 'وكيل'),
-      `${esc(String(agent['code'] || ''))} · ${chip(String(agent['status'] || '—'), 'neutral')}`)
+      String(agent['code'] || ''), chip(String(agent['status'] || '—'), 'neutral'))
       + kpiRow([
-        { label: 'عمولة محسوبة', value: money(calc), tone: 'primary' },
+        { label: 'نطاقات عمولة', value: count(cycleRows.length), tone: 'primary',
+          sub: 'القيم المالية في الجدول من الخادم' },
         { label: 'كابينات', value: count(fdts.length), tone: 'gold' },
         { label: 'مشتركو التنصيب', value: count(Number(inst['subscribers'] || 0)), tone: 'blue' },
-        { label: 'أسماء بديلة', value: count(aliases.length), tone: 'green' },
+        { label: 'حالة الوكيل', value: esc(String(agent['status'] || '—')), tone: 'green' },
       ])
+      + `<div class="insight warn agent-summary-contract"><span class="insight-dot"></span><span>
+          <b>الملخص المالي الموحّد غير متاح من عقد القراءة الحالي</b>
+          <small>لا تجمع الواجهة «محسوب / معتمد / جاهز / مدفوع» من جداول مختلفة. تعرض أدناه كل نطاق كما أعاده الخادم حتى يتوفر عقد خادمي موحّد ويجتاز اختبارات قاعدة البيانات.</small></span></div>`
       // القاعدتان المحاسبيتان تبقيان منفصلتين في العرض: جمعهما يوحي بقاعدة لا وجود لها.
       + `<div class="grid2">
-        <div class="box"><h3>◎ العمولات</h3>
+        <div class="box"><h3>النتيجة المالية حسب الدورة والنطاق</h3>
           ${cycleRows.length ? table(agentCycleColumns(), cycleRows) : `<p class="muted">لا دورات محسوبة</p>`}</div>
-        <div class="box"><h3>⚙ أجور التنصيب</h3>
+        <div class="box"><h3>تفصيل أجور التنصيب</h3>
           ${Object.keys(stages).length
             ? Object.entries(stages).map(([k, v]) => `<div class="minirow"><span>${esc(k)}</span><b>${count(v)}</b></div>`).join('')
             : `<p class="muted">لا مشتركين منسوبين — التسميات التاريخية لم تُربط بعد بالوكلاء المعتمدين</p>`}
         </div></div>`
-      + `<div class="box" style="margin-top:14px"><h3>الكابينات</h3>
-        ${fdts.length ? fdts.map((f) => `<a class="chip chip-neutral" style="margin:2px" href="${esc(href('/master/fdt', { code: f }))}">${esc(f)}</a>`).join('') : '<p class="muted">لا كابينات</p>'}</div>`;
+      + `<div class="box agent-decisions"><h3>القرارات</h3>
+          <p class="muted">قرارات الملكية غير المحسومة لا تُنسب إلى هذا الوكيل بلا دليل.</p>
+          <a class="btn gold" href="${esc(href('/work/ownership'))}">راجع قرارات الملكية</a>
+        </div>`
+      + `<div class="box agent-details"><h3>التفاصيل</h3>
+        <div class="minirow"><span>الكابينات</span><span>${fdts.length
+          ? fdts.map((f) => `<a class="chip chip-neutral" href="${esc(href(`/master/fdts/${encodeURIComponent(f)}`))}">${esc(f)}</a>`).join(' ')
+          : '—'}</span></div>
+        <details class="technical-detail"><summary>الأسماء البديلة والتفاصيل التقنية</summary>
+          <p>${aliases.length ? aliases.map((a) => esc(a)).join('، ') : 'لا أسماء بديلة'}</p>
+          <code dir="ltr">${esc(id)}</code>
+        </details></div>`;
   },
 };
 
 function agentCycleColumns(): Array<Column<Record<string, unknown>>> {
   return [
-    { key: 'cycle', label: 'الدورة', cell: (r) => esc(r['cycle'] ?? '—') },
+    { key: 'cycle', label: 'الدورة', cell: (r) => `<b>${esc(r['cycle'] ?? '—')}</b>
+      <div class="muted table-hint">${esc(cycleStatusAr(String(r['status'] || '')))}</div>` },
     { key: 'scope', label: 'النطاق', cell: (r) => esc(r['scope_id'] ?? '—') },
     { key: 'tier', label: 'الشريحة', cell: (r) => esc(String(r['tier'] ?? '—').toUpperCase()), numeric: true },
     { key: 'subs', label: 'مشتركون', cell: (r) => count(num(r, 'unique_activated_subscribers')), numeric: true },
+    { key: 'events', label: 'تفعيلات', cell: (r) => count(num(r, 'qualifying_events')), numeric: true },
+    { key: 'p35', label: 'P35', cell: (r) => count(num((r['package_breakdown'] || {}) as Record<string, unknown>, 'P-35000')), numeric: true },
+    { key: 'p45', label: 'P45', cell: (r) => count(num((r['package_breakdown'] || {}) as Record<string, unknown>, 'P-45000')), numeric: true },
+    { key: 'p65', label: 'P65', cell: (r) => count(num((r['package_breakdown'] || {}) as Record<string, unknown>, 'P-65000')), numeric: true },
     { key: 'gross', label: 'الإجمالي', cell: (r) => `<span class="money">${money(num(r, 'gross_commission'))}</span>`, numeric: true },
   ];
 }

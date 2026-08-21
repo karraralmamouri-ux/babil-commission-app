@@ -890,6 +890,11 @@ th[aria-sort="descending"]::after { content: "↓"; opacity: 1; color: var(--gol
 .review-note { min-height: 78px; resize: vertical; }
 .review-apply { width: 100%; margin-top: var(--s3); }
 .review-navigation { display: flex; justify-content: space-between; gap: var(--s3); margin-top: auto; }
+.cycle-operational-result, .agent-decisions, .agent-details { margin-top: var(--s3); }
+.technical-detail { margin-top: 5px; color: var(--muted); font-size: 10px; }
+.technical-detail summary { cursor: pointer; font-weight: 700; }
+.technical-detail code, .technical-detail span { display: block; margin-top: 4px; overflow-wrap: anywhere; }
+.table-hint { font-size: 10px; margin-top: 3px; }
 
 /* ---------------------------------------------------------------------------
    17. حالات الشاشة

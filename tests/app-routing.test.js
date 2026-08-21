@@ -214,11 +214,12 @@ test('الأرقام تأتي من دوالّ الخادم', () => {
   assert.match(s, /installation_cycle_pipeline/);
 });
 
-test('أساس الشريحة والأحداث المؤهَّلة معروضان منفصلين', () => {
+test('أساس التير والتفعيلات المؤهَّلة معروضان منفصلين', () => {
   const s = read('src/features/commissions/index.ts');
-  assert.match(s, /أساس الشريحة/);
-  assert.match(s, /الأحداث المؤهَّلة/);
-  assert.match(s, /ليست أساس الشريحة/);
+  assert.match(s, /أساس التير/);
+  assert.match(s, /التفعيلات المؤهَّلة/);
+  assert.match(s, /unique_activated_subscribers/);
+  assert.match(s, /qualifying_events/);
 });
 
 /* ---------------------------------------------------------------------------
