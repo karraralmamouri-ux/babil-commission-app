@@ -26,6 +26,14 @@ values ('ac000000-0000-0000-0000-000000000001', 'Acceptance Admin',
         'acceptance-admin@fixture.invalid', 'admin', true)
 on conflict (id) do update set role = 'admin', is_active = true;
 
+-- indicative_rates intentionally starts from the package catalogue.  A clean
+-- database has no operational import configuration to seed that catalogue,
+-- so this isolated fixture declares the two established paid packages it uses.
+insert into public.packages (code, name, semantic_category)
+values ('P-35000', 'P-35000', 'PAID_PACKAGE'),
+       ('P-45000', 'P-45000', 'PAID_PACKAGE')
+on conflict (code) do nothing;
+
 insert into public.saas_import_batches
   (id, source_kind, source_filename, source_checksum, parser_version, imported_by,
    completeness_status)
