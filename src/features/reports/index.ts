@@ -76,24 +76,25 @@ export const commissionReport: Route = {
     const cycles = await select<Row[]>('commission_cycles?select=id,name,status&order=period_start.desc');
     const id = m.query.get('cycle') || str(cycles[0] || {}, 'id');
     if (!id) { view.write(pageHeader('تقرير نتيجة العمولات') + empty('لا دورات عمولة')); return; }
+    const report = await rpc<Row>('commission_report_product', { p_cycle_id: id });
     const result = await readCycleResult(id);
     if (!result) { view.write(pageHeader('تقرير نتيجة العمولات') + empty('لا نتيجة محسوبة للدورة')); return; }
     if (!view.live) return;
 
     const unresolved = result.unresolved_ownership;
-    const rows: Row[] = result.agents.map((a) => ({ ...a, allocation: 'KNOWN' }));
-    if (unresolved.amount) rows.push({
-      allocation: 'UNRESOLVED', agent_name: 'ملكية تحتاج حسم', agent_code: '—',
-      events: unresolved.events, subscribers: unresolved.subscribers, gross: unresolved.amount,
-    });
+    const rows: Row[] = (report?.['rows'] || []) as Row[];
 
     const columns: Array<Column<Row>> = [
-      { key: 'agent', label: 'الوكيل / المصالحة', cell: (r) => r['allocation'] === 'UNRESOLVED'
-        ? `<b>${esc(str(r, 'agent_name'))}</b> ${chip('قرار معلّق', 'warning')}`
-        : `<b>${esc(str(r, 'agent_name'))}</b><div class="muted table-hint">${esc(str(r, 'agent_code'))}</div>` },
-      { key: 'events', label: 'التفعيلات المؤهَّلة', cell: (r) => count(num(r, 'events')), numeric: true },
-      { key: 'subs', label: 'المشتركون', cell: (r) => count(num(r, 'subscribers')), numeric: true },
-      { key: 'gross', label: 'محسوب', cell: (r) => `<span class="money">${money(num(r, 'gross'))}</span>`, numeric: true },
+      { key: 'agent', label: 'الوكيل', cell: (r) => r['agent_id'] ? `<a href="${esc(href(`/commissions/agents/${str(r,'agent_id')}`))}"><b>${esc(str(r, 'agent_name'))}</b></a>` : `<b>${esc(str(r,'agent_name'))}</b>` },
+      { key: 'zone', label: 'المنطقة / FDT', cell: (r) => `${esc(str(r,'zone') === 'new' ? 'جديدة' : 'قديمة')}<div class="muted">${esc(str(r,'fdt_code'))}</div>` },
+      { key: 'tier', label: 'الشريحة', cell: (r) => esc(str(r,'tier_code') || '—') },
+      { key: 'packs', label: 'P35 / P45 / P65', cell: (r) => `${count(num(r,'p35_count'))} / ${count(num(r,'p45_count'))} / ${count(num(r,'p65_count'))}`, numeric: true },
+      { key: 'events', label: 'المؤهلة', cell: (r) => count(num(r, 'qualifying_events')), numeric: true },
+      { key: 'basis', label: 'أساس الشريحة', cell: (r) => count(num(r, 'tier_basis')), numeric: true },
+      { key: 'calc', label: 'محسوب', cell: (r) => money(num(r,'calculated')), numeric: true },
+      { key: 'approved', label: 'معتمد', cell: (r) => money(num(r,'approved')), numeric: true },
+      { key: 'ready', label: 'جاهز', cell: (r) => money(num(r,'ready')), numeric: true },
+      { key: 'paid', label: 'مدفوع', cell: (r) => money(num(r,'paid')), numeric: true },
     ];
 
     view.innerHTML = pageHeader('تقرير نتيجة العمولات',
@@ -101,6 +102,7 @@ export const commissionReport: Route = {
       + kpiRow([
         { label: 'محسوب', value: money(result.totals.gross), tone: 'primary' },
         { label: 'معتمد', value: money(result.totals.approved), tone: 'green' },
+        { label: 'جاهز للصرف', value: money(result.totals.ready), tone: 'gold' },
         { label: 'مدفوع', value: money(result.totals.paid), tone: 'blue' },
         { label: 'ملكية غير محسومة', value: money(unresolved.amount), tone: unresolved.amount ? 'red' : 'green',
           sub: `${count(unresolved.events)} تفعيلات`, link: href('/work/ownership') },
@@ -113,16 +115,16 @@ export const commissionReport: Route = {
           <div class="minirow"><span>ملكية تحتاج حسم</span><b class="money">${money(unresolved.amount)}</b></div>
           <div class="minirow"><span><b>إجمالي الدورة</b></span><b class="money">${money(result.totals.gross)}</b></div>
         </div>`
-      + `<div class="insight warn report-contract-limit"><span class="insight-dot"></span><span>
-          <b>تفصيل FDT / Tier / P35 / P45 / P65 والجاهز للصرف غير متاح في عقد التقرير الحالي</b>
-          <small>لن تجمعه الواجهة من مصادر متعددة. يحتاج عقد تقرير خادمي موحّداً واختبارات قاعدة بيانات خضراء.</small></span></div>`
+      + (unresolved.amount ? `<div class="insight warn"><span class="insight-dot"></span><span><b>ملكية تحتاج حسم — ${money(unresolved.amount)}</b><small>تبقى خارج صفوف الوكلاء حتى يصدر قرار بدليل.</small></span><a class="btn" href="${esc(href('/work/ownership'))}">افتح القرار</a></div>` : '')
       + exportBar()
       + table(columns, rows);
 
     wireFilters(view.el);
     wireExport(view, 'commission-result', rows, [
-      ['agent_name', 'الوكيل أو بند المصالحة'], ['agent_code', 'رمز الوكيل'],
-      ['events', 'التفعيلات المؤهلة'], ['subscribers', 'المشتركون'], ['gross', 'المحسوب'],
+      ['agent_name', 'الوكيل'], ['zone', 'المنطقة'], ['fdt_code', 'FDT'], ['tier_code','الشريحة'],
+      ['p35_count','P35'],['p45_count','P45'],['p65_count','P65'],
+      ['qualifying_events', 'التفعيلات المؤهلة'], ['tier_basis', 'أساس الشريحة'],
+      ['calculated', 'المحسوب'],['approved','المعتمد'],['ready','الجاهز'],['paid','المدفوع'],
     ], { 'المحسوب': result.totals.gross, 'المعتمد': result.totals.approved,
       'المدفوع': result.totals.paid, 'الملكية غير المحسومة': unresolved.amount });
   },

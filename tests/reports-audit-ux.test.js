@@ -7,17 +7,19 @@ const root = path.join(__dirname, '..');
 const reports = fs.readFileSync(path.join(root, 'src', 'features', 'reports', 'index.ts'), 'utf8');
 const audit = fs.readFileSync(path.join(root, 'src', 'features', 'audit', 'index.ts'), 'utf8');
 
-test('تقرير العمولات يستهلك عقد الدورة ويصدر بند الملكية غير المحسومة', () => {
+test('تقرير العمولات يستهلك عقد التقرير الخادمي ويبقي الملكية غير المحسومة خارجه', () => {
   assert.match(reports, /pattern: '\/reports\/commissions'/);
   assert.match(reports, /readCycleResult\(id\)/);
-  assert.match(reports, /allocation: 'UNRESOLVED'/);
+  assert.match(reports, /commission_report_product/);
   assert.match(reports, /knownAgentTotal\(result\)/);
   assert.match(reports, /'الملكية غير المحسومة': unresolved\.amount/);
 });
 
-test('التقرير لا يخترع تفاصيل غير موجودة في عقد القراءة', () => {
-  assert.match(reports, /تفصيل FDT \/ Tier \/ P35 \/ P45 \/ P65 والجاهز للصرف غير متاح/);
-  assert.match(reports, /يحتاج عقد تقرير خادمي موحّداً واختبارات قاعدة بيانات خضراء/);
+test('تفصيل التقرير والجاهز يأتيان من عقد القراءة الخادمي', () => {
+  for (const field of ['p35_count','p45_count','p65_count','tier_basis','calculated','approved','ready','paid']) {
+    assert.match(reports, new RegExp(field));
+  }
+  assert.doesNotMatch(reports, /تفصيل FDT \/ Tier .* غير متاح/);
 });
 
 test('حركة الدفتر تعرض اتجاه الخادم ولا تعيد حساب المبلغ في المتصفح', () => {

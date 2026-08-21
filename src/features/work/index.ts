@@ -36,7 +36,7 @@ export const workCenter: Route = {
     view.write(loading('جارٍ جمع ما ينتظر قراراً…'));
 
     const [doc, cycles] = await Promise.all([
-      rpc<Row>('action_center', {}),
+      rpc<Row>('product_action_center', {}),
       select<Row[]>('commission_cycles?select=id,name,status&order=period_start.desc&limit=1'),
     ]);
     if (!view.live) return;

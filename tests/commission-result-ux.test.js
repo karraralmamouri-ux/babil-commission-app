@@ -36,15 +36,17 @@ test('الاستثناءات تقود بتسمية عمل بشرية وتبقي 
   assert.match(source, /<code>\$\{esc\(r\['reason_code'\]\)\}<\/code>/);
 });
 
-test('ملف الوكيل لا يخترع ملخصاً مالياً من تجميع المتصفح', () => {
+test('ملف الوكيل يستهلك الملخص المالي الخادمي ولا يجمعه في المتصفح', () => {
   assert.doesNotMatch(source, /cycleRows\.reduce/);
-  assert.match(source, /الملخص المالي الموحّد غير متاح من عقد القراءة الحالي/);
+  assert.match(source, /agent_financial_profile_product/);
+  assert.match(source, /commission_summary/);
+  assert.match(source, /جاهز للصرف/);
   assert.match(source, /\/master\/fdts\/\$\{encodeURIComponent\(f\)\}/);
   assert.match(source, /الأسماء البديلة والتفاصيل التقنية/);
 });
 
-test('تبويب تدقيق الدورة لا يعرض تدقيق كل الدورات كأنه مقيّد بالدورة', () => {
-  assert.match(source, /عقد التدقيق الحالي يرشّح بنوع الكيان ولا يقبل معرّف الدورة/);
+test('تبويب تدقيق الدورة يستهلك عقداً مقيّداً بمعرّف الدورة', () => {
   const auditTab = source.slice(source.indexOf("if (tab === 'audit')"), source.indexOf('// overview'));
-  assert.doesNotMatch(auditTab, /list_audit_events/);
+  assert.match(auditTab, /page_commission_cycle_audit_product/);
+  assert.match(auditTab, /p_cycle_id: id/);
 });

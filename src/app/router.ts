@@ -149,9 +149,10 @@ export class Router {
   }
 
   /** يُعيد الرسم للمسار الحالي — بعد تغيّر يمسّ المعروض. */
-  refresh(): void { void this.resolve(); }
+  refresh(preserveScroll = false): void { void this.resolve(preserveScroll); }
 
-  private async resolve(): Promise<void> {
+  private async resolve(preserveScroll = false): Promise<void> {
+    const priorScroll = preserveScroll ? window.scrollY : 0;
     const { path, query } = readLocation();
     const { outlet, routes } = this.options;
 
@@ -179,6 +180,9 @@ export class Router {
         this.options.onNavigated?.(route, match);
         const result = route.render(view, match);
         if (result instanceof Promise) await result;
+        if (preserveScroll && !controller.signal.aborted) {
+          window.requestAnimationFrame(() => window.scrollTo({ top: priorScroll }));
+        }
       } catch (error) {
         // الإلغاء ليس خطأً يُعرَض: المستخدم غادر الشاشة عمداً.
         if (controller.signal.aborted) return;

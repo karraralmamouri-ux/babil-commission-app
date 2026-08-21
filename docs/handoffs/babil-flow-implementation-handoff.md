@@ -302,3 +302,49 @@ Required order when the environment exists: regression first → minimal read-co
 ## Safety statement
 
 No payment posted. No July finalization. No fabricated ownership. No fabricated FDT classification. No fabricated invoice verification. No raw source mutation.
+
+## Product acceptance fix batch — branch handoff
+
+Starting SHA: `fe2deff0ee34b9d07532fa43878fff38274c198f`.
+Branch: `feat/product-acceptance-fix` (not merged). The former DB-environment
+blockers above now have additive read-only contracts in migration
+`20260927090000_product_acceptance_read_contracts.sql`. Nothing in that
+migration writes business data or changes calculation, ownership, RLS,
+payment, or finalisation.
+
+Completed locally:
+
+- Correct blocker terminology, authoritative server-side commission Ready,
+  and an explicit “not calculated yet” state.
+- Navigable Agent/FDT context; human event evidence plus server filters and
+  pagination; current-cycle UNKNOWN_FDT decision/evidence pages.
+- Unified agent financial profile, export-safe commission report, and
+  cycle-scoped audit read contracts.
+- Exact Work Center destinations for FDT, incomplete imports,
+  classification review and pending business decisions.
+- Subscriber “history and evidence” consolidation, shared presentation
+  labels, and scoped refresh that preserves route/query/scroll state.
+- BF-SA-13 (logo) intentionally excluded.
+
+Verification: JavaScript `556/556`, TypeScript clean, production build green
+(40 modules, 9 referenced assets). PostgreSQL is unavailable locally, so the
+authoritative gate ran in isolated PostgreSQL 16 on PR **#78**, CI run
+`32469137046`: **66/66 deterministic migrations** applied from empty state and
+**812/812 DB assertions passed**. Both `test` and `db-regression` jobs passed.
+PR #78 remains unmerged.
+
+Financial anchors remain unchanged: 21,969,500 gross; 21,950,750 known;
+18,750 unresolved; 4,549 qualifying; 4,413 tier basis; UNDER_REVIEW; paid 0;
+DIRECT_COMPANY blockers 0. Installation remains 5,693 / 17,117 /
+54,828,000 / 2,196 / 7,278,000 / Ready 0 / unresolved 5.
+
+Manual live acceptance still required after deployment (read-only unless a
+separate fixture is authorized):
+
+1. Home Ready/no-result and blocker-unit semantics → exact cycle work.
+2. July Scope/FDT → Agent profile → return with tab/filter/position retained.
+3. Commission event human evidence → secondary UUID/Event technical detail.
+4. Current 95 FDT decisions → 4,215 events reconciliation, cabinet 87 once,
+   DIRECT_COMPANY reseller blockers zero; do not classify.
+5. Installation invariant/evidence chain → invoice drawer without saving →
+   July outside CLOSED archive → cycle audit Who/When/What/Entity/Before/After/Why.

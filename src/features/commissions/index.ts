@@ -7,13 +7,14 @@
 
 import type { Route, RouteMatch, View } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, select, toPage, can } from '../../services/api';
+import { rpc, select, toPage, envelope, can } from '../../services/api';
 import { money, count } from '../../domain/money';
 import {
   readCycleResult, knownAgentTotal, cycleStatusAr, isProjectedStatus,
   type CycleResult, type UnresolvedOwnership,
 } from '../../domain/cycle';
 import { dateTime } from '../../domain/time';
+import { packageLabel } from '../../domain/presentation';
 import {
   esc, loading, empty, errorState, pageHeader, table, pager, kpiRow,
   chip, projectedTag, filterBar, wireFilters, type Column,
@@ -356,7 +357,7 @@ async function renderCycle(view: View, m: RouteMatch, tab: string): Promise<void
         sub: projected ? 'قيد المراجعة — ليست مستحقاً معتمداً' : 'نتيجة معتمدة' },
       { label: 'معتمد', value: money(result.totals.approved), tone: 'green' },
       { label: 'مدفوع', value: money(result.totals.paid), tone: 'blue' },
-      { label: 'قرارات تمنع الاعتماد', value: count(result.blockers.length),
+      { label: 'فئات أسباب حاجبة', value: count(result.blockers.length),
         tone: result.blockers.length ? 'red' : 'green', link: href(`/commissions/cycles/${id}/review`) },
     ])
     + `<div class="box cycle-operational-result"><h3>النتيجة التشغيلية</h3>
@@ -386,17 +387,22 @@ async function renderCycleTab(view: View, cycle: Cycle, result: CycleResult, tab
   if (tab === 'events') {
     const limit = Number(m.query.get('limit') || 50);
     const offset = Number(m.query.get('offset') || 0);
-    const rows = await rpc<Array<Record<string, unknown>>>('commission_cycle_events_page', {
-      p_cycle_id: id, p_scope_type: m.query.get('scope_type'), p_scope_id: m.query.get('scope_id'),
+    const raw = await rpc<Record<string, unknown>>('page_commission_cycle_events_product', {
+      p_cycle_id: id, p_agent_id: m.query.get('agent') || null,
+      p_fdt_code: m.query.get('fdt') || null, p_source: m.query.get('source') || null,
+      p_package_code: m.query.get('package') || null, p_search: m.query.get('search') || null,
       p_limit: limit, p_offset: offset,
     });
-    const page = toPage(rows as never, limit, offset);
+    const page = envelope<Record<string, unknown>>(raw);
     view.writeInto('#cycleTabBody', filterBar([
-      { key: 'scope_type', label: 'نوع النطاق', type: 'select', options: [
-        { value: 'AGENT', label: 'وكيل — المنطقة القديمة' },
-        { value: 'FDT', label: 'كابينة — المنطقة الجديدة' },
+      { key: 'search', label: 'المشترك', type: 'search' },
+      { key: 'agent', label: 'معرّف الوكيل', type: 'search' },
+      { key: 'fdt', label: 'الكابينة', type: 'search' },
+      { key: 'source', label: 'اسم المصدر', type: 'search' },
+      { key: 'package', label: 'الباقة', type: 'select', options: [
+        { value: 'P-35000', label: 'P35' }, { value: 'P-45000', label: 'P45' },
+        { value: 'P-65000', label: 'P65' },
       ] },
-      { key: 'scope_id', label: 'رمز الوكيل أو الكابينة', type: 'search' },
     ], `/commissions/cycles/${id}/events`, m.query)
       + (page.rows.length
       ? table(eventColumns(), page.rows as Array<Record<string, unknown>>)
@@ -450,10 +456,18 @@ async function renderCycleTab(view: View, cycle: Cycle, result: CycleResult, tab
   }
 
   if (tab === 'audit') {
-    view.writeInto('#cycleTabBody', `<div class="insight warn"><span class="insight-dot"></span><span>
-        <b>تدقيق الدورة يحتاج عقد قراءة مقيّداً بالدورة</b>
-        <small>عقد التدقيق الحالي يرشّح بنوع الكيان ولا يقبل معرّف الدورة؛ لن نعرض سجلّ كل الدورات هنا كأنه سجلّ هذه الدورة.</small></span>
-        <a class="btn" href="${esc(href('/audit'))}">افتح تدقيق النظام</a></div>`);
+    const offset = Number(m.query.get('offset') || 0);
+    const raw = await rpc<Record<string, unknown>>('page_commission_cycle_audit_product', {
+      p_cycle_id: id, p_limit: 50, p_offset: offset,
+    });
+    const page = envelope<Record<string, unknown>>(raw);
+    const cols: Array<Column<Record<string, unknown>>> = [
+      { key: 'when', label: 'متى', cell: (r) => esc(dateTime(r['created_at'])) },
+      { key: 'who', label: 'من', cell: (r) => esc(r['actor'] ?? '—') },
+      { key: 'what', label: 'ماذا', cell: (r) => `<b>${esc(r['action'] ?? '—')}</b><div class="muted">${esc(r['entity_type'] ?? '')}</div>` },
+      { key: 'change', label: 'التغيير والسبب', cell: (r) => `${esc(r['old_value'] ?? '—')} ← ${esc(r['new_value'] ?? '—')}${r['extra'] ? `<div class="muted">${esc(r['extra'])}</div>` : ''}<details class="technical-detail"><summary>قبل / بعد</summary><pre>${esc(JSON.stringify({ before: r['before_data'], after: r['after_data'] }, null, 2))}</pre></details>` },
+    ];
+    view.writeInto('#cycleTabBody', page.rows.length ? table(cols, page.rows) + pager(page.total, 50, offset, `/commissions/cycles/${id}/audit`, m.query) : empty('لا أثر تدقيق لهذه الدورة'));
     return;
   }
 
@@ -467,7 +481,7 @@ const num = (r: Record<string, unknown>, k: string) => Number(r[k] || 0);
 
 function scopeTable(rows: Snapshot[]): string {
   const columns: Array<Column<Snapshot>> = [
-    { key: 'scope', label: 'النطاق', cell: (r) => `<b>${esc(r.scope_label || r.scope_id)}</b>
+    { key: 'scope', label: 'النطاق', cell: (r) => `<a href="${esc(r.scope_type === 'AGENT' ? href(`/commissions/agents/${r.scope_id}`) : href(`/master/fdts/${encodeURIComponent(r.scope_id)}`))}"><b>${esc(r.scope_label || r.scope_id)}</b></a>
       <div class="muted" style="font-size:10px">${esc(r.scope_type === 'FDT' ? 'كابينة' : 'وكيل')} · ${esc(r.scope_id)}</div>` },
     { key: 'zone', label: 'المنطقة', cell: (r) => chip(r.zone === 'new' ? 'جديدة' : 'قديمة', r.zone === 'new' ? 'success' : 'info') },
     { key: 'tier', label: 'الشريحة', cell: (r) => chip(String(r.tier_code || '—').toUpperCase(), 'brand'), numeric: true },
@@ -483,10 +497,13 @@ function scopeTable(rows: Snapshot[]): string {
 
 function eventColumns(): Array<Column<Record<string, unknown>>> {
   return [
-    { key: 'subscriber', label: 'المشترك', cell: (r) => `<b>${esc(r['subscriber_key'] ?? '—')}</b>
+    { key: 'subscriber', label: 'المشترك', cell: (r) => `<b>${esc(r['subscriber'] ?? '—')}</b>
       <details class="technical-detail"><summary>تفاصيل تقنية</summary>
-        <span dir="ltr">Event: ${esc(r['activation_event_id'] ?? r['saas_event_id'] ?? '—')}</span></details>` },
-    { key: 'pkg', label: 'الباقة', cell: (r) => esc(r['package_code'] ?? '—') },
+        <span dir="ltr">Key: ${esc(r['subscriber_key'] ?? '—')} · Event: ${esc(r['activation_event_id'] ?? '—')}</span></details>` },
+    { key: 'agent', label: 'الوكيل', cell: (r) => r['agent_id'] ? `<a href="${esc(href(`/commissions/agents/${r['agent_id']}`))}">${esc(r['agent_name'] ?? '—')}</a>` : '—' },
+    { key: 'fdt', label: 'الكابينة', cell: (r) => r['fdt_code'] ? `<a dir="ltr" href="${esc(href(`/master/fdts/${encodeURIComponent(String(r['fdt_code']))}`))}">${esc(r['fdt_code'])}</a>` : '—' },
+    { key: 'source', label: 'المصدر', cell: (r) => esc(r['source'] ?? '—') },
+    { key: 'pkg', label: 'الباقة', cell: (r) => `${esc(packageLabel(r['package_code']))}<details class="technical-detail"><summary>القيمة الخام</summary><code>${esc(r['package_code'] ?? '—')}</code></details>` },
     { key: 'tier', label: 'الشريحة', cell: (r) => esc(String(r['tier_code'] ?? '—').toUpperCase()), numeric: true },
     { key: 'amount', label: 'العمولة', cell: (r) => `<span class="money">${money(num(r, 'amount'))}</span>`, numeric: true },
     { key: 'at', label: 'تاريخ التفعيل', cell: (r) => `${esc(dateTime(r['event_at']))}<div class="muted table-hint">بتوقيت بغداد</div>` },
@@ -580,7 +597,7 @@ function wireResolve(view: View): void {
         status.value === 'WAIVED'
           ? 'تُجووِز ولم يزل سببه — البيانات كما هي.'
           : 'سُجِّل أن سببه عولج. تُعاد حسبة الدورة ليظهر الأثر.');
-      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1400);
+      window.setTimeout(() => { if (view.live) window.dispatchEvent(new CustomEvent('babil:refresh')); }, 1400);
     } catch (error) {
       if (!view.live) return;
       out.innerHTML = insight('danger', 'لم يُحسم الاستثناء',
@@ -701,7 +718,7 @@ export const agentDetail: Route = {
   async render(view, m) {
     const id = m.params['id'] as string;
     view.write(loading('جارٍ تحميل ملفّ الوكيل…'));
-    const profile = await rpc<Record<string, unknown>>('agent_financial_profile', { p_agent_id: id });
+    const profile = await rpc<Record<string, unknown>>('agent_financial_profile_product', { p_agent_id: id });
     if (!profile) { view.write(empty('الوكيل غير موجود')); return; }
 
     const agent = (profile['agent'] || {}) as Record<string, unknown>;
@@ -709,25 +726,24 @@ export const agentDetail: Route = {
     const fdts = (profile['fdts'] || []) as string[];
     const aliases = (profile['aliases'] || []) as string[];
     const cycleRows = (profile['commission_cycles'] || []) as Array<Record<string, unknown>>;
+    const summary = (profile['commission_summary'] || {}) as Record<string, unknown>;
+    const scopes = (profile['commission_scopes'] || []) as Array<Record<string, unknown>>;
 
     const stages = (inst['stage_distribution'] || {}) as Record<string, number>;
 
     view.innerHTML = pageHeader(String(agent['name'] || agent['code'] || 'وكيل'),
       String(agent['code'] || ''), chip(String(agent['status'] || '—'), 'neutral'))
       + kpiRow([
-        { label: 'نطاقات عمولة', value: count(cycleRows.length), tone: 'primary',
-          sub: 'القيم المالية في الجدول من الخادم' },
-        { label: 'كابينات', value: count(fdts.length), tone: 'gold' },
-        { label: 'مشتركو التنصيب', value: count(Number(inst['subscribers'] || 0)), tone: 'blue' },
-        { label: 'حالة الوكيل', value: esc(String(agent['status'] || '—')), tone: 'green' },
+        { label: 'محسوب', value: money(Number(summary['calculated'] || 0)), tone: 'primary' },
+        { label: 'معتمد', value: money(Number(summary['approved'] || 0)), tone: 'green' },
+        { label: 'جاهز للصرف', value: money(Number(summary['ready'] || 0)), tone: 'gold' },
+        { label: 'مدفوع', value: money(Number(summary['paid'] || 0)), tone: 'blue' },
       ])
-      + `<div class="insight warn agent-summary-contract"><span class="insight-dot"></span><span>
-          <b>الملخص المالي الموحّد غير متاح من عقد القراءة الحالي</b>
-          <small>لا تجمع الواجهة «محسوب / معتمد / جاهز / مدفوع» من جداول مختلفة. تعرض أدناه كل نطاق كما أعاده الخادم حتى يتوفر عقد خادمي موحّد ويجتاز اختبارات قاعدة البيانات.</small></span></div>`
+      + `<div class="box"><div class="minirow"><span>المتبقي</span><b class="money">${money(Number(summary['remaining'] || 0))}</b></div></div>`
       // القاعدتان المحاسبيتان تبقيان منفصلتين في العرض: جمعهما يوحي بقاعدة لا وجود لها.
       + `<div class="grid2">
         <div class="box"><h3>النتيجة المالية حسب الدورة والنطاق</h3>
-          ${cycleRows.length ? table(agentCycleColumns(), cycleRows) : `<p class="muted">لا دورات محسوبة</p>`}</div>
+          ${scopes.length ? table(agentProductColumns(), scopes) : `<p class="muted">لا نطاقات محسوبة في الدورة</p>`}</div>
         <div class="box"><h3>تفصيل أجور التنصيب</h3>
           ${Object.keys(stages).length
             ? Object.entries(stages).map(([k, v]) => `<div class="minirow"><span>${esc(k)}</span><b>${count(v)}</b></div>`).join('')
@@ -747,6 +763,20 @@ export const agentDetail: Route = {
         </details></div>`;
   },
 };
+
+function agentProductColumns(): Array<Column<Record<string, unknown>>> {
+  return [
+    { key: 'zone', label: 'المنطقة', cell: (r) => esc(r['zone'] === 'new' ? 'جديدة' : 'قديمة') },
+    { key: 'fdt', label: 'FDT / النطاق', cell: (r) => esc(r['fdt_code'] ?? '—') },
+    { key: 'tier', label: 'الشريحة', cell: (r) => esc(r['tier_code'] ?? '—') },
+    { key: 'p35', label: 'P35', cell: (r) => count(num(r,'p35_count')), numeric: true },
+    { key: 'p45', label: 'P45', cell: (r) => count(num(r,'p45_count')), numeric: true },
+    { key: 'p65', label: 'P65', cell: (r) => count(num(r,'p65_count')), numeric: true },
+    { key: 'calc', label: 'محسوب', cell: (r) => money(num(r,'calculated')), numeric: true },
+    { key: 'ready', label: 'جاهز', cell: (r) => money(num(r,'ready')), numeric: true },
+    { key: 'paid', label: 'مدفوع', cell: (r) => money(num(r,'paid')), numeric: true },
+  ];
+}
 
 function agentCycleColumns(): Array<Column<Record<string, unknown>>> {
   return [
@@ -911,7 +941,7 @@ function wireWorkflow(view: View, cycle: Cycle, blockers: number): void {
       await call(why);
       if (!view.live) return;
       out.innerHTML = insight('good', done);
-      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1300);
+      window.setTimeout(() => { if (view.live) window.dispatchEvent(new CustomEvent('babil:refresh')); }, 1300);
     } catch (error) {
       if (!view.live) return;
       out.innerHTML = insight('danger', `لم يتم ${label}`,
@@ -946,7 +976,7 @@ function wireWorkflow(view: View, cycle: Cycle, blockers: number): void {
         if (!view.live) return;
         out.innerHTML = insight('good', 'أُعيد الحساب');
       }
-      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1800);
+      window.setTimeout(() => { if (view.live) window.dispatchEvent(new CustomEvent('babil:refresh')); }, 1800);
     } catch (error) {
       if (!view.live) return;
       out.innerHTML = insight('danger', 'لم يتم إعادة الحساب',

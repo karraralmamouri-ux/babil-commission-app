@@ -89,7 +89,7 @@ test('مركز العمل يُجمِّع بوحدة القرار، والتجم�
   assert.match(work, /pattern: '\/work'/);
   // التجميع انتقل إلى الخادم: مصدرٌ واحد بدل ثلاثة تُركَّب في الواجهة،
   // فتُقارَن المجموعات ببعضها بدل أن تُقرأ كلٌّ وحدها.
-  assert.match(work, /rpc<Row>\('action_center', \{\}\)/);
+  assert.match(work, /rpc<Row>\('product_action_center', \{\}\)/);
   assert.match(work, /وحدة القرار/);
 
   const sql = read(
