@@ -87,7 +87,7 @@ export const commissionSchemes: Route = {
 
     const check = isDraft
       ? await rpc<Row>('validate_commission_draft',
-          { p_version_id: str(version, 'id') }).catch(() => null)
+          { p_version_id: str(version, 'id') })
       : null;
     if (!view.live) return;
     const problems = (check?.['problems'] || []) as Row[];

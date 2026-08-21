@@ -68,7 +68,7 @@ export const mapping: Route = {
     // حقيقي لو وقع. الأول عولج في الخادم، وهذا يُعالَج هنا.
     const [page, summary, agentsResult] = await Promise.all([
       pageRpc<Row>('page_fdt_mapping', args, view.signal),
-      rpc<Row>('fdt_mapping_summary', {}).catch(() => null),
+      rpc<Row>('fdt_mapping_summary', {}),
       rpc<Row[]>('list_agents_for_pick', {})
         .then((r) => ({ ok: true as const, rows: Array.isArray(r) ? r : [] }))
         .catch((e: unknown) => ({ ok: false as const, error: e })),

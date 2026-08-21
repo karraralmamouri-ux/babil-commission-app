@@ -214,7 +214,7 @@ export const subscriberCase: Route = {
 
     const [doc, next] = await Promise.all([
       rpc<Row>('installation_subscriber_case', { p_subscriber_id: id }),
-      rpc<Row>('subscriber_next_action', { p_subscriber_id: id }).catch(() => null),
+      rpc<Row>('subscriber_next_action', { p_subscriber_id: id }),
     ]);
     const sub = (doc?.['subscriber'] || null) as Row | null;
     if (!sub) { view.innerHTML = empty('المشترك غير موجود', id); return; }

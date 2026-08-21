@@ -59,7 +59,7 @@ export const users: Route = {
 
     const [page, cat] = await Promise.all([
       pageRpc<Row>('page_users', args, view.signal),
-      rpc<Row>('permission_catalogue', {}).catch(() => null),
+      rpc<Row>('permission_catalogue', {}),
     ]);
     if (!view.live) return;
 
@@ -226,7 +226,7 @@ export const userDetail: Route = {
 
     const [doc, cat] = await Promise.all([
       rpc<Row>('user_effective_permissions', { p_user_id: id }),
-      rpc<Row>('permission_catalogue', {}).catch(() => null),
+      rpc<Row>('permission_catalogue', {}),
     ]);
     if (!view.live) return;
     const roleOptions = (cat?.['roles'] || []) as Row[];
