@@ -898,6 +898,9 @@ th[aria-sort="descending"]::after { content: "↓"; opacity: 1; color: var(--gol
 .installation-stage-result, .installation-historical-decisions,
 .installation-source-diagnostics, .installation-next-actions { margin-top: var(--s3); }
 .installation-source-diagnostics summary { cursor: pointer; color: var(--navy); }
+.report-reconciliation, .report-contract-limit,
+.archive-unfinished-cycles, .archive-closed-cycles { margin-top: var(--s3); }
+.technical-detail pre { white-space: pre-wrap; max-height: 180px; overflow: auto; }
 
 /* ---------------------------------------------------------------------------
    17. حالات الشاشة
