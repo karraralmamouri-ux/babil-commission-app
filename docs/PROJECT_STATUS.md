@@ -8,6 +8,13 @@
 
 فرع العمل الحالي: `feat/remaining-results-decisions-actions` — استكمال واجهة Results → Decisions → Actions دون تغيير قاعدة البيانات
 
+## Hotfix عقود قراءة الكابينات المجهولة — 2026-08-21
+
+- كشف القبول الحي أن عقدَي `current_unknown_fdt_decisions` و`current_unknown_fdt_events` في migration 66 يقرآن `commission_exceptions.indicative_amount` مع أن العمود غير موجود؛ لذلك كانت شاشة كابينات الدورة تفشل وقت التنفيذ.
+- migration 67 أمامية ومحدودة بعقدَي القراءة: تستمد المبلغ المؤشّر من `indicative_rates(cycle)` حسب الباقة، وهي الآلية المعتمدة القائمة، ولا تكتب بيانات عمل ولا تغيّر الحساب أو الملكية أو RLS أو الدفع أو الإقفال.
+- أضيفت أربعة assertions تشغيلية تستدعي العقدين على fixture معزول وتثبت تجميع 4,000 + 5,500 = 9,500 د.ع؛ صار المتوقع في CI هو 67 migration و816 assertion.
+- التحقق المحلي: JavaScript ‏556/556، TypeScript نظيف، والبناء الإنتاجي ناجح. تحقق DB الكامل ينتظر CI لأن Docker/PostgreSQL غير متاح محلياً.
+
 ## استكمال Results → Decisions → Actions — 2026-08-21
 
 - بدأ العمل من `3ecfe0d` بعد fast-forward آمن، وشجرة نظيفة، وحفظ تقرير التدقيق المحلي خارج المستودع ببصمته.

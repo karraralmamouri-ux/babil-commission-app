@@ -101,3 +101,7 @@
 ## migrations
 
 توضع الملفات في `supabase/migrations/` بترتيب زمني. كل migration تشمل القيود والفهارس وRLS والـgrants اللازمة، وتختبر على Staging قبل الإنتاج.
+
+### المبلغ المؤشّر لاستثناءات الكابينات
+
+`commission_exceptions` لا يخزن `indicative_amount`. هذا مقصود: المبلغ المؤشّر قراءة مشتقة من `indicative_rates(cycle_id)` وربط `saas_activation_events.profile_name` مع `package_code`. عقدا `current_unknown_fdt_decisions` و`current_unknown_fdt_events` في migration 67 يطبقان هذا الاشتقاق ولا ينشئان التزاماً مالياً أو يغيران نتيجة دورة.
