@@ -66,7 +66,7 @@ export const invoiceReview: Route = {
 
     const [page, summary] = await Promise.all([
       pageRpc<Row>('page_invoice_review', args, view.signal),
-      rpc<Row>('invoice_review_summary', {}).catch(() => null),
+      rpc<Row>('invoice_review_summary', {}),
     ]);
     if (!view.live) return;
 

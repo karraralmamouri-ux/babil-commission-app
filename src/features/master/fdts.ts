@@ -47,7 +47,7 @@ export const unknownFdts: Route = {
 
     const [page, summary] = await Promise.all([
       pageRpc<Row>('page_unknown_fdts', args, view.signal),
-      rpc<Row>('unknown_fdt_summary', {}).catch(() => null),
+      rpc<Row>('unknown_fdt_summary', {}),
     ]);
     if (!view.live) return;
 
@@ -128,7 +128,7 @@ export const fdtRegistry: Route = {
 
     const [page, summary] = await Promise.all([
       pageRpc<Row>('page_fdts', args, view.signal),
-      rpc<Row>('unknown_fdt_summary', {}).catch(() => null),
+      rpc<Row>('unknown_fdt_summary', {}),
     ]);
     if (!view.live) return;
 

@@ -62,10 +62,10 @@ export const home: Route = {
     // نتيجة الدورة تُقرأ بعقدها الواحد لا بتقرير الإدارة: التقرير كان يُقرأ
     // بمفتاحٍ لا ينتجه، فتصير البطاقات شرطات.
     const [result, action, pipeline, company] = await Promise.all([
-      readCycleResult(cycleId).catch(() => null),
-      rpc<Row>('action_center', {}).catch(() => null),
-      rpc<Row>('installation_cycle_pipeline', {}).catch(() => null),
-      rpc<Row>('company_parent_breakdown', {}).catch(() => null),
+      readCycleResult(cycleId),
+      rpc<Row>('action_center', {}),
+      rpc<Row>('installation_cycle_pipeline', {}),
+      rpc<Row>('company_parent_breakdown', {}),
     ]);
     if (!view.live) return;
 
