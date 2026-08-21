@@ -18,6 +18,7 @@ import type { Route } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, select } from '../../services/api';
 import { money, count } from '../../domain/money';
+import { readCycleResult } from '../../domain/cycle';
 import { esc, loading, empty, pageHeader, chip, projectedTag } from '../../components/ui';
 
 type Row = Record<string, unknown>;
@@ -58,18 +59,20 @@ export const home: Route = {
     const status = String(cycle['status']);
     const projected = !FINAL.has(status);
 
-    const [summary, action, pipeline, company] = await Promise.all([
-      rpc<Row>('report_management_summary', { p_cycle_id: cycleId }).catch(() => null),
+    // نتيجة الدورة تُقرأ بعقدها الواحد لا بتقرير الإدارة: التقرير كان يُقرأ
+    // بمفتاحٍ لا ينتجه، فتصير البطاقات شرطات.
+    const [result, action, pipeline, company] = await Promise.all([
+      readCycleResult(cycleId).catch(() => null),
       rpc<Row>('action_center', {}).catch(() => null),
       rpc<Row>('installation_cycle_pipeline', {}).catch(() => null),
       rpc<Row>('company_parent_breakdown', {}).catch(() => null),
     ]);
     if (!view.live) return;
 
-    const g = (summary?.['global'] || {}) as Row;
-    const c = (summary?.['commission'] || {}) as Row;
-    const t = (c['totals'] || {}) as Row;
-    const x = (c['exceptions'] || {}) as Row;
+    const cycleTotals = result?.totals ?? { gross: 0, approved: 0, paid: 0, remaining: 0, scopes: 0 };
+    const unresolvedAmount = result?.unresolved_ownership.amount ?? 0;
+    const blockingDecisions = (result?.blockers ?? [])
+      .reduce((a, b) => a + b.subscribers, 0);
 
     const groups = (action?.['groups'] || []) as Row[];
     const open = groups.filter((r) => num(r, 'decisions') > 0)
@@ -92,19 +95,43 @@ export const home: Route = {
       esc(String(cycle['name'])),
       projected ? projectedTag() : chip('معتمدة', 'success'))
 
-      /* ١ · الوضع المالي */
+      /* ١ · العمولات — بالمعنى المالي لا بالحالة التقنية.
+       *
+       * «إجمالي المستحق» كانت تسميةً خاطئة لدورةٍ قيد المراجعة: الرقم محسوب
+       * ولم يُعتمد، وتسميتُه مستحقّاً تجعله يبدو التزاماً نهائياً. الأربعة
+       * هنا مراتب: محسوب ← معتمد ← جاهز ← مدفوع، ولكلٍّ منها معنى مختلف. */
       + `<section style="margin-top:4px">
-        ${sectionTitle('الوضع المالي')}
+        ${sectionTitle('العمولات')}
         <div class="cards cards-4">
-          ${moneyCard('إجمالي المستحق', money(num(g, 'total_obligations')),
-            'عمولات وأجور تنصيب', 'kpi-primary', href(`/commissions/cycles/${cycleId}`))}
-          ${moneyCard('المدفوع', money(num(g, 'total_paid')),
+          ${moneyCard('عمولات محسوبة', money(cycleTotals.gross),
+            projected ? 'قيد المراجعة — لم تُعتمد' : 'معتمدة',
+            'kpi-primary', href('/commissions'))}
+          ${moneyCard('معتمد', money(cycleTotals.approved),
+            cycleTotals.approved ? 'مثبَّت بلقطة' : 'لم يُعتمد بعد', 'blueline',
+            href(`/commissions/cycles/${cycleId}/review`))}
+          ${moneyCard('جاهز للصرف', money(0),
+            'يتبع الاعتماد', 'greenline', href('/finance/payment-batches'))}
+          ${moneyCard('مدفوع', money(cycleTotals.paid),
             'مُرحَّل في الدفتر', 'greenline', href('/reports/payments'))}
-          ${moneyCard('المتبقّي', money(num(g, 'total_remaining')),
-            'بعد المدفوع', 'blueline', href(`/commissions/cycles/${cycleId}/payout`))}
-          ${moneyCard('موقوف بانتظار قرار', blockedMoney ? money(blockedMoney) : '—',
-            blockedMoney ? 'حيث يُعرف المبلغ' : 'لا مبلغ محسوب بعد', 'redline', href('/work'))}
         </div>
+        ${blockingDecisions
+          ? `<div class="insight danger" style="margin-top:10px">
+              <span class="insight-dot"></span><span>
+              <b>${count(blockingDecisions)} قراراً يمنع الاعتماد</b>
+              <small>لا تُعتمد الدورة قبل حسمها.</small></span>
+              <a class="btn gold" style="margin-inline-start:auto"
+                 href="${esc(href(`/commissions/cycles/${cycleId}/review`))}">راجع دورة العمولة</a>
+            </div>`
+          : ''}
+        ${unresolvedAmount
+          ? `<div class="insight warn" style="margin-top:10px">
+              <span class="insight-dot"></span><span>
+              <b>ملكية تحتاج حسم — ${money(unresolvedAmount)}</b>
+              <small>محسوبة في الإجمالي وغير منسوبة إلى وكيل.</small></span>
+              <a class="btn" style="margin-inline-start:auto"
+                 href="${esc(href('/work/ownership'))}">افتح القرار</a>
+            </div>`
+          : ''}
       </section>`
 
       /* ٢ · تحتاج إجراء */
@@ -136,15 +163,15 @@ export const home: Route = {
             <h3>◎ عمولات الوكلاء</h3>
             <div class="split-money">
               <div class="part released"><span class="k">محسوب</span>
-                <span class="v">${money(num(t, 'gross'))}</span></div>
-              <div class="part blocked"><span class="k">استثناءات حاجبة</span>
-                <span class="v">${count(num(x, 'blocking'))}</span></div>
-              <div class="part exposure"><span class="k">أساس الشريحة</span>
-                <span class="v">${count(num(t, 'unique_activated_subscribers'))}</span></div>
+                <span class="v">${money(cycleTotals.gross)}</span></div>
+              <div class="part blocked"><span class="k">قرارات حاجبة</span>
+                <span class="v">${count(blockingDecisions)}</span></div>
+              <div class="part exposure"><span class="k">أساس التير</span>
+                <span class="v">${count(result?.volumes.tier_basis ?? 0)}</span></div>
             </div>
             <div class="minirow" style="margin-top:10px">
-              <span class="muted">الأحداث المؤهَّلة</span>
-              <b>${count(num(t, 'qualifying_events'))}</b></div>
+              <span class="muted">التفعيلات المؤهَّلة</span>
+              <b>${count(result?.volumes.qualifying_events ?? 0)}</b></div>
             <div class="actions" style="margin-top:10px">
               <a class="btn" href="${esc(href(`/commissions/cycles/${cycleId}/scopes`))}">النطاقات</a>
               <a class="btn" href="${esc(href('/exceptions', { blocking: 'true' }))}">الاستثناءات</a>

@@ -205,7 +205,10 @@ test('الشاشات لا تحمل معدّلات ولا حدود شرائح', (
 
 test('الأرقام تأتي من دوالّ الخادم', () => {
   const s = read('src/features/home/index.ts');
-  assert.match(s, /report_management_summary/);
+  // نتيجة الدورة تُقرأ بعقدها الواحد. كانت تُقرأ من `report_management_summary`
+  // بمفتاح `totals` — وهو مفتاحٌ لا تُنتجه تلك الدالّة، فتصير البطاقات شرطات.
+  assert.match(s, /readCycleResult/);
+  assert.doesNotMatch(s, /report_management_summary/);
   // الحجب صار يأتي من مركز العمل: مصدرٌ واحد مصنَّف بدل تقرير يُقرأ وحده.
   assert.match(s, /action_center/);
   assert.match(s, /installation_cycle_pipeline/);
@@ -285,7 +288,7 @@ test('كل عنصر ملاحة يقصد مساراً مسجَّلاً', () => {
 test('الزرّان الميّتان صار لهما مساران حقيقيان', () => {
   const shell = read('src/app/shell.ts');
   assert.match(shell, /أسعار العمولات والتير/);
-  assert.match(shell, /ربط الوكلاء والكابينات/);
+  assert.match(shell, /الوكلاء والكابينات/);
   assert.match(shell, /'\/master\/commission-schemes'/);
   assert.match(shell, /'\/master\/mapping'/);
 

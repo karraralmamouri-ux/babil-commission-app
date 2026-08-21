@@ -30,6 +30,20 @@ export interface NavGroup {
  * تُرسَم ملوّنةً بخطّ النظام، فتكسر النظام البصري وتتغيّر شكلاً بين
  * المنصّات. استُبدلت بمحارف من العائلة نفسها.
  */
+/*
+ * الترتيب: نتيجة ← قرار ← إجراء.
+ *
+ * كان الشريط مرتَّباً بالجداول: قسمٌ لكل محرّك، وقسمٌ لكل مجموعة شاشات.
+ * فيقرأ المشغّل «الاستثناءات» و«تصحيح التفعيلات» و«الدورة الشهرية» بلا
+ * ترتيبٍ يقول أيّها نتيجة وأيّها قرار.
+ *
+ * فصار الترتيب يتبع السؤال لا الجدول: ما النتيجة؟ ثم ما القرار المطلوب؟
+ * ثم أين البيانات التي تُبنى عليها؟ ثم النظام.
+ *
+ * والمسارات لم تتغيّر — أُعيد تجميعها فقط. كل رابطٍ عميق قديم يبقى صالحاً،
+ * وما خرج من الشريط لم يخرج من المُوجِّه: يُبلَغ من سياقه (زرّ في صفّ، أو
+ * وصلة من قرار) لا من قائمةٍ عامة.
+ */
 export const NAV: NavGroup[] = [
   {
     key: 'main', label: '', items: [
@@ -37,64 +51,66 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    key: 'commission', label: 'عمولات الوكلاء', items: [
-      { label: 'نظرة عامة', path: '/commissions', icon: '◎', capability: 'commission.view' },
-      { label: 'الدورات', path: '/commissions/cycles', icon: '◷', capability: 'commission.view' },
-      { label: 'الوكلاء', path: '/commissions/agents', icon: '◍', capability: 'commission.view' },
-    ],
-  },
-  {
-    key: 'installation', label: 'أجور التنصيب', items: [
-      { label: 'مركز التحكّم', path: '/installation', icon: '⊞', capability: 'installation.view' },
-      { label: 'الدورة الشهرية', path: '/installation/cycle', icon: '◷', capability: 'installation.view' },
-      { label: 'المشتركون', path: '/installation/subscribers', icon: '◫', capability: 'installation.view' },
-      { label: 'مراجعة الفواتير', path: '/installation/invoices', icon: '▤', capability: 'invoice.view' },
-      { label: 'جاهز للصرف', path: '/installation/ready', icon: '✓', capability: 'installation.view' },
-      { label: 'التعليقات', path: '/installation/holds', icon: '‖', capability: 'installation.view' },
-    ],
-  },
-  {
-    key: 'finance', label: 'المالية', items: [
-      { label: 'دفعات الصرف', path: '/finance/payment-batches', icon: '◈', capability: 'payment.view' },
-      { label: 'دفعات التنصيب', path: '/finance/installation-batches', icon: '⊟', capability: 'payment.view' },
-    ],
-  },
-  {
-    key: 'work', label: 'تحتاج إجراء', items: [
-      { label: 'مركز العمل', path: '/work', icon: '◉', capability: 'report.view' },
-      { label: 'الاستثناءات', path: '/exceptions', icon: '◬', capability: 'commission.view' },
-      { label: 'تصحيح التفعيلات', path: '/commissions/corrections', icon: '⊗', capability: 'commission.view' },
-    ],
-  },
-  {
-    key: 'master', label: 'البيانات الرئيسية', items: [
-      { label: 'الآباء والعائدية', path: '/master/parents', icon: '⌂', capability: 'agent.view' },
-      { label: 'الوكلاء', path: '/master/agents', icon: '◇', capability: 'agent.view' },
-      { label: 'الباقات', path: '/master/packages', icon: '▥', capability: 'agent.view' },
-      { label: 'الكابينات', path: '/master/fdts', icon: '⊡', capability: 'commission.view' },
-      { label: 'ربط الوكلاء والكابينات', path: '/master/mapping', icon: '⋈', capability: 'commission.view' },
-      { label: 'أسعار العمولات والتير', path: '/master/commission-schemes', icon: '⊜', capability: 'commission.view' },
-    ],
-  },
-  {
-    key: 'reports', label: 'التقارير', items: [
+    key: 'results', label: 'النتائج المالية', items: [
+      { label: 'العمولات', path: '/commissions', icon: '◎', capability: 'commission.view' },
+      { label: 'أجور التنصيب', path: '/installation', icon: '⊞', capability: 'installation.view' },
       { label: 'التقارير', path: '/reports', icon: '▧', capability: 'report.view' },
       { label: 'الأرشيف', path: '/reports/archive', icon: '▩', capability: 'report.view' },
     ],
   },
   {
+    key: 'work', label: '', items: [
+      { label: 'مركز العمل', path: '/work', icon: '◉', capability: 'report.view' },
+    ],
+  },
+  {
+    key: 'data', label: 'البيانات', items: [
+      { label: 'المشتركون', path: '/installation/subscribers', icon: '◫', capability: 'installation.view' },
+      { label: 'الوكلاء والكابينات', path: '/master/mapping', icon: '⋈', capability: 'commission.view' },
+      { label: 'الملكية وأسماء المصدر', path: '/master/parents', icon: '⌂', capability: 'agent.view' },
+      { label: 'الباقات', path: '/master/packages', icon: '▥', capability: 'agent.view' },
+      { label: 'أسعار العمولات والتير', path: '/master/commission-schemes', icon: '⊜', capability: 'commission.view' },
+    ],
+  },
+  {
     key: 'system', label: 'النظام', items: [
       { label: 'الاستيراد', path: '/system/imports', icon: '⊕', capability: 'saas.review' },
-      { label: 'المستخدمون', path: '/system/users', icon: '◍', capability: 'permission.manage' },
+      { label: 'المستخدمون والصلاحيات', path: '/system/users', icon: '◍', capability: 'permission.manage' },
       { label: 'سجلّ التدقيق', path: '/audit', icon: '❑', capability: 'audit.view' },
     ],
   },
   {
-    // تبقى مرئيّةً حتى تكتمل المكافئات، ومُعلَّمةً بأنها سابقة.
+    // تبقى مرئيّةً ومُعلَّمةً بأنها سابقة، وللقراءة التاريخية وحدها.
     key: 'legacy', label: 'الشاشات السابقة', items: [
       { label: 'مساحة العمل الكاملة', path: '/legacy', icon: '▥', legacy: true },
     ],
   },
+];
+
+/**
+ * مسارات باقية في المُوجِّه وخارج الشريط.
+ *
+ * ليست محذوفة ولا مهجورة: تُبلَغ من سياقها. «جاهز للصرف» يُفتح من نتيجة
+ * التنصيب، و«مراجعة الفواتير» من قرارها في مركز العمل، و«تصحيح التفعيلات»
+ * من الحدث نفسه. وضعُها في قائمةٍ عامة يجعل المشغّل يختار من بين عشرين
+ * اسماً بدل أن يتبع ما تقوله النتيجة.
+ *
+ * تُذكر هنا صراحةً ليبقى وجودها مقصوداً ومُختبَراً، لا منسيّاً.
+ */
+export const CONTEXTUAL_ROUTES: string[] = [
+  '/commissions/cycles',
+  '/commissions/agents',
+  '/commissions/corrections',
+  '/exceptions',
+  '/installation/cycle',
+  '/installation/invoices',
+  '/installation/ready',
+  '/installation/holds',
+  '/finance/payment-batches',
+  '/finance/installation-batches',
+  '/master/agents',
+  '/master/fdts',
+  '/system/imports/new',
 ];
 
 /**

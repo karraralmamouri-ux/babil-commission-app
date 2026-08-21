@@ -229,13 +229,42 @@ test('لا استثناء يُحيل إلى المطوّر', () => {
 const shell = fs.readFileSync(path.join(root, 'src', 'app', 'shell.ts'), 'utf8');
 
 test('معمارية الملاحة المعتمدة كاملة', () => {
-  ['عمولات الوكلاء', 'أجور التنصيب', 'المالية']
+  // الترتيب صار يتبع السؤال لا الجدول: نتيجة ← قرار ← بيانات ← نظام.
+  // كان مرتَّباً بالمحرّكات (عمولات، تنصيب، مالية)، فلا يقول أيّ شاشةٍ
+  // نتيجةٌ وأيّها قرار.
+  ['النتائج المالية', 'البيانات', 'النظام']
     .forEach((label) => assert.match(shell, new RegExp(label), `${label} مفقود من الملاحة`));
-  ['commission', 'installation', 'finance']
+  ['results', 'work', 'data', 'system']
     .forEach((key) => assert.match(shell, new RegExp(`key: '${key}'`), `${key} مفقود`));
+
+  // مركز العمل بندٌ أوّل لا مجموعة: هو مدخل القرارات كلّها.
+  assert.match(shell, /مركز العمل/);
+
   // وكل مجموعة تقود إلى شاشات مستقلّة لا إلى لوحة واحدة.
-  const paths = [...shell.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1]);
+  const paths = [...shell.matchAll(/path:\s*'([^']+)'/g)]
+    .map((m) => m[1])
+    // مسارات السياق تُذكر في قائمةٍ منفصلة، ولا تُعدّ وجهات ملاحة.
+    .filter((p) => !shell.slice(shell.indexOf('CONTEXTUAL_ROUTES')).includes(`'${p}'`));
   assert.equal(paths.length, new Set(paths).size, 'وجهتان متطابقتان في الملاحة');
+});
+
+test('ما خرج من الشريط لم يخرج من المُوجِّه', () => {
+  // إخراج شاشةٍ من القائمة العامة لا يعني حذفها: تُبلَغ من سياقها. ولو
+  // سقط مسارٌ من المُوجِّه لصار رابطاً عميقاً مكسوراً بلا أن يلاحظ أحد.
+  const contextual = [...shell.slice(shell.indexOf('CONTEXTUAL_ROUTES'))
+    .matchAll(/'(\/[^']+)'/g)].map((m) => m[1]);
+  assert.ok(contextual.length >= 10, `expected contextual routes, found ${contextual.length}`);
+
+  const featureDir = path.join(root, 'src', 'features');
+  const sources = fs.readdirSync(featureDir, { recursive: true })
+    .filter((f) => String(f).endsWith('.ts'))
+    .map((f) => fs.readFileSync(path.join(featureDir, String(f)), 'utf8'));
+  const patterns = new Set(sources.flatMap((s) =>
+    [...s.matchAll(/pattern:\s*'([^']+)'/g)].map((m) => m[1])));
+
+  for (const route of contextual) {
+    assert.ok(patterns.has(route), `مسار سياقي غير مسجَّل في المُوجِّه: ${route}`);
+  }
 });
 
 test('ما لا صلاحية له يُخفى لا يُعطَّل فقط', () => {

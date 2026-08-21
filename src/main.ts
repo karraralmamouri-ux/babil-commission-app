@@ -23,6 +23,7 @@ import { routes as mappingRoutes } from './features/master/mapping';
 import { routes as fdtEventRoutes } from './features/master/fdt-events';
 import { routes as correctionRoutes } from './features/commissions/corrections';
 import { routes as workRoutes } from './features/work';
+import { routes as decisionRoutes } from './features/work/decisions';
 import { routes as auditRoutes } from './features/audit';
 import { routes as systemRoutes } from './features/system/users';
 import { routes as importRoutes } from './features/system/imports';
@@ -57,6 +58,7 @@ const ROUTES: Route[] = [
   ...fdtEventRoutes,
   ...correctionRoutes,
   ...workRoutes,
+  ...decisionRoutes,
   ...auditRoutes,
   ...systemRoutes,
   ...importRunRoutes,

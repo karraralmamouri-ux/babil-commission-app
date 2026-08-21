@@ -59,14 +59,24 @@ export const mapping: Route = {
     if (mapped === 'true') args['p_mapped'] = true;
     if (mapped === 'false') args['p_mapped'] = false;
 
-    const [page, summary, agents] = await Promise.all([
+    // قائمة الوكلاء لا تسقط صامتةً إلى [].
+    //
+    // كانت `.catch(() => [])` تُحوِّل أي عطل إلى قائمة فارغة، فتبدو الشاشة
+    // سليمةً وفيها قائمةٌ خالية. ولم يكن ذلك سبب الفراغ — الدالّة كانت
+    // ترشّح `status = 'ACTIVE'` بحروف كبيرة وقيد الجدول لا يقبل إلا
+    // الصغيرة، فتنجح وتُعيد صفراً — لكن السقوط الصامت كان يمنع رؤية أي عطلٍ
+    // حقيقي لو وقع. الأول عولج في الخادم، وهذا يُعالَج هنا.
+    const [page, summary, agentsResult] = await Promise.all([
       pageRpc<Row>('page_fdt_mapping', args, view.signal),
       rpc<Row>('fdt_mapping_summary', {}).catch(() => null),
-      rpc<Row[]>('list_agents_for_pick', {}).catch(() => [] as Row[]),
+      rpc<Row[]>('list_agents_for_pick', {})
+        .then((r) => ({ ok: true as const, rows: Array.isArray(r) ? r : [] }))
+        .catch((e: unknown) => ({ ok: false as const, error: e })),
     ]);
     if (!view.live) return;
 
-    const list = Array.isArray(agents) ? agents : [];
+    const list = agentsResult.ok ? agentsResult.rows : [];
+    const agentsFailed = !agentsResult.ok;
     const unmapped = summary ? num(summary, 'unmapped') : 0;
     const unregistered = summary ? num(summary, 'unregistered') : 0;
 
@@ -136,7 +146,7 @@ export const mapping: Route = {
           { value: 'false', label: 'غير المربوطة' }, { value: 'true', label: 'المربوطة' } ] },
       ], '/master/mapping', m.query)
 
-      + mapPanel(list)
+      + mapPanel(list, agentsFailed)
       + (page.rows.length ? table(columns, page.rows) : empty('لا كابينات مطابقة'))
       + pager(page.total, limit, offset, '/master/mapping', m.query);
 
@@ -145,7 +155,21 @@ export const mapping: Route = {
   },
 };
 
-function mapPanel(agents: Row[]): string {
+function mapPanel(agents: Row[], failed: boolean): string {
+  // العطل يُقال عطلاً. قائمةٌ فارغة تُقرأ «لا وكلاء»، وذلك كذبٌ على المشغّل
+  // حين يكون السبب أن الطلب لم ينجح أصلاً.
+  if (failed) {
+    return `<div class="box" style="margin-top:12px">
+      <div class="insight danger"><span class="insight-dot"></span><span>
+        <b>تعذّر تحميل قائمة الوكلاء</b>
+        <small>لا يتمّ الربط بلا قائمة. أعِد المحاولة، وإن تكرّر فالخادم لا يستجيب.</small>
+      </span></div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn" onclick="location.reload()">إعادة المحاولة</button>
+      </div>
+    </div>`;
+  }
+
   if (!can('fdt.manage')) {
     return `<div class="box" style="margin-top:12px">
       <p class="muted">العرض فقط — الربط يحتاج صلاحية

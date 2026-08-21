@@ -12,6 +12,7 @@
 
 import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
+import { dateTime } from '../../domain/time';
 import { rpc, pageRpc, edge, can, ApiError } from '../../services/api';
 import { count } from '../../domain/money';
 import {
@@ -22,7 +23,7 @@ import {
 type Row = Record<string, unknown>;
 const num = (r: Row, k: string) => Number(r[k] || 0);
 const str = (r: Row, k: string) => String(r[k] ?? '');
-const when = (v: unknown) => (v ? String(v).replace('T', ' ').slice(0, 16) : '—');
+const when = (v: unknown) => (v ? dateTime(v) : '—');
 
 const SOURCE_AR: Record<string, { label: string; tone: 'success' | 'critical' | 'info' | 'neutral' }> = {
   ROLE:            { label: 'من الدور', tone: 'info' },

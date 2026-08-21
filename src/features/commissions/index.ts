@@ -10,6 +10,11 @@ import { href } from '../../app/router';
 import { rpc, select, toPage, can } from '../../services/api';
 import { money, count } from '../../domain/money';
 import {
+  readCycleResult, knownAgentTotal, cycleStatusAr, isProjectedStatus,
+  type CycleResult, type UnresolvedOwnership,
+} from '../../domain/cycle';
+import { dateTime } from '../../domain/time';
+import {
   esc, loading, empty, errorState, pageHeader, table, pager, kpiRow,
   chip, projectedTag, filterBar, wireFilters, type Column,
 } from '../../components/ui';
@@ -59,21 +64,109 @@ export const overview: Route = {
     const list = await cycles();
     if (!list.length) { view.write(empty('لا توجد دورات عمولة بعد')); return; }
     const current = list[0] as Cycle;
-    const detail = await rpc<Record<string, unknown>>('report_commission_cycle_detail', { p_cycle_id: current.id })
-      .catch(() => null);
-    const totals = (detail?.['totals'] || {}) as Record<string, number>;
-    const projected = isProjected(current.status);
 
-    view.write(pageHeader('عمولات الوكلاء', 'الدورة الأحدث ومدخل إلى الدورات السابقة')
+    // قراءةٌ واحدة بعقدٍ واحد. والعطل يُعرَض عطلاً: «تعذّر التحميل» و«لا
+    // بيانات» حالتان مختلفتان، وعرضُ الشرطة لكليهما يُخفي الأولى.
+    let result: CycleResult | null;
+    try {
+      result = await readCycleResult(current.id);
+    } catch (error) {
+      if (!view.live) return;
+      view.write(pageHeader('عمولات الوكلاء', current.name)
+        + errorState(
+            error instanceof Error ? error.message : 'تعذّر تحميل بيانات الدورة',
+            'location.reload()'));
+      return;
+    }
+    if (!view.live) return;
+
+    if (!result) {
+      view.write(pageHeader('عمولات الوكلاء', current.name)
+        + empty('لا نتيجة محسوبة لهذه الدورة بعد', 'تُحسب الدورة من شاشتها'));
+      return;
+    }
+
+    const projected = isProjectedStatus(result.cycle.status);
+    const known = knownAgentTotal(result);
+    const unresolved = result.unresolved_ownership;
+
+    view.write(pageHeader('عمولات الوكلاء',
+      `${esc(result.cycle.name)} · ${esc(cycleStatusAr(result.cycle.status))}`,
+      projected ? projectedTag() : chip('معتمدة', 'success'))
+
+      // النتيجة المالية أولاً: محسوب، معتمد، مدفوع.
       + kpiRow([
-        { label: 'الإجمالي المحسوب', value: money(totals['gross'] ?? null) + (projected ? ' ' + projectedTag() : ''), tone: 'primary', sub: current.name, link: href(`/commissions/cycles/${current.id}`) },
-        { label: 'أساس الشريحة — مشتركون فريدون', value: count(totals['unique_activated_subscribers'] ?? null), tone: 'blue', link: href(`/commissions/cycles/${current.id}/scopes`) },
-        { label: 'الأحداث المؤهَّلة', value: count(totals['qualifying_events'] ?? null), tone: 'green', link: href(`/commissions/cycles/${current.id}/events`) },
-        { label: 'النطاقات', value: count(totals['scopes'] ?? null), tone: 'gold', link: href(`/commissions/cycles/${current.id}/scopes`) },
+        { label: 'عمولات محسوبة', value: money(result.totals.gross), tone: 'primary',
+          sub: projected ? 'قيد المراجعة — لم تُعتمد بعد' : 'معتمدة',
+          link: href(`/commissions/cycles/${current.id}`) },
+        { label: 'معتمد', value: money(result.totals.approved), tone: 'green',
+          sub: result.totals.approved ? 'مثبَّت بلقطة' : 'لم يُعتمد بعد' },
+        { label: 'مدفوع', value: money(result.totals.paid), tone: 'blue',
+          sub: 'مُرحَّل في دفعات الصرف' },
+        { label: 'قرارات تمنع الاعتماد',
+          value: count(result.blockers.reduce((a, b) => a + b.subscribers, 0)),
+          tone: result.blockers.length ? 'red' : 'green',
+          sub: result.blockers.length ? 'تُحسم قبل الاعتماد' : 'لا مانع',
+          link: href(`/commissions/cycles/${current.id}/review`) },
       ])
-      + `<div class="box"><h3>الدورات</h3>${table<Cycle>(cycleColumns(), list, (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`)}</div>`);
+
+      // المصالحة معروضة: مجموع الوكلاء وحده يبدو ناقصاً بلا سبب.
+      + reconciliationBox(result, known, unresolved)
+
+      + `<div class="box" style="margin-top:12px"><h3>الأحجام التشغيلية</h3>
+          <div class="minirow"><span>التفعيلات المؤهَّلة</span>
+            <b>${count(result.volumes.qualifying_events)}</b></div>
+          <div class="minirow"><span>أساس التير — مشتركون فريدون</span>
+            <b>${count(result.volumes.tier_basis)}</b></div>
+        </div>`
+
+      + `<div class="box" style="margin-top:12px"><h3>الدورات</h3>${
+          table<Cycle>(cycleColumns(), list,
+            (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`)}</div>`);
   },
 };
+
+/**
+ * المصالحة المرئية.
+ *
+ * أربعة أحداث في تموز بلا وكيل فعّال، مجموعها 18,750 د.ع. المحرّك يحسبها
+ * في الإجمالي — وهي مستحقّة فعلاً — وقائمة الوكلاء لا تعرضها لأنها تُجمّع
+ * بالوكيل. فيبدو مجموع الوكلاء أقلّ من الدورة بلا تفسير.
+ *
+ * ولا تُوزَّع على وكيلٍ لتستقيم المعادلة: توزيعُها بلا دليل يُسمّي التخمين
+ * حساباً. تُعرض بندَ قرارٍ قائماً بذاته حتى يُحسم بدليل.
+ */
+function reconciliationBox(r: CycleResult, known: number, u: UnresolvedOwnership): string {
+  if (!u.amount) {
+    return `<div class="box" style="margin-top:12px">
+      <h3>توزيع الإجمالي</h3>
+      <div class="minirow"><span>منسوب لوكلاء معروفين</span>
+        <b class="money">${money(known)}</b></div>
+      <div class="minirow"><span>إجمالي الدورة</span>
+        <b class="money">${money(r.totals.gross)}</b></div>
+      <p class="muted" style="font-size:11px;margin:8px 0 0">كل المبلغ منسوب.</p>
+    </div>`;
+  }
+  return `<div class="box" style="margin-top:12px">
+    <h3>توزيع الإجمالي</h3>
+    <div class="minirow"><span>منسوب لوكلاء معروفين</span>
+      <b class="money">${money(known)}</b></div>
+    <div class="minirow"><span>ملكية تحتاج حسم
+        <div class="muted" style="font-size:11px">${count(u.events)} تفعيلاً ·
+          ${count(u.subscribers)} مشتركاً ·
+          المصدر ${u.parents.map((p) => esc(p)).join('، ') || '—'}</div></span>
+      <b class="money">${money(u.amount)}</b></div>
+    <div class="minirow" style="border-top:1px solid var(--line)">
+      <span><b>إجمالي الدورة</b></span>
+      <b class="money">${money(r.totals.gross)}</b></div>
+    <p class="muted" style="font-size:11px;margin:8px 0 0">
+      المبلغ المعلّق مستحقٌّ ومحسوب، ولم يُنسب إلى وكيل لأن عائديته لم تُحسم.
+      لا يُوزَّع بلا دليل.</p>
+    <div class="actions" style="margin-top:10px">
+      <a class="btn gold" href="${esc(href('/work'))}">افتح قرار الملكية</a>
+    </div>
+  </div>`;
+}
 
 function cycleColumns(): Array<Column<Cycle>> {
   return [

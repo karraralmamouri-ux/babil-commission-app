@@ -13,6 +13,7 @@ import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, pageRpc, can, ApiError } from '../../services/api';
 import { count } from '../../domain/money';
+import { dateTime } from '../../domain/time';
 import {
   esc, loading, empty, pageHeader, table, pager, chip,
   filterBar, wireFilters, type Column,
@@ -20,7 +21,7 @@ import {
 
 type Row = Record<string, unknown>;
 const str = (r: Row, k: string) => String(r[k] ?? '');
-const when = (v: unknown) => (v ? String(v).replace('T', ' ').slice(0, 16) : '—');
+const when = (v: unknown) => (v ? dateTime(v) : '—');
 
 const PERMANENCE_AR: Record<string, string> = {
   PERMANENT: 'دائم',

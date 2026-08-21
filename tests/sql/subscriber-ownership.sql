@@ -418,10 +418,19 @@ select pg_temp.ok(
   'العيّنة تعرض الأب كما كُتب في المصدر');
 
 -- والوكلاء المعروضون للاختيار فعّالون فقط.
+--
+-- كان هذا التوكيد يقارن بـ'ACTIVE' بحروف كبيرة، وقيد الجدول لا يقبل إلا
+-- 'active'. فكان يمرّ لأن الدالّة تُعيد صفر صفوف لا لأن الحكم صحيح:
+-- توكيدٌ على مجموعةٍ فارغة يصدق دائماً. ولذلك لم يكشف أن القائمة فارغة
+-- أصلاً طوال الوقت. فيُشترط أوّلاً أنها ليست فارغة.
+select pg_temp.ok(
+  jsonb_array_length(public.list_agents_for_pick(null, 200)) > 0,
+  'قائمة الاختيار ليست فارغة — وإلا صدق ما بعدها بلا معنى');
+
 select pg_temp.ok(
   not exists (
     select 1 from jsonb_array_elements(public.list_agents_for_pick(null, 200)) a
-    where a ->> 'status' <> 'ACTIVE'),
+    where lower(a ->> 'status') <> 'active'),
   'قائمة الاختيار لا تعرض وكيلاً غير فعّال');
 
 reset role;
