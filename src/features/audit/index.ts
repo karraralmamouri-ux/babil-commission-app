@@ -10,6 +10,7 @@
 
 import type { Route } from '../../app/router';
 import { href } from '../../app/router';
+import { dateTime } from '../../domain/time';
 import { rpc, pageRpc } from '../../services/api';
 import { count } from '../../domain/money';
 import {
@@ -33,7 +34,7 @@ const ACTION_AR: Record<string, string> = {
 /** الأفعال التي تحرّك مالاً أو تحسم عائدية تُميَّز بصرياً. */
 const WEIGHTY = /payment|published|transferred|classified|reversed|finalize/i;
 
-const when = (v: unknown) => String(v ?? '').replace('T', ' ').slice(0, 16);
+const when = (v: unknown) => dateTime(v ?? '');
 
 export const auditLog: Route = {
   pattern: '/audit',

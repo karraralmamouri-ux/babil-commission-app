@@ -216,6 +216,15 @@ fi
 echo "$out24" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out24" | grep -c "            ok ")))
 
+echo "== ownership and contracts =="
+out29=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/ownership-and-contracts.sql 2>&1)
+if echo "$out29" | grep -qE "FAILED|ERROR"; then
+  echo "$out29" | grep -E "FAILED|ERROR" || true
+  echo "OWNERSHIP CONTRACT TESTS FAILED" >&2; exit 1
+fi
+echo "$out29" | grep -E "^ {15,18}(ok|==) " || true
+passed=$((passed + $(echo "$out29" | grep -c "ok " || true)))
+
 echo "== activation corrections =="
 out28=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/activation-corrections.sql 2>&1)
 if echo "$out28" | grep -qE "FAILED|ERROR"; then

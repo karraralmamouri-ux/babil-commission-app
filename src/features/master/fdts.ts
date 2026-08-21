@@ -12,6 +12,7 @@ import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, pageRpc, can, ApiError } from '../../services/api';
 import { money, count } from '../../domain/money';
+import { dateTime } from '../../domain/time';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -20,7 +21,7 @@ import {
 type Row = Record<string, unknown>;
 const num = (r: Row, k: string) => Number(r[k] || 0);
 const str = (r: Row, k: string) => String(r[k] ?? '');
-const when = (v: unknown) => (v ? String(v).replace('T', ' ').slice(0, 16) : '—');
+const when = (v: unknown) => (v ? dateTime(v) : '—');
 
 export const ZONE_AR: Record<string, string> = { old: 'قديمة', new: 'جديدة' };
 
