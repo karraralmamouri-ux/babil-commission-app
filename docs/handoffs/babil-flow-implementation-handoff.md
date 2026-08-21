@@ -259,6 +259,13 @@ Logical commits before documentation:
 
 No migration added. No SQL, RLS, ownership, payment, finalization or production data changed.
 
+## Pull request and CI
+
+- Draft PR: `#77` — `Complete frontend-safe results, decisions, and actions`.
+- CI run `32461776098`: TypeScript passed; JavaScript passed `556/556`; production build passed with 38 modules transformed and all 9 referenced assets present.
+- The checked-in CI workflow does **not** run `npm run localdb:test`, PostgreSQL or Docker. Exact DB result: the 801 assertions were **not run**, so this CI run is not an authoritative DB regression result.
+- PR remains draft and unmerged pending the database regression environment for the blocked contracts below.
+
 ## Financial invariants preserved
 
 ```text
