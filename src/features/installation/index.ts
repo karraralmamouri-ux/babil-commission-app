@@ -57,30 +57,55 @@ export const controlCenter: Route = {
   async render(view) {
     view.write(loading('جارٍ تحميل حالة التنصيب…'));
     // حالة التصنيف تُقرأ من الخادم الآن، لا تُحسب في المتصفّح وتضيع.
-    const [state, classState] = await Promise.all([
+    const [state, pipeline, candidates, historical, classState] = await Promise.all([
       rpc<Row>('installation_cycle_state', {}),
-      rpc<Row>('classification_state', {}).catch(() => null),
+      rpc<Row>('installation_cycle_pipeline', {}),
+      rpc<Row>('installation_payout_candidates', {}),
+      rpc<Row>('historical_unresolved_subscribers', {}),
+      rpc<Row>('classification_state', {}),
     ]);
     const hist = (state?.['historical'] || {}) as Row;
-    const ent = (state?.['entitlements'] || {}) as Row;
     const enroll = (state?.['enrollments'] || {}) as Record<string, number>;
+    const candidate = (pipeline?.['candidate'] || {}) as Row;
+    const ready = (pipeline?.['ready'] || {}) as Row;
+    const historicalTotals = (pipeline?.['historical'] || {}) as Row;
+    const byStage = (candidates?.['by_stage'] || {}) as Record<string, Row>;
+    const unresolvedRows = (historical?.['rows'] || []) as Row[];
 
-    const stageRows = Object.entries(enroll).map(([k, v]) => ({ stage: k, n: v }));
+    const stageRows = ['P1', 'P2', 'P3', 'P4'].map((stage) => ({
+      stage,
+      n: num(byStage[stage] || {}, 'subscribers'),
+      amount: num(byStage[stage] || {}, 'amount'),
+    }));
+    const done = Number(enroll['DONE'] || 0);
 
     view.innerHTML = pageHeader('أجور التنصيب', 'مركز التحكّم التشغيلي')
       + kpiRow([
         { label: 'المشتركون', value: count(num(hist, 'subscribers')), tone: 'primary', link: href('/installation/subscribers') },
-        { label: 'مدفوع تاريخياً', value: money(num(hist, 'paid')), tone: 'green', sub: `${count(num(hist, 'payment_rows'))} دفعة` },
-        { label: 'مستحق حالي', value: money(num(ent, 'due')), tone: 'gold', link: href('/installation/ready') },
-        { label: 'إيقافات فعّالة', value: count(num(state || {}, 'holds')), tone: 'red', link: href('/installation/holds') },
+        { label: 'مدفوع تاريخياً', value: money(num(historicalTotals, 'paid')), tone: 'green',
+          sub: `${count(num(historicalTotals, 'rows'))} صف دفع`, link: href('/reports/historical') },
+        { label: 'مرشّح للصرف', value: count(num(candidate, 'subscribers')), tone: 'gold',
+          sub: money(num(candidate, 'amount')), link: href('/installation/ready') },
+        { label: 'جاهز للصرف', value: count(num(ready, 'subscribers')), tone: num(ready, 'subscribers') ? 'green' : 'red',
+          sub: money(num(ready, 'amount')), link: href('/installation/ready') },
+        { label: 'تعليقات فعّالة', value: count(num(state || {}, 'holds')), tone: 'red', link: href('/installation/holds') },
       ])
-      + `<div class="grid2">
-          <div class="box"><h3>توزيع المراحل</h3>
-            ${stageRows.length
-              ? stageRows.map((r) => `<div class="minirow"><span>${chip(r.stage, STAGE_TONE[r.stage] || 'neutral')}</span><b>${count(r.n)}</b></div>`).join('')
-              : '<p class="muted">لا تسجيلات</p>'}</div>
-          <div class="box"><h3>تصنيف الجِدّة</h3>
-            ${classificationPanel(classState)}</div>
+      + `<div class="box installation-stage-result"><h3>نتيجة المراحل المرشّحة</h3>
+          ${stageRows.map((r) => `<div class="minirow"><span>${chip(r.stage, STAGE_TONE[r.stage] || 'neutral')}</span>
+            <span><b>${count(r.n)}</b>${r.amount ? ` · <span class="money">${money(r.amount)}</span>` : ''}</span></div>`).join('')}
+          <div class="minirow"><span>${chip('DONE', 'success')}</span><b>${count(done)}</b></div>
+        </div>`
+      + `<div class="box installation-historical-decisions"><h3>القرارات</h3>
+          <div class="minirow"><span><b>تحتاج حسم تاريخي</b>
+            <div class="muted table-hint">لا تُصنّف دون دليل</div></span>
+            <span><b>${count(unresolvedRows.length)}</b>
+              <a class="smallbtn" href="${esc(href('/work/historical'))}">راجع الحالات</a></span></div>
+        </div>`
+      + `<details class="box installation-source-diagnostics"><summary><b>تشخيصات المصدر والتصنيف</b></summary>
+          ${classificationPanel(classState)}</details>`
+      + `<div class="actions installation-next-actions">
+          <a class="btn" href="${esc(href('/installation/cycle'))}">افتح خطوات الدورة</a>
+          <a class="btn gold" href="${esc(href('/installation/invoices', { status: 'NOT_CHECKED' }))}">راجع الفواتير</a>
         </div>`;
   },
 };

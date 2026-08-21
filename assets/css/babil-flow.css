@@ -895,6 +895,9 @@ th[aria-sort="descending"]::after { content: "↓"; opacity: 1; color: var(--gol
 .technical-detail summary { cursor: pointer; font-weight: 700; }
 .technical-detail code, .technical-detail span { display: block; margin-top: 4px; overflow-wrap: anywhere; }
 .table-hint { font-size: 10px; margin-top: 3px; }
+.installation-stage-result, .installation-historical-decisions,
+.installation-source-diagnostics, .installation-next-actions { margin-top: var(--s3); }
+.installation-source-diagnostics summary { cursor: pointer; color: var(--navy); }
 
 /* ---------------------------------------------------------------------------
    17. حالات الشاشة
