@@ -42,3 +42,111 @@ jobs:
       # مخرَج يشير إلى ملف لا يحتويه، والفشل هنا أرخص من اكتشافه لاحقاً.
       - name: Build
         run: npm run build
+
+  db-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LC_ALL: C
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify deterministic migration manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          migrations=(supabase/migrations/*.sql)
+
+          if [[ "${#migrations[@]}" -ne 65 ]]; then
+            echo "Expected exactly 65 migrations, found ${#migrations[@]}" >&2
+            exit 1
+          fi
+
+          previous=''
+          for migration in "${migrations[@]}"; do
+            name="${migration##*/}"
+            if [[ ! "$name" =~ ^[0-9]{14}_[a-z0-9_]+\.sql$ ]]; then
+              echo "Invalid migration filename: $name" >&2
+              exit 1
+            fi
+            if [[ -n "$previous" && "$name" < "$previous" ]]; then
+              echo "Non-deterministic migration order: $previous then $name" >&2
+              exit 1
+            fi
+            previous="$name"
+            printf '%s\n' "$name"
+          done
+
+          unique_count=$(printf '%s\n' "${migrations[@]##*/}" | sort -u | wc -l)
+          if [[ "$unique_count" -ne 65 ]]; then
+            echo "Migration filenames are not unique" >&2
+            exit 1
+          fi
+
+          sha256sum "${migrations[@]}" > migration-manifest.sha256
+          echo "Verified 65 unique migrations in deterministic filename order"
+
+      - name: Start isolated PostgreSQL 16
+        run: npm run localdb:up
+
+      - name: Verify empty test database
+        shell: bash
+        run: |
+          set -euo pipefail
+          table_count=$(docker exec babil-local-pg psql -U postgres -d babil_local -tAc \
+            "select count(*) from pg_tables where schemaname not in ('pg_catalog','information_schema')")
+          if [[ "$table_count" -ne 0 ]]; then
+            echo "Expected an empty test database, found $table_count tables" >&2
+            exit 1
+          fi
+          echo "Verified empty isolated test database"
+
+      - name: Apply all migrations from clean state
+        run: npm run localdb:rebuild
+
+      - name: Verify required extensions
+        shell: bash
+        run: |
+          set -euo pipefail
+          extensions=$(docker exec babil-local-pg psql -U postgres -d babil_local -tAc \
+            "select extname from pg_extension order by extname")
+          printf '%s\n' "$extensions"
+          grep -Fxq 'btree_gist' <<<"$extensions"
+
+      - name: Run authoritative DB regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run localdb:test | tee db-regression.log
+          assertion_count=$(sed -n 's/^local database assertions passed: //p' db-regression.log | tail -n 1)
+          if [[ ! "$assertion_count" =~ ^[0-9]+$ ]]; then
+            echo "DB regression runner did not report an assertion count" >&2
+            exit 1
+          fi
+          if [[ "$assertion_count" -lt 801 ]]; then
+            echo "Expected at least 801 DB assertions, got $assertion_count" >&2
+            exit 1
+          fi
+          echo "Authoritative DB assertions passed: $assertion_count"
+
+      - name: Upload DB regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-regression-evidence
+          path: |
+            migration-manifest.sha256
+            db-regression.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop isolated PostgreSQL
+        if: always()
+        run: npm run localdb:down
