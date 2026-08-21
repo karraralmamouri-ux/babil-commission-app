@@ -38,6 +38,11 @@ const DECISIONS = [
   { value: 'REJECTED', label: 'مرفوضة' },
 ];
 
+function invoiceStateChip(state: string): string {
+  const meta = INVOICE_STATE[state];
+  return chip(meta ? meta.label : state || '—', meta?.tone || 'neutral');
+}
+
 export const invoiceReview: Route = {
   pattern: '/installation/invoices',
   capability: 'invoice.view',
@@ -78,9 +83,7 @@ export const invoiceReview: Route = {
       { key: 'amt', label: 'المبلغ', cell: (r) =>
         `<span class="money">${money(num(r, 'amount'))}</span>`, numeric: true },
       { key: 'state', label: 'الفاتورة', cell: (r) => {
-        const st = str(r, 'invoice_status');
-        const meta = INVOICE_STATE[st];
-        return chip(meta ? meta.label : st, meta?.tone || 'neutral');
+        return invoiceStateChip(str(r, 'invoice_status'));
       } },
       { key: 'num', label: 'رقم الفاتورة', cell: (r) =>
         str(r, 'invoice_number') ? `<span dir="ltr">${esc(str(r, 'invoice_number'))}</span>` : '—' },
@@ -94,9 +97,8 @@ export const invoiceReview: Route = {
         if (r['eligible'] !== true) bits.push(chip('أهلية', 'warning'));
         return bits.length ? bits.join(' ') : '<span class="muted">لا مانع آخر</span>';
       } },
-      { key: 'go', label: '', cell: (r) => editable
-        ? `<button class="smallbtn" data-review="${esc(str(r, 'subscriber_id'))}"
-             data-stage="${esc(str(r, 'stage'))}">راجِع</button>`
+      { key: 'go', label: 'الإجراء', cell: (r) => editable
+        ? `<button class="smallbtn" data-review-index="${page.rows.indexOf(r)}">راجِع</button>`
         : '' },
     ];
 
@@ -130,47 +132,54 @@ export const invoiceReview: Route = {
         : '')
       + (page.rows.length ? table(columns, page.rows) : empty('لا فواتير في الطابور'))
       + pager(page.total, limit, offset, '/installation/invoices', m.query)
-      + `<div id="reviewHost"></div>`;
+      + `<button class="review-drawer-backdrop" id="reviewBackdrop" type="button"
+          aria-label="إغلاق مراجعة الفاتورة"></button>
+        <aside class="drawer review-drawer" id="reviewDrawer" aria-hidden="true"
+          aria-label="مراجعة الفاتورة"></aside>`;
 
     wireFilters(view.el);
-    wireReview(view);
+    wireReview(view, page.rows);
   },
 };
 
-function wireReview(view: View): void {
-  const host = view.el.querySelector<HTMLElement>('#reviewHost');
-  if (!host) return;
+function wireReview(view: View, rows: Row[]): void {
+  const drawer = view.el.querySelector<HTMLElement>('#reviewDrawer');
+  const backdrop = view.el.querySelector<HTMLButtonElement>('#reviewBackdrop');
+  if (!drawer || !backdrop) return;
 
-  view.el.querySelectorAll<HTMLButtonElement>('[data-review]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset['review'] || '';
-      const stage = btn.dataset['stage'] || '';
-      host.innerHTML = `<div class="box" style="margin-top:12px" id="reviewBox">
-        <h3>مراجعة فاتورة <span dir="ltr">${esc(id)}</span> — ${esc(stage)}</h3>
-        <div class="toolbar">
-          <select class="select" id="rvStatus" aria-label="القرار">
-            ${DECISIONS.map((d) => `<option value="${esc(d.value)}">${esc(d.label)}</option>`).join('')}
-          </select>
-          <input class="search" id="rvNumber" placeholder="رقم الفاتورة (اختياري)"
-            aria-label="رقم الفاتورة" dir="ltr">
-          <input class="search" id="rvNote" placeholder="سبب القرار (إلزامي)"
-            aria-label="سبب القرار">
-          <button class="btn gold" id="rvApply">احفظ القرار</button>
-        </div>
-        <p class="muted" style="font-size:11px;margin-top:6px">
-          «مدقَّقة» ترفع حاجب الفاتورة عن هذا القسط وحده. المراحل الأخرى تُراجَع كلٌّ في وقتها.</p>
-        <div id="rvResult"></div>
-      </div>`;
-      host.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  let activeIndex = -1;
+  const close = () => {
+    drawer.classList.remove('open');
+    backdrop.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+  };
 
-      const status = host.querySelector<HTMLSelectElement>('#rvStatus');
-      const number = host.querySelector<HTMLInputElement>('#rvNumber');
-      const note = host.querySelector<HTMLInputElement>('#rvNote');
-      const apply = host.querySelector<HTMLButtonElement>('#rvApply');
-      const out = host.querySelector<HTMLElement>('#rvResult');
-      if (!status || !apply || !out) return;
+  const open = (index: number) => {
+    const row = rows[index];
+    if (!row) return;
+    activeIndex = index;
+    drawer.innerHTML = reviewDrawer(row, index, rows.length);
+    drawer.classList.add('open');
+    backdrop.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
 
-      apply.addEventListener('click', async () => {
+    drawer.querySelector<HTMLButtonElement>('[data-review-close]')?.addEventListener('click', close);
+    drawer.querySelector<HTMLButtonElement>('[data-review-prev]')?.addEventListener('click', () => open(index - 1));
+    drawer.querySelector<HTMLButtonElement>('[data-review-next]')?.addEventListener('click', () => open(index + 1));
+
+    const status = drawer.querySelector<HTMLSelectElement>('#rvStatus');
+    const number = drawer.querySelector<HTMLInputElement>('#rvNumber');
+    const note = drawer.querySelector<HTMLTextAreaElement>('#rvNote');
+    const apply = drawer.querySelector<HTMLButtonElement>('#rvApply');
+    const out = drawer.querySelector<HTMLElement>('#rvResult');
+    if (!status || !apply || !out) return;
+
+    apply.addEventListener('click', async () => {
+        if (!status.value) {
+          out.innerHTML = insight('warn', 'اختر القرار', 'لا يوجد قرار محدد مسبقاً');
+          status.focus();
+          return;
+        }
         const why = note?.value.trim() || '';
         if (!why) {
           out.innerHTML = insight('warn', 'السبب إلزامي', 'يُحفظ مع القرار ويظهر في التدقيق');
@@ -180,8 +189,8 @@ function wireReview(view: View): void {
         out.innerHTML = loading('جارٍ حفظ القرار…');
         try {
           const result = await rpc<Row>('review_invoice', {
-            p_subscriber_id: id,
-            p_stage_code: stage,
+            p_subscriber_id: str(row, 'subscriber_id'),
+            p_stage_code: str(row, 'stage'),
             p_status: status.value,
             p_note: why,
             p_invoice_number: number?.value.trim() || null,
@@ -195,7 +204,13 @@ function wireReview(view: View): void {
                 after === 'VERIFIED'
                   ? `رُفع حاجب الفاتورة عن ${money(num(result, 'amount'))}.`
                   : 'يبقى الحاجب قائماً حتى تُدقَّق.');
-          window.setTimeout(() => { if (view.live) window.location.reload(); }, 1200);
+          if (after) {
+            row['invoice_status'] = after;
+            if (number?.value.trim()) row['invoice_number'] = number.value.trim();
+            updateVisibleRow(view, index, row);
+            const state = drawer.querySelector<HTMLElement>('[data-current-invoice-state]');
+            if (state) state.innerHTML = invoiceStateChip(after);
+          }
         } catch (error) {
           if (!view.live) return;
           out.innerHTML = insight('danger', 'لم يُحفظ القرار',
@@ -204,8 +219,72 @@ function wireReview(view: View): void {
           apply.disabled = false;
         }
       });
-    });
+    window.setTimeout(() => status.focus(), 0);
+  };
+
+  view.el.querySelectorAll<HTMLButtonElement>('[data-review-index]').forEach((btn) => {
+    btn.addEventListener('click', () => open(Number(btn.dataset['reviewIndex'])));
   });
+  backdrop.addEventListener('click', close);
+  view.signal.addEventListener('abort', close, { once: true });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && activeIndex >= 0) close();
+  }, { signal: view.signal });
+}
+
+function reviewDrawer(row: Row, index: number, total: number): string {
+  const decisions = DECISIONS.filter((d) => d.value === 'VERIFIED'
+    ? can('invoice.verify') : can('invoice.reject'));
+  const evidence = [
+    ['المصدر', str(row, 'invoice_source') || '—'],
+    ['مرجع المصدر', str(row, 'invoice_reference') || '—'],
+    ['تاريخ الفاتورة', str(row, 'invoice_date') || '—'],
+    ['العائدية', str(row, 'ownership') === 'RESELLER' ? 'وكيل' : 'تحتاج حسم'],
+    ['التعليق', row['held'] === true ? 'يوجد تعليق فعّال' : 'لا يوجد'],
+    ['الأهلية', row['eligible'] === true ? 'مستوفاة' : 'تحتاج مراجعة'],
+  ];
+  return `<div class="modalhead">
+      <div><h2>مراجعة فاتورة</h2><div class="muted review-position">${index + 1} من ${total}</div></div>
+      <button class="smallbtn" type="button" data-review-close aria-label="إغلاق">إغلاق</button>
+    </div>
+    <section class="review-result" aria-label="بيانات القرار">
+      <div><span class="muted">المشترك</span><b dir="ltr">${esc(str(row, 'subscriber_id'))}</b></div>
+      <div><span class="muted">الوكيل / الأب</span><b>${esc(str(row, 'reseller') || '—')}</b></div>
+      <div><span class="muted">المرحلة</span><b>${chip(str(row, 'stage'), 'info')}</b></div>
+      <div><span class="muted">المبلغ</span><b class="money">${money(num(row, 'amount'))}</b></div>
+      <div><span class="muted">حالة الفاتورة</span><b data-current-invoice-state>${invoiceStateChip(str(row, 'invoice_status'))}</b></div>
+      <div><span class="muted">رقم الفاتورة</span><b dir="ltr">${esc(str(row, 'invoice_number') || '—')}</b></div>
+    </section>
+    <section class="review-evidence"><h3>الأدلة المتاحة</h3>
+      ${evidence.map(([label, value]) => `<div class="minirow"><span class="muted">${esc(label)}</span><b>${esc(value)}</b></div>`).join('')}
+    </section>
+    <section class="review-decision"><h3>القرار</h3>
+      <label for="rvStatus">اختر القرار</label>
+      <select class="select" id="rvStatus"><option value="" selected disabled>اختر القرار</option>
+        ${decisions.map((d) => `<option value="${esc(d.value)}">${esc(d.label)}</option>`).join('')}
+      </select>
+      <label for="rvNumber">رقم الفاتورة <span class="muted">(اختياري)</span></label>
+      <input class="search" id="rvNumber" value="${esc(str(row, 'invoice_number'))}" dir="ltr">
+      <label for="rvNote">سبب القرار</label>
+      <textarea class="search review-note" id="rvNote" rows="3" placeholder="سبب القرار (إلزامي)"></textarea>
+      <p class="field-help">«مدقَّقة» ترفع حاجب الفاتورة عن هذا القسط وحده. لا يُنشئ هذا الإجراء دفعة.</p>
+      <button class="btn gold review-apply" id="rvApply" type="button">احفظ القرار</button>
+      <div id="rvResult" aria-live="polite"></div>
+    </section>
+    <div class="review-navigation">
+      <button class="btn" type="button" data-review-prev${index <= 0 ? ' disabled' : ''}>السابق</button>
+      <button class="btn" type="button" data-review-next${index >= total - 1 ? ' disabled' : ''}>التالي</button>
+    </div>`;
+}
+
+function updateVisibleRow(view: View, index: number, row: Row): void {
+  const btn = view.el.querySelector<HTMLButtonElement>(`[data-review-index="${index}"]`);
+  const tr = btn?.closest('tr');
+  const stateCell = tr?.querySelector<HTMLElement>('td[data-label="الفاتورة"]');
+  const numberCell = tr?.querySelector<HTMLElement>('td[data-label="رقم الفاتورة"]');
+  if (stateCell) stateCell.innerHTML = invoiceStateChip(str(row, 'invoice_status'));
+  if (numberCell) numberCell.innerHTML = str(row, 'invoice_number')
+    ? `<span dir="ltr">${esc(str(row, 'invoice_number'))}</span>` : '—';
 }
 
 function insight(tone: 'good' | 'warn' | 'danger', title: string, detail = ''): string {
