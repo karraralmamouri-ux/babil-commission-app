@@ -63,13 +63,13 @@ export const home: Route = {
     // بمفتاحٍ لا ينتجه، فتصير البطاقات شرطات.
     const [result, action, pipeline, company] = await Promise.all([
       readCycleResult(cycleId),
-      rpc<Row>('action_center', {}),
+      rpc<Row>('product_action_center', {}),
       rpc<Row>('installation_cycle_pipeline', {}),
       rpc<Row>('company_parent_breakdown', {}),
     ]);
     if (!view.live) return;
 
-    const cycleTotals = result?.totals ?? { gross: 0, approved: 0, paid: 0, remaining: 0, scopes: 0 };
+    const cycleTotals = result?.totals;
     const unresolvedAmount = result?.unresolved_ownership.amount ?? 0;
     const blockingDecisions = (result?.blockers ?? [])
       .reduce((a, b) => a + b.subscribers, 0);
@@ -103,22 +103,22 @@ export const home: Route = {
       + `<section style="margin-top:4px">
         ${sectionTitle('العمولات')}
         <div class="cards cards-4">
-          ${moneyCard('عمولات محسوبة', money(cycleTotals.gross),
+          ${moneyCard('عمولات محسوبة', cycleTotals ? money(cycleTotals.gross) : 'لم تُحسب بعد',
             projected ? 'قيد المراجعة — لم تُعتمد' : 'معتمدة',
             'kpi-primary', href('/commissions'))}
-          ${moneyCard('معتمد', money(cycleTotals.approved),
-            cycleTotals.approved ? 'مثبَّت بلقطة' : 'لم يُعتمد بعد', 'blueline',
+          ${moneyCard('معتمد', cycleTotals ? money(cycleTotals.approved) : 'لم تُحسب بعد',
+            cycleTotals?.approved ? 'مثبَّت بلقطة' : 'لم يُعتمد بعد', 'blueline',
             href(`/commissions/cycles/${cycleId}/review`))}
-          ${moneyCard('جاهز للصرف', money(0),
-            'يتبع الاعتماد', 'greenline', href('/finance/payment-batches'))}
-          ${moneyCard('مدفوع', money(cycleTotals.paid),
+          ${moneyCard('جاهز للصرف', cycleTotals ? money(cycleTotals.ready) : 'لم تُحسب بعد',
+            cycleTotals?.ready ? 'متحقق خادمياً من قابلية الصرف' : 'لا نطاق جاهز', 'greenline', href('/finance/payment-batches'))}
+          ${moneyCard('مدفوع', cycleTotals ? money(cycleTotals.paid) : 'لم تُحسب بعد',
             'مُرحَّل في الدفتر', 'greenline', href('/reports/payments'))}
         </div>
         ${blockingDecisions
           ? `<div class="insight danger" style="margin-top:10px">
               <span class="insight-dot"></span><span>
-              <b>${count(blockingDecisions)} قراراً يمنع الاعتماد</b>
-              <small>لا تُعتمد الدورة قبل حسمها.</small></span>
+              <b>${count(blockingDecisions)} اشتراكاً متأثراً عبر الأسباب</b>
+              <small>قد يتكرر المشترك بين أكثر من سبب؛ لا يُقرأ هذا الجمع كعدد قرارات فريد.</small></span>
               <a class="btn gold" style="margin-inline-start:auto"
                  href="${esc(href(`/commissions/cycles/${cycleId}/review`))}">راجع دورة العمولة</a>
             </div>`
@@ -163,15 +163,15 @@ export const home: Route = {
             <h3>◎ عمولات الوكلاء</h3>
             <div class="split-money">
               <div class="part released"><span class="k">محسوب</span>
-                <span class="v">${money(cycleTotals.gross)}</span></div>
-              <div class="part blocked"><span class="k">قرارات حاجبة</span>
+                <span class="v">${cycleTotals ? money(cycleTotals.gross) : 'لم تُحسب بعد'}</span></div>
+              <div class="part blocked"><span class="k">اشتراكات متأثرة عبر الأسباب</span>
                 <span class="v">${count(blockingDecisions)}</span></div>
               <div class="part exposure"><span class="k">أساس التير</span>
                 <span class="v">${count(result?.volumes.tier_basis ?? 0)}</span></div>
             </div>
             <div class="minirow" style="margin-top:10px">
               <span class="muted">التفعيلات المؤهَّلة</span>
-              <b>${count(result?.volumes.qualifying_events ?? 0)}</b></div>
+              <b>${result ? count(result.volumes.qualifying_events) : 'لم تُحسب بعد'}</b></div>
             <div class="actions" style="margin-top:10px">
               <a class="btn" href="${esc(href(`/commissions/cycles/${cycleId}/scopes`))}">النطاقات</a>
               <a class="btn" href="${esc(href('/exceptions', { blocking: 'true' }))}">الاستثناءات</a>

@@ -302,3 +302,36 @@ Required order when the environment exists: regression first → minimal read-co
 ## Safety statement
 
 No payment posted. No July finalization. No fabricated ownership. No fabricated FDT classification. No fabricated invoice verification. No raw source mutation.
+
+## Product acceptance fix batch — branch handoff
+
+Branch: `feat/product-acceptance-fix` (not merged). The former DB-environment
+blockers above now have additive read-only contracts in migration
+`20260927090000_product_acceptance_read_contracts.sql`. Nothing in that
+migration writes business data or changes calculation, ownership, RLS,
+payment, or finalisation.
+
+Completed locally:
+
+- Correct blocker terminology, authoritative server-side commission Ready,
+  and an explicit “not calculated yet” state.
+- Navigable Agent/FDT context; human event evidence plus server filters and
+  pagination; current-cycle UNKNOWN_FDT decision/evidence pages.
+- Unified agent financial profile, export-safe commission report, and
+  cycle-scoped audit read contracts.
+- Exact Work Center destinations for FDT, incomplete imports,
+  classification review and pending business decisions.
+- Subscriber “history and evidence” consolidation, shared presentation
+  labels, and scoped refresh that preserves route/query/scroll state.
+- BF-SA-13 (logo) intentionally excluded.
+
+Local verification: JavaScript `556/556`, TypeScript clean, production build
+green (40 modules, 9 referenced assets). PostgreSQL is unavailable locally;
+the new suite adds 11 contract assertions, so the authoritative expected CI
+result is **812 DB assertions** across **66 deterministic migrations**. The PR
+must remain unmerged unless that exact CI DB gate is green.
+
+Financial anchors remain unchanged: 21,969,500 gross; 21,950,750 known;
+18,750 unresolved; 4,549 qualifying; 4,413 tier basis; UNDER_REVIEW; paid 0;
+DIRECT_COMPANY blockers 0. Installation remains 5,693 / 17,117 /
+54,828,000 / 2,196 / 7,278,000 / Ready 0 / unresolved 5.

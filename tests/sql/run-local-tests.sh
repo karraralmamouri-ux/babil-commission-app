@@ -267,6 +267,15 @@ if [ $? -ne 0 ]; then echo "$out21" >&2; echo "PARITY TESTS FAILED" >&2; exit 1;
 echo "$out21" | grep -E "^pass  parity" || true
 passed=$((passed + $(echo "$out21" | grep -c "^pass  parity")))
 
+echo "== product acceptance read contracts =="
+out30=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/product-acceptance-contracts.sql 2>&1)
+if echo "$out30" | grep -qE "FAILED|ERROR"; then
+  echo "$out30" | grep -E "FAILED|ERROR" || true
+  echo "PRODUCT ACCEPTANCE CONTRACT TESTS FAILED" >&2; exit 1
+fi
+echo "$out30" | grep -E "^ {15,18}(ok|==) " || true
+passed=$((passed + $(echo "$out30" | grep -c "ok " || true)))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh

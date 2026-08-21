@@ -16,7 +16,7 @@ import { routes as payoutRoutes } from './payout';
 import { routes as invoiceRoutes } from './invoices';
 import { routes as cycleRoutes } from './cycle';
 import {
-  esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
+  esc, loading, empty, errorState, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
 } from '../../components/ui';
 
@@ -188,13 +188,11 @@ export const subscribers: Route = {
 const CASE_TABS = [
   { key: 'overview', label: 'نظرة عامة' },
   { key: 'ownership', label: 'العائدية' },
-  { key: 'activations', label: 'التفعيلات' },
   { key: 'invoices', label: 'الفواتير' },
   { key: 'entitlements', label: 'الاستحقاقات' },
   { key: 'payments', label: 'الدفعات' },
   { key: 'holds', label: 'الإيقافات' },
-  { key: 'history', label: 'التاريخ' },
-  { key: 'audit', label: 'التدقيق' },
+  { key: 'history', label: 'التاريخ والأدلة' },
 ];
 
 export const subscriberCase: Route = {
@@ -251,8 +249,8 @@ export const subscriberCase: Route = {
         try {
           const events = await rpc<Row[]>('subscriber_timeline', { p_subscriber_id: id });
           host.innerHTML = events && events.length ? timeline(events) : empty('لا أحداث');
-        } catch {
-          host.innerHTML = empty('تعذّر تحميل التاريخ');
+        } catch (error) {
+          host.innerHTML = errorState(error instanceof Error ? error.message : 'تعذّر تحميل التاريخ والأدلة');
         }
       }
     }
@@ -325,8 +323,8 @@ function renderCaseTab(doc: Row, tab: string, id: string): string {
     return listed + holdPanel(id);
   }
 
-  if (tab === 'activations' || tab === 'history' || tab === 'audit') {
-    return `<div id="timelineHost">${tab === 'history' ? loading('جارٍ بناء التاريخ…') : empty('يُعرض في تبويب التاريخ', 'التاريخ يُشتقّ من الأحداث والدفتر والتدقيق')}</div>`;
+  if (tab === 'history') {
+    return `<div class="muted" style="margin-bottom:10px">خط زمني موحّد من التفعيلات والفواتير والاستحقاقات والدفعات والإيقافات والتدقيق.</div><div id="timelineHost">${loading('جارٍ بناء التاريخ والأدلة…')}</div>`;
   }
 
   // overview

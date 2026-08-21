@@ -89,7 +89,7 @@ export const mapping: Route = {
           : chip('غير محدّد', 'critical') },
       { key: 'agent', label: 'الوكيل', cell: (r) =>
         str(r, 'agent_id')
-          ? `<b>${esc(str(r, 'agent_name'))}</b>
+          ? `<a href="${esc(href(`/commissions/agents/${str(r,'agent_id')}`))}"><b>${esc(str(r, 'agent_name'))}</b></a>
              <div class="muted" dir="ltr">${esc(str(r, 'agent_code'))}</div>`
           : chip('غير مربوطة', 'critical') },
       // ثلاثة أرقام لا رقم واحد. كان العمود يقول «أحداث» ويعرض مجموع كل ما
@@ -246,7 +246,7 @@ function wireMap(view: View): void {
       out.innerHTML = insight('good', 'حُفظ الربط',
         agent.value ? 'أحداث الكابينة صارت تُنسب إلى هذا الوكيل.'
                     : 'الكابينة مسجَّلة بلا وكيل — أحداثها تبقى بلا نسبة.');
-      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1200);
+      window.setTimeout(() => { if (view.live) window.dispatchEvent(new CustomEvent('babil:refresh')); }, 1200);
     } catch (error) {
       if (!view.live) return;
       const message = error instanceof ApiError ? error.message : 'خطأ غير متوقّع';

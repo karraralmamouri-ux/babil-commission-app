@@ -19,6 +19,7 @@ import { rpc } from '../services/api';
 export interface CycleTotals {
   gross: number;
   approved: number;
+  ready: number;
   paid: number;
   remaining: number;
   scopes: number;
@@ -85,7 +86,7 @@ const n = (v: unknown) => Number(v || 0);
  */
 export async function readCycleResult(cycleId?: string): Promise<CycleResult | null> {
   const raw = await rpc<Record<string, unknown>>(
-    'commission_cycle_result', cycleId ? { p_cycle_id: cycleId } : {});
+    'commission_cycle_product_result', cycleId ? { p_cycle_id: cycleId } : {});
 
   if (!raw || raw['found'] !== true) return null;
 
@@ -99,6 +100,7 @@ export async function readCycleResult(cycleId?: string): Promise<CycleResult | n
     totals: {
       gross: n(totals['gross']),
       approved: n(totals['approved']),
+      ready: n(totals['ready']),
       paid: n(totals['paid']),
       remaining: n(totals['remaining']),
       scopes: n(totals['scopes']),

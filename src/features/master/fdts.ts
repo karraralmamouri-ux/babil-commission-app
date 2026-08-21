@@ -143,7 +143,9 @@ export const fdtRegistry: Route = {
         const z = str(r, 'zone');
         return chip(ZONE_AR[z] || z || '—', z === 'new' ? 'success' : 'info');
       } },
-      { key: 'agent', label: 'الوكيل', cell: (r) => esc(str(r, 'agent_name') || '—') },
+      { key: 'agent', label: 'الوكيل', cell: (r) => str(r,'agent_id')
+        ? `<a href="${esc(href(`/commissions/agents/${str(r,'agent_id')}`))}">${esc(str(r,'agent_name')||'—')}</a>`
+        : '—' },
       { key: 'subs', label: 'المشتركون', cell: (r) => count(num(r, 'subscribers')), numeric: true },
       { key: 'ev', label: 'الأحداث', cell: (r) => count(num(r, 'events')), numeric: true },
       { key: 'status', label: 'الحالة', cell: (r) =>
@@ -242,7 +244,7 @@ export const fdtDetail: Route = {
             <div class="minirow"><span class="muted">المنطقة</span>
               <b>${esc(ZONE_AR[zone] || zone || '—')}</b></div>
             <div class="minirow"><span class="muted">الوكيل</span>
-              <b>${esc(str(rec, 'agent_name') || '—')}</b></div>
+              ${str(rec,'agent_id') ? `<a href="${esc(href(`/commissions/agents/${str(rec,'agent_id')}`))}"><b>${esc(str(rec,'agent_name')||'—')}</b></a>` : '<b>—</b>'}</div>
             <div class="minirow"><span class="muted">آخر تعديل</span>
               <b dir="ltr">${esc(when(rec['updated_at']))}</b></div>
             ${str(rec, 'notes') ? `<p class="muted">${esc(str(rec, 'notes'))}</p>` : ''}`
@@ -353,7 +355,7 @@ function wireClassify(view: View, code: string): void {
       if (!view.live) return;
       out.innerHTML = insight('good', `صُنِّفت ${ZONE_AR[zone.value] || zone.value}`,
         'تُعاد الأحداث المرتبطة بها إلى الحساب في إعادة التقييم.');
-      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1300);
+      window.setTimeout(() => { if (view.live) window.dispatchEvent(new CustomEvent('babil:refresh')); }, 1300);
     } catch (error) {
       if (!view.live) return;
       out.innerHTML = insight('danger', 'لم يُحفظ التصنيف',
