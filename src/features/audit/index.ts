@@ -55,7 +55,7 @@ export const auditLog: Route = {
 
     const [page, facets] = await Promise.all([
       pageRpc<Row>('page_audit_logs', args, view.signal),
-      rpc<Row>('audit_facets', {}).catch(() => null),
+      rpc<Row>('audit_facets', {}),
     ]);
     if (!view.live) return;
 
@@ -69,24 +69,25 @@ export const auditLog: Route = {
     }));
 
     const columns: Array<Column<Row>> = [
-      { key: 'when', label: 'الوقت', cell: (r) => `<span dir="ltr">${esc(when(r['created_at']))}</span>` },
+      { key: 'who', label: 'من؟', cell: (r) =>
+        `<b>${esc(str(r, 'actor_name') || str(r, 'actor_email') || 'النظام')}</b>` },
+      { key: 'when', label: 'متى؟', cell: (r) => `<span dir="ltr">${esc(when(r['created_at']))}</span>
+        <div class="muted table-hint">بتوقيت بغداد</div>` },
       { key: 'action', label: 'الفعل', cell: (r) => {
         const a = str(r, 'action');
         return `${esc(ACTION_AR[a] || a)}${WEIGHTY.test(a) ? ` ${chip('مؤثِّر', 'warning')}` : ''}`;
       } },
-      { key: 'who', label: 'الفاعل', cell: (r) =>
-        esc(str(r, 'actor_name') || str(r, 'actor_email') || 'النظام') },
-      { key: 'what', label: 'الحقل', cell: (r) => esc(str(r, 'field') || '—') },
-      // «قبل ← بعد» في خلية واحدة: التغيير يُقرأ تغييراً.
-      { key: 'change', label: 'التغيير', cell: (r) => {
-        const before = str(r, 'old_value');
-        const after = str(r, 'new_value');
-        if (!before && !after) return '<span class="muted">—</span>';
-        return `<span class="muted">${esc(before || '—')}</span> ← <b>${esc(after || '—')}</b>`;
-      } },
-      { key: 'extra', label: 'التفصيل', cell: (r) => {
-        const x = str(r, 'extra');
-        return x ? `<span class="muted" dir="ltr" style="font-size:10px">${esc(x)}</span>` : '—';
+      { key: 'entity', label: 'أي كيان؟', cell: (r) => `<b>${esc(str(r, 'entity_label') || str(r, 'entity_type') || '—')}</b>
+        ${str(r, 'field') ? `<div class="muted table-hint">${esc(str(r, 'field'))}</div>` : ''}` },
+      { key: 'before', label: 'قبل', cell: (r) => esc(str(r, 'old_value') || '—') },
+      { key: 'after', label: 'بعد', cell: (r) => `<b>${esc(str(r, 'new_value') || '—')}</b>` },
+      { key: 'why', label: 'لماذا؟', cell: (r) => {
+        const reason = str(r, 'reason') || str(r, 'note');
+        return `${esc(reason || '—')}<details class="technical-detail"><summary>تفاصيل تقنية</summary>
+          <code>${esc(str(r, 'action'))}</code>
+          <span dir="ltr">Entity: ${esc(str(r, 'entity_id') || '—')}</span>
+          <span dir="ltr">Request: ${esc(str(r, 'request_id') || '—')}</span>
+          ${str(r, 'extra') ? `<pre>${esc(str(r, 'extra'))}</pre>` : ''}</details>`;
       } },
     ];
 

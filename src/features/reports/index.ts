@@ -11,9 +11,10 @@
 
 import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, envelope } from '../../services/api';
+import { rpc, select, envelope } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { dateTime } from '../../domain/time';
+import { readCycleResult, knownAgentTotal, cycleStatusAr } from '../../domain/cycle';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -27,6 +28,8 @@ const when = (v: unknown) => (v ? dateTime(v) : '—');
 /* ---- فهرس التقارير ------------------------------------------------------- */
 
 const REPORTS = [
+  { key: 'commission', label: 'نتيجة العمولات', path: '/reports/commissions',
+    hint: 'نتيجة الدورة ومصالحة الوكلاء المعروفين مع الملكية غير المحسومة' },
   { key: 'installation', label: 'أجور التنصيب', path: '/reports/installation',
     hint: 'الاستحقاقات بمراحلها ووكلائها وحالة دفعها' },
   { key: 'historical', label: 'المدفوع تاريخياً', path: '/reports/historical',
@@ -54,6 +57,74 @@ export const reportsIndex: Route = {
             <p class="muted" style="font-size:11px;margin:0">${esc(r.hint)}</p>
           </a>`).join('')}
       </div>`;
+  },
+};
+
+/* ---- تقرير نتيجة العمولات ----------------------------------------------- */
+
+export const commissionReport: Route = {
+  pattern: '/reports/commissions',
+  capability: 'report.view',
+  title: 'تقرير نتيجة العمولات',
+  breadcrumb: () => [
+    { label: 'الرئيسية', href: href('/') },
+    { label: 'التقارير', href: href('/reports') },
+    { label: 'نتيجة العمولات' },
+  ],
+  async render(view, m) {
+    view.write(loading('جارٍ تحميل نتيجة العمولات…'));
+    const cycles = await select<Row[]>('commission_cycles?select=id,name,status&order=period_start.desc');
+    const id = m.query.get('cycle') || str(cycles[0] || {}, 'id');
+    if (!id) { view.write(pageHeader('تقرير نتيجة العمولات') + empty('لا دورات عمولة')); return; }
+    const result = await readCycleResult(id);
+    if (!result) { view.write(pageHeader('تقرير نتيجة العمولات') + empty('لا نتيجة محسوبة للدورة')); return; }
+    if (!view.live) return;
+
+    const unresolved = result.unresolved_ownership;
+    const rows: Row[] = result.agents.map((a) => ({ ...a, allocation: 'KNOWN' }));
+    if (unresolved.amount) rows.push({
+      allocation: 'UNRESOLVED', agent_name: 'ملكية تحتاج حسم', agent_code: '—',
+      events: unresolved.events, subscribers: unresolved.subscribers, gross: unresolved.amount,
+    });
+
+    const columns: Array<Column<Row>> = [
+      { key: 'agent', label: 'الوكيل / المصالحة', cell: (r) => r['allocation'] === 'UNRESOLVED'
+        ? `<b>${esc(str(r, 'agent_name'))}</b> ${chip('قرار معلّق', 'warning')}`
+        : `<b>${esc(str(r, 'agent_name'))}</b><div class="muted table-hint">${esc(str(r, 'agent_code'))}</div>` },
+      { key: 'events', label: 'التفعيلات المؤهَّلة', cell: (r) => count(num(r, 'events')), numeric: true },
+      { key: 'subs', label: 'المشتركون', cell: (r) => count(num(r, 'subscribers')), numeric: true },
+      { key: 'gross', label: 'محسوب', cell: (r) => `<span class="money">${money(num(r, 'gross'))}</span>`, numeric: true },
+    ];
+
+    view.innerHTML = pageHeader('تقرير نتيجة العمولات',
+      `${result.cycle.name} · ${cycleStatusAr(result.cycle.status)}`)
+      + kpiRow([
+        { label: 'محسوب', value: money(result.totals.gross), tone: 'primary' },
+        { label: 'معتمد', value: money(result.totals.approved), tone: 'green' },
+        { label: 'مدفوع', value: money(result.totals.paid), tone: 'blue' },
+        { label: 'ملكية غير محسومة', value: money(unresolved.amount), tone: unresolved.amount ? 'red' : 'green',
+          sub: `${count(unresolved.events)} تفعيلات`, link: href('/work/ownership') },
+      ])
+      + filterBar([{ key: 'cycle', label: 'الدورة', type: 'select', options: cycles.map((c) => ({
+        value: str(c, 'id'), label: `${str(c, 'name')} — ${cycleStatusAr(str(c, 'status'))}`,
+      })) }], '/reports/commissions', m.query)
+      + `<div class="box report-reconciliation"><h3>المصالحة</h3>
+          <div class="minirow"><span>منسوب لوكلاء معروفين</span><b class="money">${money(knownAgentTotal(result))}</b></div>
+          <div class="minirow"><span>ملكية تحتاج حسم</span><b class="money">${money(unresolved.amount)}</b></div>
+          <div class="minirow"><span><b>إجمالي الدورة</b></span><b class="money">${money(result.totals.gross)}</b></div>
+        </div>`
+      + `<div class="insight warn report-contract-limit"><span class="insight-dot"></span><span>
+          <b>تفصيل FDT / Tier / P35 / P45 / P65 والجاهز للصرف غير متاح في عقد التقرير الحالي</b>
+          <small>لن تجمعه الواجهة من مصادر متعددة. يحتاج عقد تقرير خادمي موحّداً واختبارات قاعدة بيانات خضراء.</small></span></div>`
+      + exportBar()
+      + table(columns, rows);
+
+    wireFilters(view.el);
+    wireExport(view, 'commission-result', rows, [
+      ['agent_name', 'الوكيل أو بند المصالحة'], ['agent_code', 'رمز الوكيل'],
+      ['events', 'التفعيلات المؤهلة'], ['subscribers', 'المشتركون'], ['gross', 'المحسوب'],
+    ], { 'المحسوب': result.totals.gross, 'المعتمد': result.totals.approved,
+      'المدفوع': result.totals.paid, 'الملكية غير المحسومة': unresolved.amount });
   },
 };
 
@@ -258,7 +329,8 @@ export const paymentsReport: Route = {
       { key: 'agent', label: 'الوكيل', cell: (r) => esc(str(r, 'agent_name') || '—') },
       { key: 'stage', label: 'المرحلة', cell: (r) => esc(str(r, 'stage') || '—') },
       { key: 'amount', label: 'المبلغ', cell: (r) =>
-        `<span class="money">${money(num(r, 'amount') * (num(r, 'direction') || 1))}</span>`, numeric: true },
+        `<span class="money">${money(num(r, 'amount'))}</span>
+         <div class="muted table-hint">${num(r, 'direction') < 0 ? 'قيد عكسي' : 'قيد مالي'}</div>`, numeric: true },
       { key: 'batch', label: 'الدفعة', cell: (r) => esc(str(r, 'batch_name') || '—') },
       { key: 'ref', label: 'الإشعار', cell: (r) =>
         str(r, 'payment_ref') ? `<span dir="ltr">${esc(str(r, 'payment_ref'))}</span>` : '—' },
@@ -311,7 +383,18 @@ export const archive: Route = {
     const totals = (doc?.['totals'] || {}) as Row;
 
     const settledChip = (r: Row) =>
-      r['settled'] === true ? chip('محسوم', 'success') : chip('جارٍ', 'warning');
+      r['settled'] === true ? chip('مكتمل', 'success') : chip('غير مكتمل', 'warning');
+    const closedCycles = cycles.filter((r) => str(r, 'status') === 'CLOSED');
+    const openHistoricalCycles = cycles.filter((r) => str(r, 'status') !== 'CLOSED');
+    const cycleTable = (rows: Row[]) => table<Row>([
+      { key: 'name', label: 'الدورة', cell: (r) => `<b>${esc(str(r, 'name'))}</b>` },
+      { key: 'period', label: 'المدى', cell: (r) =>
+        `<span dir="ltr">${esc(str(r, 'period_start'))} → ${esc(str(r, 'period_end'))}</span>` },
+      { key: 'status', label: 'الحالة', cell: (r) => chip(cycleStatusAr(str(r, 'status')),
+        str(r, 'status') === 'CLOSED' ? 'success' : 'warning') },
+      { key: 'settled', label: 'الاكتمال', cell: settledChip },
+      { key: 'fin', label: 'وقت الاعتماد', cell: (r) => `<span dir="ltr">${esc(when(r['finalized_at']))}</span>` },
+    ], rows);
 
     view.innerHTML = pageHeader('الأرشيف',
       'قراءةٌ محضة — الأرشيف مرجعٌ لا سلطةٌ ثانية على المال')
@@ -331,18 +414,13 @@ export const archive: Route = {
           <small>كل ما في هذه الشاشة قراءة. التصحيح يمرّ بالدفتر، والتعديل
           بمساحته — لا سلطتان على المال.</small></span></div>`
 
-      + `<div class="box" style="margin-top:12px">
-          <h3>دورات العمولة</h3>
-          ${cycles.length ? table<Row>([
-            { key: 'name', label: 'الدورة', cell: (r) => `<b>${esc(str(r, 'name'))}</b>` },
-            { key: 'period', label: 'المدى', cell: (r) =>
-              `<span dir="ltr">${esc(str(r, 'period_start'))} → ${esc(str(r, 'period_end'))}</span>` },
-            { key: 'status', label: 'الحالة', cell: (r) => chip(str(r, 'status'), 'info') },
-            { key: 'settled', label: '', cell: settledChip },
-            { key: 'fin', label: 'اعتُمدت', cell: (r) =>
-              `<span dir="ltr">${esc(when(r['finalized_at']))}</span>` },
-          ], cycles) : '<p class="muted">لا دورات</p>'}
-        </div>`
+      + (openHistoricalCycles.length ? `<div class="box archive-unfinished-cycles">
+          <h3>دورات تاريخها قديم لكنها غير مكتملة</h3>
+          <div class="insight warn"><span class="insight-dot"></span><span><b>ليست أرشيفاً مقفلاً</b>
+            <small>قِدم التاريخ لا يعني اكتمال الدورة. تبقى حالتها التشغيلية كما سجلها الخادم.</small></span></div>
+          ${cycleTable(openHistoricalCycles)}</div>` : '')
+      + `<div class="box archive-closed-cycles"><h3>دورات مقفلة تاريخياً</h3>
+          ${closedCycles.length ? cycleTable(closedCycles) : '<p class="muted">لا دورات مقفلة</p>'}</div>`
 
       + `<div class="box" style="margin-top:12px">
           <h3>دفعات التنصيب</h3>
@@ -418,5 +496,5 @@ function wireExport(view: View, name: string, rows: Row[],
 }
 
 export const routes: Route[] = [
-  reportsIndex, installationReport, historicalReport, paymentsReport, archive,
+  reportsIndex, commissionReport, installationReport, historicalReport, paymentsReport, archive,
 ];

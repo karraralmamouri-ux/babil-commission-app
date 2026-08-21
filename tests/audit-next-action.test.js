@@ -27,10 +27,9 @@ test('السجلّ يُصفَّح على الخادم بالصدفة نفسها'
   assert.match(audit, /page\.outOfRange/);
 });
 
-test('السجلّ يقرأ التغيير تغييراً: قبل ثم بعد', () => {
-  assert.match(audit, /const before = str\(r, 'old_value'\)/);
-  assert.match(audit, /const after = str\(r, 'new_value'\)/);
-  assert.match(audit, /←/);
+test('السجلّ يقرأ التغيير تغييراً في عمودَي قبل وبعد', () => {
+  assert.match(audit, /label: 'قبل'.*old_value/s);
+  assert.match(audit, /label: 'بعد'.*new_value/s);
 });
 
 test('الفاعل يُعرض باسمه، والفعل بلا فاعلٍ يُنسب إلى النظام', () => {
