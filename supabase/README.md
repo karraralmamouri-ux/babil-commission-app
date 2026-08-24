@@ -2,7 +2,7 @@
 
 This directory contains the reviewed database migrations and Edge Function sources for the Babil Commission environments.
 
-- Production ref: `qolrsefpbvfuugwyqggu`.
+- Production ref: `fbgffpxpskjzgheheikd`.
 - Staging ref: `unohqhxubraelqgjhxgh`.
 - Both projects are in AWS `ap-northeast-1` (Tokyo).
 
