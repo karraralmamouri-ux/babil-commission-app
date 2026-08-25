@@ -12,6 +12,7 @@
 import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, pageRpc, can, ApiError } from '../../services/api';
+import { canReleaseHold } from './holdRelease';
 import { count } from '../../domain/money';
 import { dateTime } from '../../domain/time';
 import {
@@ -84,6 +85,16 @@ export const holds: Route = {
         if (str(r, 'status') === 'RELEASED') return chip('مرفوع', 'success');
         return chip('انقضى', 'neutral');
       } },
+      { key: 'release', label: '', cell: (r) =>
+        canReleaseHold(str(r, 'status'), can('installation.release_hold'))
+          ? `<button class="smallbtn release-hold"
+               data-id="${esc(str(r, 'id'))}"
+               data-subscriber="${esc(str(r, 'subscriber_id'))}"
+               data-permanence="${esc(str(r, 'permanence'))}"
+               data-source="${esc(SOURCE_AR[str(r, 'source')] || str(r, 'source'))}"
+               data-placed="${esc(when(r['created_at']))}"
+               data-reason="${esc(str(r, 'reason_note') || str(r, 'reason_label') || str(r, 'reason_code'))}">ارفع</button>`
+          : '' },
     ];
 
     view.innerHTML = pageHeader('التعليقات',
@@ -112,11 +123,87 @@ export const holds: Route = {
            <small>المجموعة فيها ${count(page.total)} تعليقاً.</small></span></div>`
         : '')
       + (page.rows.length ? table(columns, page.rows) : empty('لا تعليقات'))
-      + pager(page.total, limit, offset, '/installation/holds', m.query);
+      + pager(page.total, limit, offset, '/installation/holds', m.query)
+      + '<div id="releaseBox" style="margin-top:12px"></div>';
 
     wireFilters(view.el);
+    wireReleaseHold(view);
   },
 };
+
+/**
+ * رفع تعليق — معاينة قبل التنفيذ.
+ *
+ * لا حذف مباشر: نفس التعليق يبقى سجلّاً، وحالته تتحوّل إلى RELEASED عبر
+ * `release_hold_v2` وحدها. زرّ التأكيد يعرض ما سيتغيّر قبل أن يتغيّر —
+ * المشترك، التعليق الحالي وسببه ونوعه ومصدره وتاريخه — ثم سبب الرفع صراحةً.
+ */
+function releaseConfirmPanel(btn: HTMLButtonElement): string {
+  const permanenceAr = PERMANENCE_AR[btn.dataset['permanence'] || ''] || btn.dataset['permanence'];
+  return `<div class="box" id="releaseConfirm">
+    <h3>رفع التعليق</h3>
+    <div class="minirow"><span class="muted">المشترك</span><b dir="ltr">${esc(btn.dataset['subscriber'] || '')}</b></div>
+    <div class="minirow"><span class="muted">السبب الحالي</span><b>${esc(btn.dataset['reason'] || '—')}</b></div>
+    <div class="minirow"><span class="muted">النوع</span><b>${esc(permanenceAr || '')}</b></div>
+    <div class="minirow"><span class="muted">المصدر</span><b>${esc(btn.dataset['source'] || '')}</b></div>
+    <div class="minirow"><span class="muted">بدأ في</span><b dir="ltr">${esc(btn.dataset['placed'] || '')}</b></div>
+    <p class="muted" style="font-size:11px;margin:10px 0 8px">
+      الرفع يسمح بدخول استحقاقات هذا المشترك في الدفعة التالية. سببه إلزاميٌّ ويُحفظ في التدقيق.</p>
+    <div class="toolbar">
+      <input class="search" id="rcReason" placeholder="سبب الرفع (إلزامي)" aria-label="سبب الرفع">
+      <button class="btn gold" id="rcConfirm">تأكيد الرفع</button>
+      <button class="btn" id="rcCancel">إلغاء</button>
+    </div>
+    <div id="rcResult"></div>
+  </div>`;
+}
+
+function wireReleaseHold(view: View): void {
+  const box = view.el.querySelector<HTMLElement>('#releaseBox');
+  if (!box) return;
+
+  for (const btn of view.el.querySelectorAll<HTMLButtonElement>('.release-hold')) {
+    btn.addEventListener('click', () => {
+      box.innerHTML = releaseConfirmPanel(btn);
+      const holdId = btn.dataset['id'] || '';
+      const reason = box.querySelector<HTMLInputElement>('#rcReason');
+      const confirm = box.querySelector<HTMLButtonElement>('#rcConfirm');
+      const cancel = box.querySelector<HTMLButtonElement>('#rcCancel');
+      const out = box.querySelector<HTMLElement>('#rcResult');
+      if (!confirm || !cancel || !out) return;
+
+      cancel.addEventListener('click', () => { box.innerHTML = ''; });
+
+      confirm.addEventListener('click', async () => {
+        const why = reason?.value.trim() || '';
+        if (!why) {
+          out.innerHTML = insight('warn', 'سبب الرفع إلزامي', 'يُحفظ في التدقيق');
+          return;
+        }
+        confirm.disabled = true;
+        out.innerHTML = loading('جارٍ رفع التعليق…');
+        try {
+          const result = await rpc<Row>('release_hold_v2', {
+            p_hold_id: holdId,
+            p_reason: why,
+            p_request_id: crypto.randomUUID(),
+          });
+          if (!view.live) return;
+          out.innerHTML = result?.['idempotent'] === true
+            ? insight('good', 'مرفوعٌ مسبقاً', 'لم يتغيّر شيء — التعليق لم يكن سارياً أصلاً')
+            : insight('good', 'رُفع التعليق', 'استحقاقات هذا المشترك تدخل الدفعة التالية.');
+          window.setTimeout(() => { if (view.live) window.dispatchEvent(new CustomEvent('babil:refresh')); }, 1200);
+        } catch (error) {
+          if (!view.live) return;
+          out.innerHTML = insight('danger', 'لم يُرفع التعليق',
+            error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
+        } finally {
+          confirm.disabled = false;
+        }
+      });
+    });
+  }
+}
 
 /* ---- التعليق بالجملة ----------------------------------------------------- */
 
