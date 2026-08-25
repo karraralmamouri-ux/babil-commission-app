@@ -993,12 +993,15 @@ function wireWorkflow(view: View, cycle: Cycle, blockers: number): void {
       await call(why);
       if (!view.live) return;
       out.innerHTML = insight('good', done);
+      // ولا يُعاد تمكين الزرّ بعد النجاح. اللوحة تبقى معروضةً حتى التحديث،
+      // وضغطةٌ ثانية فيها ترسل طلباً ثانياً بمعرّفٍ جديد — فلا يردّه حارس
+      // الإعادة على الخادم لأنه يميّز الطلب المُعاد بمعرّفه لا بأثره.
       window.setTimeout(() => { if (view.live) window.dispatchEvent(new CustomEvent('babil:refresh')); }, 1300);
     } catch (error) {
       if (!view.live) return;
       out.innerHTML = insight('danger', `لم يتم ${label}`,
         error instanceof Error ? error.message : 'خطأ غير متوقّع');
-    } finally {
+      // فشلٌ حقيقي: لم يقع شيء، فتُتاح المحاولة من جديد.
       button.disabled = false;
     }
   };
@@ -1033,7 +1036,6 @@ function wireWorkflow(view: View, cycle: Cycle, blockers: number): void {
       if (!view.live) return;
       out.innerHTML = insight('danger', 'لم يتم إعادة الحساب',
         error instanceof Error ? error.message : 'خطأ غير متوقّع');
-    } finally {
       recalc.disabled = false;
     }
   });
@@ -1049,11 +1051,14 @@ function wireWorkflow(view: View, cycle: Cycle, blockers: number): void {
       if (!view.live) return;
       downloadJson(`${cycle.name}.json`, res);
       out.innerHTML = insight('good', 'نُزِّل التصدير', 'وسُجِّل في سجلّ التدقيق.');
+      // التصدير يكتب سطر تدقيقٍ أيضاً، فضغطتان تُسجَّلان تصديرين لنيّةٍ واحدة.
+      // ولا يُقفل كالبقيّة: إعادة التصدير نيّةٌ مشروعة، ولا تحديث بعده يُعيد
+      // بناء اللوحة — فمهلةٌ قصيرة تكفي لالتقاط الضغطة المزدوجة وحدها.
+      window.setTimeout(() => { if (view.live) exportBtn.disabled = false; }, 1300);
     } catch (error) {
       if (!view.live) return;
       out.innerHTML = insight('danger', 'لم يتم التصدير',
         error instanceof Error ? error.message : 'خطأ غير متوقّع');
-    } finally {
       exportBtn.disabled = false;
     }
   });
