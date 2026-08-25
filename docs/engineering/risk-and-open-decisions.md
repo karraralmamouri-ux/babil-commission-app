@@ -209,6 +209,38 @@ calculation** and nothing else. It does **not** block Phases 0–7. Foundational
 without it: commission scheme V1 records the honest current basis (`activation_events`), and
 V2 with `unique_active_users` waits for the answer.
 
+### D-11 — Invoice evidence attachment: storage/security/retention foundation · **OPEN**
+
+**Raised during Installation Operations Batch 1 (2026-08-25), Phase 4.** The task asked for
+evidence attachment on `installation_invoices` (file/subscriber/invoice reference, filename,
+content type, uploaded_by, uploaded_at) so a reviewer can open the source document from the
+invoice review screen before deciding `VERIFIED`/`REJECTED`.
+
+**FACT.** No Supabase Storage bucket, bucket policy, or `storage.objects` reference exists
+anywhere in `supabase/migrations/`. `installation_invoices` carries only text metadata
+(`external_invoice_id`, `invoice_number`, `invoice_reference`) — fields the table's own
+migration comment says are kept deliberately separate "حتى لا يُبنى ربط على افتراض" (so no
+linkage is built on an assumption). There is no file/URL column, and no prior architectural
+decision about file storage in `docs/DECISIONS.md` or `docs/ARCHITECTURE.md` (both mention
+only browser `localStorage`, an unrelated legacy mechanism).
+
+**Why this stayed a STOP, not an implementation.** Building evidence attachment on this gap
+means making three decisions with no prior precedent in this codebase, each financial/security
+in nature:
+
+1. **Bucket + access policy** — who may upload, who may read raw evidence (same set as
+   `invoice.verify`/`invoice.reject`, or broader), public vs. signed-URL access.
+2. **Retention** — how long evidence is kept, whether rejected-invoice evidence is retained
+   differently from verified-invoice evidence.
+3. **Identity of the reference** — a Storage object key, or an external URL (Odoo, SaaS) —
+   given `odoo_model`/`odoo_record_id` already exist on the table for a future Odoo-owned
+   invoice record.
+
+Per this task's own instruction, an undocumented bucket/security/retention decision halts
+Phase 4 only; it does not block Phases 1–3, which shipped independently.
+
+**Needed by:** Phase 4 (Invoice Evidence), next batch. Not currently blocking anything else.
+
 ---
 
 ## 4. Hard scenarios
