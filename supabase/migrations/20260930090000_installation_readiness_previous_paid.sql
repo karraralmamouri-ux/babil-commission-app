@@ -3,10 +3,22 @@ begin;
 -- ---------------------------------------------------------------------------
 -- الجاهزية: «كم دُفع سابقاً» بجانب «كم المستحق الآن» — لا حسابٌ من العميل.
 --
--- installation_entitlements هو دفتر الصرف الفعلي: سطرٌ لكل (فترة + مشترك +
--- مرحلة) دُفع بالفعل. المرشّح في page_payout_candidate_lines يقرأ حالته
--- الحالية من installation_subscriber_state لا من الدفتر، فـ«سابقاً» يعني
--- مجموع كل ما دُفع لهذا المشترك عبر كل الفترات والمراحل الماضية — رقمٌ
+-- «سابقاً» مصدران منفصلان تماماً، لا يتقاطعان لنفس المرحلة، ومجموعهما وحده
+-- يعطي الرقم الصحيح:
+--
+--   installation_payment_history   وقائع ما قبل النظام الدوري — أكثر من
+--                                   خمسة آلاف مشترك استُوردوا بتاريخهم
+--                                   دفعةً واحدة (20260816090000)، مربوطون
+--                                   بـsubscriber_uuid لا بنص المعرّف.
+--   installation_entitlements      استحقاقات الدورة الشهرية القائمة، سطرٌ
+--                                   لكل (فترة + مشترك + مرحلة) دُفع فعلاً
+--                                   عبر مسار الصرف الحالي.
+--
+-- الاكتفاء بالثاني وحده كان يُعيد صفراً لكل مشترك من القاعدة التاريخية —
+-- وهي بالضبط من يظهر في هذه الشاشة أصلاً، لأن base هنا مبنيّة على
+-- installation_subscribers/installation_subscriber_state، الجدولين نفسيهما
+-- اللذين يربطهما installation_payment_history.subscriber_uuid. المرشّح يقرأ
+-- حالته الحالية من installation_subscriber_state لا من أيّ دفتر، فـ«سابقاً»
 -- منفصل تماماً عن «المستحق الآن»، لا يُعاد بناؤه، ولا يمسّ شرط الجاهزية.
 --
 -- الحساب على صفحة الفرز المُرجَعة فقط (v_lim صفّاً كحدّ أقصى)، لا على كامل
@@ -41,7 +53,7 @@ begin
 
   with base as (
     select
-      s.subscriber_id, s.reseller, s.fdt,
+      s.id as subscriber_uuid, s.subscriber_id, s.reseller, s.fdt,
       st.remaining, st.current_stage as stage,
       public.installation_amount_for_stage(st.current_stage) as amount,
       st.resolution, st.payment_eligible,
@@ -109,7 +121,9 @@ begin
              to_jsonb(p.blockers) as blockers, p.is_ready,
              (select coalesce(sum(e.paid_amount), 0) from public.installation_entitlements e
               where e.subscriber_id = p.subscriber_id
-                and e.payment_status = 'paid') as previous_paid
+                and e.payment_status = 'paid')
+             + (select coalesce(sum(h.amount), 0) from public.installation_payment_history h
+                where h.subscriber_uuid = p.subscriber_uuid) as previous_paid
       from page p) x), '[]'::jsonb)
   into v_total, v_rows
   from filtered;

@@ -160,6 +160,11 @@ select pg_temp.ok(
 -- 1.6 «سابقاً» رقمٌ من دفتر الاستحقاقات الفعلي، لا تخمينٌ ولا تأثير على الجاهزية
 -- ---------------------------------------------------------------------------
 
+-- الإدراج يقع خارج دور authenticated: الجدول قراءةٌ فقط لكل جلسة متصفّح،
+-- وكل كتابةٍ تمرّ عبر RPC مفحوص — هذا سطر بيانات إعداد، لا يمثّل مساراً
+-- من الواجهة، فيُدرَج بدور المالك كما يفعل قسم ٢ أدناه بالضبط.
+reset role;
+
 insert into public.installation_entitlements
   (id, period, subscriber_id, subscriber_name, reseller, zone, fdt, remaining, stage, amount,
    invoice_status, payment_status, paid_amount, paid_by, paid_at, created_by)
@@ -168,6 +173,9 @@ values
    13000,'P1',3000,'approved','paid',3000,
    '90000000-0000-0000-0000-0000000000a1', now(), '90000000-0000-0000-0000-0000000000a1')
 on conflict do nothing;
+
+set local role authenticated;
+set local request.jwt.claim.sub = '90000000-0000-0000-0000-0000000000a1';
 
 select pg_temp.ok(
   (select (r ->> 'previous_paid')::bigint from jsonb_array_elements(
@@ -186,6 +194,45 @@ select pg_temp.ok(
      public.page_payout_candidate_lines(p_limit => 50) -> 'rows') r
    where r ->> 'subscriber_id' = 'pb-1') = 'false',
   'previous_paid عرضٌ فقط — لا يغيّر شرط الجاهزية، وpb-1 يبقى محجوباً بفاتورة');
+
+-- ---------------------------------------------------------------------------
+-- 1.7 «سابقاً» يشمل ما قبل النظام الدوري أيضاً — من installation_payment_history
+--
+-- مشتركٌ من القاعدة التاريخية دفع P1 قبل أن يوجد أيّ استحقاقٍ دوريٍّ له على
+-- الإطلاق. الاكتفاء بـinstallation_entitlements وحده كان يقول صفراً هنا،
+-- وهو اختلاقٌ بالغياب لا حقيقة.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+insert into public.installation_subscribers
+  (id, subscriber_id, reseller, fdt, start_date, total_amount, created_by)
+values
+  ('90000000-0000-0000-0000-0000000000b4','pb-4','وكيل الصرف','PB-FDT', date '2026-01-01', 13000,'90000000-0000-0000-0000-0000000000a1')
+on conflict do nothing;
+
+insert into public.installation_subscriber_state
+  (subscriber_uuid, as_of_date, remaining, current_stage, resolution, payment_eligible)
+values
+  ('90000000-0000-0000-0000-0000000000b4', date '2026-06-30', 10000, 'P2', 'resolved', true)
+on conflict (subscriber_uuid) do update
+  set remaining = excluded.remaining, current_stage = excluded.current_stage,
+      resolution = excluded.resolution, payment_eligible = excluded.payment_eligible;
+
+insert into public.installation_payment_history
+  (subscriber_uuid, stage, amount, payment_date, created_by)
+values
+  ('90000000-0000-0000-0000-0000000000b4','P1',3000, date '2026-05-01', '90000000-0000-0000-0000-0000000000a1')
+on conflict do nothing;
+
+set local role authenticated;
+set local request.jwt.claim.sub = '90000000-0000-0000-0000-0000000000a1';
+
+select pg_temp.ok(
+  (select (r ->> 'previous_paid')::bigint from jsonb_array_elements(
+     public.page_payout_candidate_lines(p_limit => 50) -> 'rows') r
+   where r ->> 'subscriber_id' = 'pb-4') = 3000,
+  'سابقاً يشمل ما دُفع قبل النظام الدوري من installation_payment_history أيضاً');
 
 -- ---------------------------------------------------------------------------
 -- 2. الاستحقاق والدفعة

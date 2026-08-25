@@ -1,6 +1,12 @@
-// الجاهزية: «مدفوع سابقاً» بجانب «المستحق الآن» — من دفتر الاستحقاقات
-// الفعلي على الخادم، لا حساباً من العميل ولا تخميناً. الشاشة كانت تعرض
-// المستحق والمتبقّي والحاجب دون أن تقول كم دُفع لهذا المشترك من قبل.
+// الجاهزية: «مدفوع سابقاً» بجانب «المستحق الآن» — من مصدرين على الخادم، لا
+// حساباً من العميل ولا تخميناً. الشاشة كانت تعرض المستحق والمتبقّي والحاجب
+// دون أن تقول كم دُفع لهذا المشترك من قبل.
+//
+// اكتشافٌ مُصحَّح أثناء تدقيق db-regression: الاكتفاء بـ
+// installation_entitlements وحده كان يُعيد صفراً لكل مشترك من القاعدة
+// التاريخية (وهي بالضبط من يظهر في هذه الشاشة) — تاريخه في
+// installation_payment_history، جدولٍ منفصل تماماً يربطه subscriber_uuid لا
+// نص المعرّف. previous_paid يجب أن يجمع المصدرين معاً.
 //
 // الخطر المحروس: أن يمسّ هذا الحقل الإضافي شرط الجاهزية نفسه (is_ready
 // وblockers) — وهو عرضٌ فقط، فلا يجوز أن يغيّر من يُعدّ جاهزاً.
@@ -18,15 +24,23 @@ const payoutUi = read('src/features/installation/payout.ts');
 const baseline = read('supabase/migrations/20260909090000_blocker_categories.sql');
 
 /* ---------------------------------------------------------------------------
-   الحساب: من دفتر installation_entitlements فعلاً، مطابَقاً بالمشترك
-   وبحالة الدفع، على صفحة النتائج فقط
+   الحساب: مجموع مصدرين مطابَقين بالمشترك، على صفحة النتائج فقط
    ------------------------------------------------------------------------ */
 
 test('previous_paid مجموعٌ من installation_entitlements المدفوع فعلاً', () => {
   assert.match(migration, /coalesce\(sum\(e\.paid_amount\), 0\)/);
   assert.match(migration, /from public\.installation_entitlements e/);
   assert.match(migration, /where e\.subscriber_id = p\.subscriber_id/);
-  assert.match(migration, /and e\.payment_status = 'paid'\) as previous_paid/);
+  assert.match(migration, /and e\.payment_status = 'paid'\)/);
+});
+
+test('previous_paid يضيف ما دُفع قبل النظام الدوري من installation_payment_history', () => {
+  // الجدولان لا يتقاطعان لنفس المرحلة؛ الجمع بينهما هو الرقم الصحيح، لا
+  // الاكتفاء بأيّهما وحده.
+  assert.match(migration, /\+ \(select coalesce\(sum\(h\.amount\), 0\) from public\.installation_payment_history h/);
+  assert.match(migration, /where h\.subscriber_uuid = p\.subscriber_uuid\) as previous_paid/);
+  // subscriber_uuid يُحمَل من base نفسها لا استعلاماً إضافياً خارج الصفحة.
+  assert.match(migration, /select\s+s\.id as subscriber_uuid, s\.subscriber_id/);
 });
 
 test('الحساب يقع على صفحة النتائج المُرجَعة فقط — لا على كامل المرشّحين قبل التصفح', () => {
