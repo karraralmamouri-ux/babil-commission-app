@@ -67,6 +67,13 @@ export const overview: Route = {
     if (!list.length) { view.write(empty('لا توجد دورات عمولة بعد')); return; }
     const current = list[0] as Cycle;
 
+    // بطاقةٌ توجيهية فقط. القرار — DRAFT + القدرة — هو نفس شرط ظهور زرّ
+    // الإلغاء في تبويب المراجعة والاعتماد، فيُعاد استعماله لا يُكتب ثانيةً.
+    // ولا RPC هنا ولا منطق إلغاء: مجرّد رابطٍ إلى حيث يعيشان.
+    const draftCard = canCancelDraft(current.status, can('commission.manage_cycle'))
+      ? draftActionsCard(current)
+      : '';
+
     // قراءةٌ واحدة بعقدٍ واحد. والعطل يُعرَض عطلاً: «تعذّر التحميل» و«لا
     // بيانات» حالتان مختلفتان، وعرضُ الشرطة لكليهما يُخفي الأولى.
     let result: CycleResult | null;
@@ -84,6 +91,7 @@ export const overview: Route = {
 
     if (!result) {
       view.write(pageHeader('عمولات الوكلاء', current.name)
+        + draftCard
         + empty('لا نتيجة محسوبة لهذه الدورة بعد', 'تُحسب الدورة من شاشتها'));
       return;
     }
@@ -95,6 +103,8 @@ export const overview: Route = {
     view.write(pageHeader('عمولات الوكلاء',
       `${esc(result.cycle.name)} · ${esc(cycleStatusAr(result.cycle.status))}`,
       projected ? projectedTag() : chip('معتمدة', 'success'))
+
+      + draftCard
 
       // النتيجة المالية أولاً: محسوب، معتمد، مدفوع.
       + kpiRow([
@@ -127,6 +137,23 @@ export const overview: Route = {
             (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`)}</div>`);
   },
 };
+
+/**
+ * بطاقة توجيهٍ لدورةٍ لا تزال مسوّدة.
+ *
+ * لا تنادي `cancel_empty_commission_cycle` ولا تُعيد رسم التأكيد — كلاهما
+ * يعيش في تبويب المراجعة والاعتماد (`workflowPanel`/`wireWorkflow`). هذه
+ * إشارةٌ فقط: أنت هنا، والإجراء هناك.
+ */
+function draftActionsCard(cycle: Cycle): string {
+  return `<div class="box" style="margin-top:12px" id="draftActionsBox">
+    <h3>إجراءات الدورة</h3>
+    <p class="muted" style="font-size:11px;margin:0 0 10px">
+      هذه الدورة مسوّدة. إجراءاتها — ومنها إلغاؤها إن كانت فارغة — في تبويب المراجعة والاعتماد.
+    </p>
+    <a class="btn" href="${esc(href(`/commissions/cycles/${cycle.id}/review`))}">افتح المراجعة والاعتماد</a>
+  </div>`;
+}
 
 /**
  * المصالحة المرئية.
@@ -340,32 +367,39 @@ async function renderCycle(view: View, m: RouteMatch, tab: string): Promise<void
       + errorState(error instanceof Error ? error.message : 'تعذّر تحميل نتيجة الدورة', 'location.reload()'));
     return;
   }
-  if (!result) {
-    view.write(pageHeader(cycle.name, `${cycle.period_start} → ${cycle.period_end}`)
-      + empty('لا نتيجة محسوبة لهذه الدورة بعد', 'تُحسب الدورة من تبويب المراجعة والاعتماد'));
-    return;
-  }
-  const projected = isProjectedStatus(result.cycle.status);
+  if (!view.live) return;
+
+  // مسوّدةٌ لم تُحسب بعد ليست عطلاً، و«لا نتيجة» غير «صفر»: لا رقم مالي
+  // يُختلَق. لكن صفحة الدورة تبقى قابلة للتنقّل بين تبويباتها — فمنها
+  // المراجعة والاعتماد الذي يحمل زرّ إلغاء المسودة، ولا سبيل إليه إن توقّف
+  // الرندر هنا كما كان قبل هذا الإصلاح.
+  const projected = isProjectedStatus(cycle.status);
 
   const tabs = CYCLE_TABS.map((t) =>
     `<a class="tab${t.key === tab ? ' active' : ''}" href="${esc(href(`/commissions/cycles/${id}/${t.key}`))}">${esc(t.label)}</a>`).join('');
 
+  const summary = result
+    ? kpiRow([
+        { label: 'عمولة محسوبة', value: money(result.totals.gross), tone: 'primary',
+          sub: projected ? 'قيد المراجعة — ليست مستحقاً معتمداً' : 'نتيجة معتمدة' },
+        { label: 'معتمد', value: money(result.totals.approved), tone: 'green' },
+        { label: 'مدفوع', value: money(result.totals.paid), tone: 'blue' },
+        { label: 'فئات أسباب حاجبة', value: count(result.blockers.length),
+          tone: result.blockers.length ? 'red' : 'green', link: href(`/commissions/cycles/${id}/review`) },
+      ])
+      + `<div class="box cycle-operational-result"><h3>النتيجة التشغيلية</h3>
+          <div class="minirow"><span>التفعيلات المؤهَّلة</span><b>${count(result.volumes.qualifying_events)}</b></div>
+          <div class="minirow"><span>أساس التير — مشتركون فريدون</span><b>${count(result.volumes.tier_basis)}</b></div>
+          <div class="minirow"><span>النطاقات المالية</span><b>${count(result.totals.scopes)}</b></div>
+        </div>`
+    // لا صفر مصطنع: غياب الحساب يُقال نصّاً، لا برقمٍ يوهم أنه قُرئ من الخادم.
+    : insight('warn', 'لم تُحسب هذه الدورة بعد',
+        'لا عمولة ولا اعتماد ولا صرف قبل أوّل حساب — من تبويب المراجعة والاعتماد.');
+
   view.write(pageHeader(cycle.name,
     `${cycle.period_start} → ${cycle.period_end}`,
     `${chip(statusLabel(cycle.status), statusTone(cycle.status))}${projected ? ' ' + projectedTag() : ''}`)
-    + kpiRow([
-      { label: 'عمولة محسوبة', value: money(result.totals.gross), tone: 'primary',
-        sub: projected ? 'قيد المراجعة — ليست مستحقاً معتمداً' : 'نتيجة معتمدة' },
-      { label: 'معتمد', value: money(result.totals.approved), tone: 'green' },
-      { label: 'مدفوع', value: money(result.totals.paid), tone: 'blue' },
-      { label: 'فئات أسباب حاجبة', value: count(result.blockers.length),
-        tone: result.blockers.length ? 'red' : 'green', link: href(`/commissions/cycles/${id}/review`) },
-    ])
-    + `<div class="box cycle-operational-result"><h3>النتيجة التشغيلية</h3>
-        <div class="minirow"><span>التفعيلات المؤهَّلة</span><b>${count(result.volumes.qualifying_events)}</b></div>
-        <div class="minirow"><span>أساس التير — مشتركون فريدون</span><b>${count(result.volumes.tier_basis)}</b></div>
-        <div class="minirow"><span>النطاقات المالية</span><b>${count(result.totals.scopes)}</b></div>
-      </div>`
+    + summary
     + `<div class="tabs">${tabs}</div><div class="panel active" id="cycleTabBody">${loading()}</div>`);
 
   const body = view.el.querySelector<HTMLElement>('#cycleTabBody');
@@ -377,7 +411,7 @@ async function renderCycle(view: View, m: RouteMatch, tab: string): Promise<void
   }
 }
 
-async function renderCycleTab(view: View, cycle: Cycle, result: CycleResult, tab: string, m: RouteMatch): Promise<void> {
+async function renderCycleTab(view: View, cycle: Cycle, result: CycleResult | null, tab: string, m: RouteMatch): Promise<void> {
   const id = cycle.id;
   if (tab === 'scopes') {
     const rows = (await select<Snapshot[]>(`commission_cycle_snapshots?select=*&cycle_id=eq.${encodeURIComponent(id)}&order=gross_commission.desc`)) || [];
@@ -472,7 +506,13 @@ async function renderCycleTab(view: View, cycle: Cycle, result: CycleResult, tab
     return;
   }
 
-  // overview — نفس عقد النتيجة المقروء مرة واحدة في رأس الشاشة.
+  // overview — نفس عقد النتيجة المقروء مرة واحدة في رأس الشاشة. بقيّة
+  // التبويبات (النطاقات، الأحداث، الاستثناءات، المراجعة، الصرف، التدقيق)
+  // تقرأ من الخادم مباشرةً ولا تعتمد على `result`، فتبقى صحيحة بلا تعديل.
+  if (!result) {
+    view.writeInto('#cycleTabBody', empty('لم تُحسب هذه الدورة بعد', 'التفصيل حسب المنطقة يظهر بعد أوّل حساب'));
+    return;
+  }
   view.writeInto('#cycleTabBody', result.zones.length
     ? `<div class="box"><h3>حسب المنطقة</h3>${table(zoneColumns(), result.zones as unknown as Array<Record<string, unknown>>)}</div>`
     : empty('لا تفصيل متاح'));

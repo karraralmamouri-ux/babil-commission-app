@@ -1881,7 +1881,7 @@ function opsCan(key){return typeof Operations!=="undefined"&&Operations.can(opsC
 function switchOpsTab(k){document.querySelectorAll("#operationsTabs .tab").forEach(b=>b.classList.toggle("active",b.dataset.ops===k));document.querySelectorAll(".ops-panel").forEach(p=>p.classList.toggle("active",p.id==="ops-"+k))}
 async function loadMyCapabilities(){
  try{const rows=await sbRequest("/rest/v1/rpc/my_capabilities",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
-  opsCapabilities=Operations.indexCapabilities(Array.isArray(rows)?rows:[]);applyCapabilityVisibility()}
+  opsCapabilities=Operations.indexCapabilities(Array.isArray(rows)?rows:[]);applyCapabilityVisibility();window.dispatchEvent(new CustomEvent("babil:capabilities"))}
  catch(error){if(error?.status!==404)console.warn("capabilities:",error)}}
 function applyCapabilityVisibility(){
  const show=(id,cap)=>{const el=document.querySelector(id);if(el)el.style.display=opsCan(cap)?"":"none"};
