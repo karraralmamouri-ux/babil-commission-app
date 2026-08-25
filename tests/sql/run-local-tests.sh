@@ -199,7 +199,10 @@ echo "$out22" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out22" | grep -c "            ok ")))
 
 echo "== installation payout =="
-out23=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-payout.sql 2>&1)
+if ! out23=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-payout.sql 2>&1); then
+  echo "$out23" >&2
+  echo "PAYOUT TESTS FAILED (psql exited non-zero)" >&2; exit 1
+fi
 if echo "$out23" | grep -qE "FAILED|ERROR"; then
   echo "$out23" | grep -E "FAILED|ERROR" || true
   echo "PAYOUT TESTS FAILED" >&2; exit 1

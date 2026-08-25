@@ -38,26 +38,40 @@ than a clean failure.
 
 **Fix.** Single published scheme version; the SQL function becomes a lookup.
 
-### R-03 — No reversal path · **CRITICAL — foundation, not a later feature**
+### R-03 — Reversal path has no frontend · **MEDIUM — backend closed, UI open**
 
-**FACT.** `protect_settled_installation_entitlement` and
-`unique (entitlement_id)` correctly prevent mutation of settled payments. No reversal or
-adjustment mechanism exists.
+**FACT, corrected 2026-08-25 (was "No reversal path exists" — stale since 2026-08-18).**
+`protect_settled_installation_entitlement` and `unique (entitlement_id)` correctly prevent
+mutation of settled payments. The originally-approved fix **landed as `20260818090000_add_financial_correction_ledger.sql`**, two days after this register closed: `reverse_financial_entry`
+and `correct_financial_entry`, writing typed rows to `financial_ledger`
+(`txn_type in ('HISTORICAL_PAYMENT','PAYMENT','ADJUSTMENT','CORRECTION','REVERSAL')`,
+`reverses_entry_id`/`corrects_entry_id`, never deleting or overwriting the original posted
+row) — this register's §4 already documents the resulting behaviour at **S-16**, but this
+entry was never updated to match. A later migration
+(`20260916090000_corrections_register.sql`) added a read-only aggregation RPC,
+`subscriber_corrections`, explicitly to show raw-vs-approved-vs-who-changed-it across all
+four correction domains (parent, ownership, FDT, and this one).
 
-**Impact.** A payment to the wrong agent has no legal correction path. The only remedy is a
-direct database edit — precisely what the safeguards forbid, which means it would be done
-outside audit.
+**Backend exists?** Yes — `reverse_financial_entry`, `correct_financial_entry`,
+`subscriber_corrections`, capability-gated and audited, confirmed present in
+`supabase/migrations/`.
+**Frontend exists?** No — `grep -rl "reverse_financial_entry\|correct_financial_entry\|subscriber_corrections" src/` returns zero matches. Contrast with the *other* three correction
+domains the same migration lists as "موجودة كلّها وتعمل": `classify_parent` (wired at
+`/master/parents`), `transfer_subscriber` (wired, `subscriber-transfer` tests), and the
+commission-domain `add_activation_correction`/`revoke_activation_correction` (wired in
+`src/features/commissions/corrections.ts`). This one domain — the financial ledger itself —
+is the odd one out.
+**Production workflow exercised?** No. Reaching this RPC today means the Supabase SQL
+console, which is exactly the manual, out-of-audit-workflow path the fix was built to avoid.
+**Actual remaining gap.** A screen presenting `subscriber_corrections` with reverse/correct
+actions wired to the two RPCs — the same shape as the existing parent/ownership/FDT
+correction screens. Not attempted in Installation Operations Batch 1 (out of that batch's
+scope); candidate for the next batch.
 
-**Approved at review: promoted to a critical implementation foundation.** The system must
-offer a legal, audited correction path. Direct database editing must never be the normal
-correction mechanism.
-
-A wrong-agent payment resolves as three ledger rows, all retained:
-original payment · reversal · correct replacement payment. The original posted transaction
-is never deleted or overwritten.
-
-**Fix.** Ledger with transaction types and `reverses_ledger_id`. **Sequencing rule: this
-must land before payment workflows are expanded, not after.**
+**Impact (residual).** A wrong-agent payment has a legal, audited correction path today, but
+reaching it requires direct database access, not an in-app action — the audit trail exists
+only if whoever runs the RPC also has database access and chooses to use it instead of
+editing a row directly.
 
 ### R-04 — Raw activation data is never stored · **MEDIUM**
 
@@ -116,6 +130,26 @@ three times during recent releases.
 
 **Fix.** Normalize once via `.gitattributes`, or keep the pre-commit check comparing
 `git diff --numstat` against `--ignore-cr-at-eol`.
+
+### R-11 — `subscriber_identities` bootstrap has no caller · **MEDIUM, added 2026-08-25**
+
+**FACT.** `subscriber_identities` was empty in production because, per the migration's own
+comment (`20260825090000_harden_fdt_zone_and_identity_pipeline.sql`), "the tables and pure
+functions exist, and no RPC writes to them." `bootstrap_subscriber_identities()` was added
+there (refined `20260825120000_fix_identity_bootstrap_aggregate.sql`) to close that.
+
+**Backend exists?** Yes — `bootstrap_subscriber_identities()`, confirmed present.
+**Frontend exists?** No — zero references in `src/`.
+**Production workflow exercised?** No — the function is not called by any trigger, RPC, or
+scheduled job in the migrations directory; nothing invokes it automatically after import.
+**Actual remaining gap.** Either an admin action that calls it explicitly, or wiring it into
+the import pipeline so identities populate as a side effect of import rather than a separate
+manual step. Not attempted in Installation Operations Batch 1; candidate for the next batch.
+
+**Impact.** Every readiness/blocker check that reads `subscriber_identities` for an
+`IDENTITY` conflict (including `page_payout_candidate_lines`, extended in Batch 1) is
+checking an empty table in production today — not because the check is wrong, but because
+nothing has ever populated the table it reads.
 
 ---
 
@@ -208,6 +242,38 @@ makes the evidence available and historically queryable. D-03 then decides the f
 calculation** and nothing else. It does **not** block Phases 0–7. Foundational work proceeds
 without it: commission scheme V1 records the honest current basis (`activation_events`), and
 V2 with `unique_active_users` waits for the answer.
+
+### D-11 — Invoice evidence attachment: storage/security/retention foundation · **OPEN**
+
+**Raised during Installation Operations Batch 1 (2026-08-25), Phase 4.** The task asked for
+evidence attachment on `installation_invoices` (file/subscriber/invoice reference, filename,
+content type, uploaded_by, uploaded_at) so a reviewer can open the source document from the
+invoice review screen before deciding `VERIFIED`/`REJECTED`.
+
+**FACT.** No Supabase Storage bucket, bucket policy, or `storage.objects` reference exists
+anywhere in `supabase/migrations/`. `installation_invoices` carries only text metadata
+(`external_invoice_id`, `invoice_number`, `invoice_reference`) — fields the table's own
+migration comment says are kept deliberately separate "حتى لا يُبنى ربط على افتراض" (so no
+linkage is built on an assumption). There is no file/URL column, and no prior architectural
+decision about file storage in `docs/DECISIONS.md` or `docs/ARCHITECTURE.md` (both mention
+only browser `localStorage`, an unrelated legacy mechanism).
+
+**Why this stayed a STOP, not an implementation.** Building evidence attachment on this gap
+means making three decisions with no prior precedent in this codebase, each financial/security
+in nature:
+
+1. **Bucket + access policy** — who may upload, who may read raw evidence (same set as
+   `invoice.verify`/`invoice.reject`, or broader), public vs. signed-URL access.
+2. **Retention** — how long evidence is kept, whether rejected-invoice evidence is retained
+   differently from verified-invoice evidence.
+3. **Identity of the reference** — a Storage object key, or an external URL (Odoo, SaaS) —
+   given `odoo_model`/`odoo_record_id` already exist on the table for a future Odoo-owned
+   invoice record.
+
+Per this task's own instruction, an undocumented bucket/security/retention decision halts
+Phase 4 only; it does not block Phases 1–3, which shipped independently.
+
+**Needed by:** Phase 4 (Invoice Evidence), next batch. Not currently blocking anything else.
 
 ---
 
