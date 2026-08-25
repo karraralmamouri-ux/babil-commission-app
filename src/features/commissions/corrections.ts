@@ -18,6 +18,7 @@ import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, pageRpc, select, can, ApiError } from '../../services/api';
 import { count } from '../../domain/money';
+import { currentCycleId } from '../../domain/cycle';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip, type Column,
 } from '../../components/ui';
@@ -45,12 +46,16 @@ export const corrections: Route = {
     const offset = Number(m.query.get('offset') || 0);
     view.innerHTML = loading('جارٍ قراءة التصحيحات…');
 
-    const list = (await select<Row[]>(
-      'commission_cycles?select=id,name,status&order=period_start.desc')) || [];
+    // القائمة للاختيار الصريح، والافتراضي من الخادم: مسوّدةٌ فارغة أحدثُ
+    // فترةً كانت تسحب الشاشة إليها فتُعرض تصحيحات دورةٍ لا أحد يقصدها.
+    const [list, current]: [Row[], string | null] = await Promise.all([
+      select<Row[]>('commission_cycles?select=id,name,status&order=period_start.desc'),
+      currentCycleId(),
+    ]);
     if (!view.live) return;
-    if (!list.length) { view.innerHTML = empty('لا دورة بعد'); return; }
+    if (!list?.length) { view.innerHTML = empty('لا دورة بعد'); return; }
 
-    const cycleId = m.query.get('cycle') || str(list[0] || {}, 'id');
+    const cycleId = m.query.get('cycle') || current || str(list[0] || {}, 'id');
     const cycle = list.find((c) => str(c, 'id') === cycleId) || list[0] || {};
 
     const args: Record<string, unknown> = {
