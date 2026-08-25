@@ -12,16 +12,23 @@ const EMPLOYEE_REF = 'qolrsefpbvfuugwyqggu';
 
 // Runs a guard against a throwaway working directory holding only a linked ref,
 // so the real repo's link state is never read or modified.
-function runGuard(script, linkedRef) {
+function runGuard(script, linkedRef, env = {}) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'guard-'));
   try {
     if (linkedRef !== null) {
       fs.mkdirSync(path.join(cwd, 'supabase', '.temp'), { recursive: true });
       fs.writeFileSync(path.join(cwd, 'supabase', '.temp', 'project-ref'), linkedRef);
     }
+    // A stray SUPABASE_* left in the developer's shell must not decide the
+    // outcome of a test about SUPABASE_*.
+    const childEnv = { ...process.env, ...env };
+    for (const name of ['SUPABASE_URL', 'SUPABASE_STAGING_PROJECT_REF', 'SUPABASE_DB_URL']) {
+      if (!(name in env)) delete childEnv[name];
+    }
     const result = spawnSync(process.execPath, [path.join(REPO, 'scripts', script)], {
       cwd,
       encoding: 'utf8',
+      env: childEnv,
     });
     return { code: result.status, out: `${result.stdout}${result.stderr}` };
   } finally {
@@ -62,6 +69,39 @@ test('both guards refuse the Employee Performance Dashboard project', () => {
   }
 });
 
+test('a staging command is refused when the environment aims it at production', () => {
+  // The link is correct in every case below. Only the environment is wrong —
+  // which is precisely what a linked-ref check cannot see.
+  const byUrl = runGuard('assert-staging-project-ref.mjs', STAGING_REF, {
+    SUPABASE_URL: `https://${PRODUCTION_REF}.supabase.co`,
+  });
+  assert.notEqual(byUrl.code, 0, 'SUPABASE_URL aimed at production must refuse');
+  assert.match(byUrl.out, /REFUSING/);
+
+  // The label says staging; the identity is production.
+  const byLabel = runGuard('assert-staging-project-ref.mjs', STAGING_REF, {
+    SUPABASE_STAGING_PROJECT_REF: PRODUCTION_REF,
+  });
+  assert.notEqual(byLabel.code, 0, 'the production ref labelled as staging must refuse');
+  assert.match(byLabel.out, /REFUSING/);
+
+  // The CLI prefers a connection string over the linked project.
+  const byDbUrl = runGuard('assert-staging-project-ref.mjs', STAGING_REF, {
+    SUPABASE_DB_URL:
+      `postgresql://postgres.${PRODUCTION_REF}:pw@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres`,
+  });
+  assert.notEqual(byDbUrl.code, 0, 'a production connection string must refuse');
+  assert.match(byDbUrl.out, /REFUSING/);
+});
+
+test('a correctly aimed staging environment still passes', () => {
+  const ok = runGuard('assert-staging-project-ref.mjs', STAGING_REF, {
+    SUPABASE_URL: `https://${STAGING_REF}.supabase.co`,
+    SUPABASE_STAGING_PROJECT_REF: STAGING_REF,
+  });
+  assert.equal(ok.code, 0, ok.out);
+  assert.match(ok.out, /OK/);
+});
 test('both guards refuse an unlinked repository', () => {
   for (const script of ['assert-project-ref.mjs', 'assert-staging-project-ref.mjs']) {
     const result = runGuard(script, null);
