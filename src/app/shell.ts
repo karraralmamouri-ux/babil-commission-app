@@ -75,6 +75,7 @@ export const NAV: NavGroup[] = [
   {
     key: 'system', label: 'النظام', items: [
       { label: 'الاستيراد', path: '/system/imports', icon: '⊕', capability: 'saas.review' },
+      { label: 'مطابقة الهوية', path: '/system/identities', icon: '⚭', capability: 'subscriber.match' },
       { label: 'المستخدمون والصلاحيات', path: '/system/users', icon: '◍', capability: 'permission.manage' },
       { label: 'سجلّ التدقيق', path: '/audit', icon: '❑', capability: 'audit.view' },
     ],

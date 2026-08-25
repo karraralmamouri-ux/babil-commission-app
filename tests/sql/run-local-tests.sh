@@ -291,6 +291,15 @@ fi
 echo "$out31" | grep -E "^ {17,20}(ok|==) " || true
 passed=$((passed + $(echo "$out31" | grep -c "                  ok " || true)))
 
+echo "== identity operations (batch 2) =="
+out32=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/identity-operations.sql 2>&1)
+if echo "$out32" | grep -qE "FAILED:|ERROR"; then
+  echo "$out32" | grep -E "FAILED:|ERROR" || true
+  echo "IDENTITY OPERATIONS TESTS FAILED" >&2; exit 1
+fi
+echo "$out32" | grep -E "\| (pass|FAIL)" || true
+passed=$((passed + $(echo "$out32" | grep -c "| pass")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh

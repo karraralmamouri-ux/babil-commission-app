@@ -12,6 +12,7 @@ import { money, count } from '../../domain/money';
 import { transferPanel, wireTransfer } from '../ownership/transfer';
 import { classificationPanel } from './classification';
 import { routes as holdRoutes, holdPanel, wireHoldPanel } from './holds';
+import { correctionActionsCell, correctionBox, wireCorrectionActions } from '../finance/paymentCorrections';
 import { routes as payoutRoutes } from './payout';
 import { routes as invoiceRoutes } from './invoices';
 import { routes as cycleRoutes } from './cycle';
@@ -242,6 +243,7 @@ export const subscriberCase: Route = {
     // مفتاح المشترك هو ما تعرفه أحداث SaaS، وهو صغير الأحرف.
     if (tab === 'ownership') await wireTransfer(view, id.toLowerCase().trim());
     if (tab === 'holds') wireHoldPanel(view);
+    if (tab === 'entitlements') wireCorrectionActions(view);
 
     if (tab === 'history') {
       const host = view.el.querySelector<HTMLElement>('#timelineHost');
@@ -251,6 +253,20 @@ export const subscriberCase: Route = {
           host.innerHTML = events && events.length ? timeline(events) : empty('لا أحداث');
         } catch (error) {
           host.innerHTML = errorState(error instanceof Error ? error.message : 'تعذّر تحميل التاريخ والأدلة');
+        }
+      }
+
+      // خط الزمن لا يعرض تصحيحات الدفتر المالي — سجلّ التدقيق الخاص بها
+      // مفهرَس بمعرّف قيد الدفتر لا بمعرّف المشترك. فتُجلب هنا من نفس
+      // القراءة المعتمدة (subscriber_corrections) بدل بناء مسارٍ ثانٍ.
+      const correctionsHost = view.el.querySelector<HTMLElement>('#correctionsHost');
+      if (correctionsHost) {
+        try {
+          const doc = await rpc<Row>('subscriber_corrections', { p_subscriber_id: id });
+          const rows = (doc?.['financial'] as Row[] | undefined) || [];
+          correctionsHost.innerHTML = rows.length ? financialCorrections(rows) : empty('لا تصحيحات مالية');
+        } catch (error) {
+          correctionsHost.innerHTML = errorState(error instanceof Error ? error.message : 'تعذّر تحميل سجلّ التصحيحات');
         }
       }
     }
@@ -283,13 +299,16 @@ function renderCaseTab(doc: Row, tab: string, id: string): string {
 
   if (tab === 'entitlements') {
     const rows = list('entitlements');
-    return rows.length ? table([
+    if (!rows.length) return empty('لا استحقاقات');
+    return table([
       { key: 'period', label: 'الفترة', cell: (r) => esc(str(r, 'period')) },
       { key: 'stage', label: 'المرحلة', cell: (r) => chip(str(r, 'stage'), STAGE_TONE[str(r, 'stage')] || 'neutral') },
       { key: 'amount', label: 'المبلغ', cell: (r) => `<span class="money">${money(num(r, 'amount'))}</span>`, numeric: true },
       { key: 'inv', label: 'الفاتورة', cell: (r) => esc(str(r, 'invoice_status') || '—') },
       { key: 'pay', label: 'الدفع', cell: (r) => esc(str(r, 'payment_status') || '—') },
-    ] as Array<Column<Row>>, rows) : empty('لا استحقاقات');
+      { key: 'act', label: '', cell: (r) =>
+        correctionActionsCell('installation', str(r, 'id'), str(r, 'payment_status') === 'paid', num(r, 'amount')) },
+    ] as Array<Column<Row>>, rows) + correctionBox();
   }
 
   if (tab === 'invoices') {
@@ -324,7 +343,8 @@ function renderCaseTab(doc: Row, tab: string, id: string): string {
   }
 
   if (tab === 'history') {
-    return `<div class="muted" style="margin-bottom:10px">خط زمني موحّد من التفعيلات والفواتير والاستحقاقات والدفعات والإيقافات والتدقيق.</div><div id="timelineHost">${loading('جارٍ بناء التاريخ والأدلة…')}</div>`;
+    return `<div class="muted" style="margin-bottom:10px">خط زمني موحّد من التفعيلات والفواتير والاستحقاقات والدفعات والإيقافات والتدقيق.</div><div id="timelineHost">${loading('جارٍ بناء التاريخ والأدلة…')}</div>`
+      + `<h3 style="margin-top:18px">سجلّ التصحيحات المالية</h3><div id="correctionsHost">${loading('جارٍ تحميل سجلّ التصحيحات…')}</div>`;
   }
 
   // overview
@@ -356,6 +376,19 @@ function timeline(events: Row[]): string {
         <small>${esc(String(e['occurred_at'] ?? '').slice(0, 19).replace('T', ' '))}
         ${e['amount'] ? ' · ' + money(num(e, 'amount')) : ''}
         ${str(e, 'detail') ? ' · ' + esc(str(e, 'detail')) : ''}</small></span>
+    </div>`).join('')}</div>`;
+}
+
+/** سجلّ التصحيحات المالية — من الدفتر مباشرةً، عكسٌ أو تصحيحٌ لكل صفّ. */
+function financialCorrections(rows: Row[]): string {
+  const label: Record<string, string> = { CORRECTION: 'تصحيح', REVERSAL: 'عكس', ADJUSTMENT: 'تسوية' };
+  return `<div class="insight-list">${rows.map((r) => `
+    <div class="insight ${str(r, 'txn_type') === 'REVERSAL' ? 'danger' : 'warn'}">
+      <span class="insight-dot"></span>
+      <span><b>${esc(label[str(r, 'txn_type')] || str(r, 'txn_type'))} — ${money(num(r, 'amount'))}</b>
+        <small>${esc(String(r['created_at'] ?? '').slice(0, 19).replace('T', ' '))}
+        ${str(r, 'actor') ? ' · ' + esc(str(r, 'actor')) : ''}
+        ${str(r, 'reason') ? ' · ' + esc(str(r, 'reason')) : ''}</small></span>
     </div>`).join('')}</div>`;
 }
 

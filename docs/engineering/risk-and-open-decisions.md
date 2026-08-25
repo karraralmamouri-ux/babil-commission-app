@@ -38,7 +38,7 @@ than a clean failure.
 
 **Fix.** Single published scheme version; the SQL function becomes a lookup.
 
-### R-03 — Reversal path has no frontend · **MEDIUM — backend closed, UI open**
+### R-03 — Reversal path has no frontend · **CLOSED for installation domain, 2026-08-25 (Batch 2)**
 
 **FACT, corrected 2026-08-25 (was "No reversal path exists" — stale since 2026-08-18).**
 `protect_settled_installation_entitlement` and `unique (entitlement_id)` correctly prevent
@@ -55,23 +55,24 @@ four correction domains (parent, ownership, FDT, and this one).
 **Backend exists?** Yes — `reverse_financial_entry`, `correct_financial_entry`,
 `subscriber_corrections`, capability-gated and audited, confirmed present in
 `supabase/migrations/`.
-**Frontend exists?** No — `grep -rl "reverse_financial_entry\|correct_financial_entry\|subscriber_corrections" src/` returns zero matches. Contrast with the *other* three correction
-domains the same migration lists as "موجودة كلّها وتعمل": `classify_parent` (wired at
-`/master/parents`), `transfer_subscriber` (wired, `subscriber-transfer` tests), and the
-commission-domain `add_activation_correction`/`revoke_activation_correction` (wired in
-`src/features/commissions/corrections.ts`). This one domain — the financial ledger itself —
-is the odd one out.
-**Production workflow exercised?** No. Reaching this RPC today means the Supabase SQL
-console, which is exactly the manual, out-of-audit-workflow path the fix was built to avoid.
-**Actual remaining gap.** A screen presenting `subscriber_corrections` with reverse/correct
-actions wired to the two RPCs — the same shape as the existing parent/ownership/FDT
-correction screens. Not attempted in Installation Operations Batch 1 (out of that batch's
-scope); candidate for the next batch.
+**Frontend — installation domain: wired in Batch 2.** A "تصحيح / عكس" action pair on the
+entitlements-tab table (`src/features/finance/paymentCorrections.ts`, called from
+`src/features/installation/index.ts`), gated on `payment.correct`/`payment.reverse` for
+visibility only (the RPCs check `current_app_role() = 'admin'` themselves). The subscriber
+case file's history tab now also renders `subscriber_corrections()`'s `financial` rows —
+`subscriber_timeline()` never surfaced these, since its `AUDIT` branch joins on
+`installation_subscribers.id` while these RPCs log under `entity_type = 'financial_ledger'`.
+Regression coverage: `tests/financial-corrections-ui.test.js` (mandatory reason, confirm-
+before-execute, fresh `request_id` per click, replay handled as quiet success, server errors
+surfaced not swallowed).
+**Frontend — commission domain: still open.** `ensure_financial_origin` supports
+`p_domain = 'commission'` against `commission_rows`, but no screen lists individual rows by
+id — only aggregated scope/zone rollups exist. Out of scope for Batch 2 (would need a new
+paginated browse RPC, beyond a minimal-footprint change); candidate for a future batch.
 
-**Impact (residual).** A wrong-agent payment has a legal, audited correction path today, but
-reaching it requires direct database access, not an in-app action — the audit trail exists
-only if whoever runs the RPC also has database access and chooses to use it instead of
-editing a row directly.
+**Impact (residual).** Installation-domain corrections now have a normal in-app action with
+disclosure and audit. The commission domain still requires direct database access to reach
+these RPCs.
 
 ### R-04 — Raw activation data is never stored · **MEDIUM**
 
@@ -131,7 +132,7 @@ three times during recent releases.
 **Fix.** Normalize once via `.gitattributes`, or keep the pre-commit check comparing
 `git diff --numstat` against `--ignore-cr-at-eol`.
 
-### R-11 — `subscriber_identities` bootstrap has no caller · **MEDIUM, added 2026-08-25**
+### R-11 — `subscriber_identities` bootstrap has no caller · **CLOSED, 2026-08-25 (Batch 2)**
 
 **FACT.** `subscriber_identities` was empty in production because, per the migration's own
 comment (`20260825090000_harden_fdt_zone_and_identity_pipeline.sql`), "the tables and pure
@@ -139,17 +140,24 @@ functions exist, and no RPC writes to them." `bootstrap_subscriber_identities()`
 there (refined `20260825120000_fix_identity_bootstrap_aggregate.sql`) to close that.
 
 **Backend exists?** Yes — `bootstrap_subscriber_identities()`, confirmed present.
-**Frontend exists?** No — zero references in `src/`.
-**Production workflow exercised?** No — the function is not called by any trigger, RPC, or
-scheduled job in the migrations directory; nothing invokes it automatically after import.
-**Actual remaining gap.** Either an admin action that calls it explicitly, or wiring it into
-the import pipeline so identities populate as a side effect of import rather than a separate
-manual step. Not attempted in Installation Operations Batch 1; candidate for the next batch.
+**Frontend — wired in Batch 2.** `/system/identities` (`src/features/system/identities.ts`,
+capability `subscriber.match`): a KPI row over matched/conflict/unmatched counts, a "شغّل
+المطابقة الآن" action behind an explicit confirm, and a filterable/paginated browse table.
+The run action calls a new capability-gated wrapper, `run_identity_bootstrap(request_id)`
+(`supabase/migrations/20261001090000_batch2_identity_operations.sql`), which is the only
+caller of the underlying engine function; the browse table reads through a new
+`page_subscriber_identities()`. Both are admin-invoked, not automatic — running still
+requires an operator to open the screen and confirm, it is not wired into the import
+pipeline as a side effect. `action_center()`'s `IDENTITY_CONFLICT` decision now opens this
+screen (`?status=CONFLICT`) instead of the generic subscriber list.
+Regression coverage: `tests/sql/identity-operations.sql` (capability enforcement, mandatory
+`request_id`, idempotent replay, zero side effects on any financial/subscriber table, "bootstrap
+≠ new subscriber") and `tests/financial-corrections-ui.test.js` (confirm-before-run, fresh
+`request_id` per click, replay handled quietly).
 
-**Impact.** Every readiness/blocker check that reads `subscriber_identities` for an
-`IDENTITY` conflict (including `page_payout_candidate_lines`, extended in Batch 1) is
-checking an empty table in production today — not because the check is wrong, but because
-nothing has ever populated the table it reads.
+**Impact.** Running the bootstrap is now a normal in-app action instead of a manual RPC call
+from the SQL console; every readiness/blocker check that reads `subscriber_identities` for an
+`IDENTITY` conflict can be kept populated without direct database access.
 
 ---
 

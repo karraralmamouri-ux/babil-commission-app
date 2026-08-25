@@ -109,11 +109,11 @@ Evidence is cited from this repository at `main` @ `94b1873`.
 
 | | |
 |---|---|
-| **Current** | Two tables, no reversal. `installation_payments` unique per entitlement; settled rows frozen by trigger. |
+| **Current** | `financial_ledger` with `reverses_entry_id`/`corrects_entry_id`, landed Phase 0b (**R-03**, closed — see `docs/engineering/risk-and-open-decisions.md`). Installation-domain operator UI shipped Batch 2; commission-domain UI still open. |
 | **Target** | One ledger with `kind` and `reverses_ledger_id`. |
-| **Gap** | **No legal correction path exists** (**R-03**). |
-| **Risk** | **Critical** — a wrong payment forces an out-of-audit database edit. |
-| **Migration** | **Phase 0b — promoted at review to a foundation that must land before payment workflows expand.** Typed transactions (`HISTORICAL_PAYMENT`/`PAYMENT`/`ADJUSTMENT`/`CORRECTION`/`REVERSAL`); physical table consolidation optional, compatibility layer preferred. |
+| **Gap** | Commission-domain correction UI — no screen lists individual `commission_rows` by id yet. |
+| **Risk** | Low for installation domain (in-app, audited, capability-gated). Commission domain still requires direct database access. |
+| **Migration** | **Phase 0b landed.** Typed transactions (`HISTORICAL_PAYMENT`/`PAYMENT`/`ADJUSTMENT`/`CORRECTION`/`REVERSAL`); physical table consolidation optional, compatibility layer preferred. |
 
 ## Commission tier calculation
 

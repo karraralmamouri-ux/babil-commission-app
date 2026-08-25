@@ -37,7 +37,7 @@ Never `revoke` a list of verbs.
 | Gap | Consequence |
 |---|---|
 | No hold model | nothing can pause a subscriber without deleting or editing financial state |
-| No reversal path | **CRITICAL, approved as a Phase 0 foundation.** A wrong payment can only be corrected by mutating history, which the triggers correctly forbid — so today there is **no** legal correction path |
+| No reversal path | **CLOSED.** The ledger and RPCs shipped as a Phase 0 foundation (§5–6); the installation-domain operator UI shipped in Batch 2 (§5, "UI deliberately deferred"). The commission-domain equivalent (`commission_rows`) has no frontend yet — see that note. |
 | No payment batch | payments are one-at-a-time; no reviewed set, no batch total |
 | No cycle close | nothing freezes a period |
 | Tier basis client-supplied | see §4 |
@@ -166,16 +166,26 @@ concurrency), `(created_by, request_id, txn_type)` unique for idempotency,
 advisory lock per source record, mandatory reason, and a trigger that refuses
 `DELETE` outright and permits `UPDATE` only of `status`.
 
-### UI deliberately deferred
+### UI — installation domain shipped, commission domain deferred
 
-No correction screen ships in this phase. Production has **zero payments**, so a
-correction UI would have nothing to act on and could not be exercised against
-real data — a screen validated only against fixtures is a screen nobody has
-tested. The layer is validated where it actually runs: 26 assertions plus a
-two-session concurrency test against real Postgres.
+Batch 2 wired the installation domain: a "تصحيح / عكس" action pair on the
+entitlements-tab table (`src/features/finance/paymentCorrections.ts`, called from
+`src/features/installation/index.ts`), gated on the existing `payment.correct` /
+`payment.reverse` capabilities for visibility only — the server's own
+`current_app_role() = 'admin'` check is unaffected by the frontend gate. The
+subscriber case file's history tab now also renders the ledger's
+`CORRECTION`/`REVERSAL`/`ADJUSTMENT` rows for that subscriber (via the existing
+`subscriber_corrections()` read, not a new query), since `subscriber_timeline()`
+indexes its `AUDIT` branch by `installation_subscribers.id` while these RPCs log
+under `entity_type = 'financial_ledger'` — a different id space that the
+timeline was never going to surface on its own.
 
-The entry point belongs with the payment workspace in Phase 6, when there are
-payments to correct.
+**Still deferred: the commission domain.** `ensure_financial_origin` supports
+`p_domain = 'commission'` against `commission_rows` (frozen legacy history), but
+no screen lists individual `commission_rows` by id — only aggregated
+scope/zone rollups exist today. Building a browse surface for this was judged
+out of scope for Batch 2's minimal-footprint goal; it needs its own small
+paginated RPC before a correction action can be attached to a row.
 
 ---
 
