@@ -157,6 +157,37 @@ select pg_temp.ok(
   'كل رمز حاجب يقع في صنفه');
 
 -- ---------------------------------------------------------------------------
+-- 1.6 «سابقاً» رقمٌ من دفتر الاستحقاقات الفعلي، لا تخمينٌ ولا تأثير على الجاهزية
+-- ---------------------------------------------------------------------------
+
+insert into public.installation_entitlements
+  (id, period, subscriber_id, subscriber_name, reseller, zone, fdt, remaining, stage, amount,
+   invoice_status, payment_status, paid_amount, paid_by, paid_at, created_by)
+values
+  ('90000000-0000-0000-0000-0000000000c8','2026-06','pb-1','PB One','وكيل الصرف','new','PB-FDT',
+   13000,'P1',3000,'approved','paid',3000,
+   '90000000-0000-0000-0000-0000000000a1', now(), '90000000-0000-0000-0000-0000000000a1')
+on conflict do nothing;
+
+select pg_temp.ok(
+  (select (r ->> 'previous_paid')::bigint from jsonb_array_elements(
+     public.page_payout_candidate_lines(p_limit => 50) -> 'rows') r
+   where r ->> 'subscriber_id' = 'pb-1') = 3000,
+  'سابقاً يجمع ما دُفع فعلاً من دفتر الاستحقاقات');
+
+select pg_temp.ok(
+  (select (r ->> 'previous_paid')::bigint from jsonb_array_elements(
+     public.page_payout_candidate_lines(p_limit => 50) -> 'rows') r
+   where r ->> 'subscriber_id' = 'pb-2') = 0,
+  'ولا يُختلَق رقمٌ لمن لا سجلّ دفعٍ له');
+
+select pg_temp.ok(
+  (select r ->> 'is_ready' from jsonb_array_elements(
+     public.page_payout_candidate_lines(p_limit => 50) -> 'rows') r
+   where r ->> 'subscriber_id' = 'pb-1') = 'false',
+  'previous_paid عرضٌ فقط — لا يغيّر شرط الجاهزية، وpb-1 يبقى محجوباً بفاتورة');
+
+-- ---------------------------------------------------------------------------
 -- 2. الاستحقاق والدفعة
 -- ---------------------------------------------------------------------------
 

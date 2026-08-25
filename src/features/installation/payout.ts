@@ -195,8 +195,19 @@ export const readyLines: Route = {
       // الاسم كما ورد من المصدر — لا يُستبدل بتسمية تصنيف.
       { key: 'res', label: 'الوكيل / الأب', cell: (r) => esc(str(r, 'reseller') || '—') },
       { key: 'stage', label: 'المرحلة', cell: (r) => chip(str(r, 'stage'), 'info') },
-      { key: 'amt', label: 'المبلغ', cell: (r) =>
+      { key: 'amt', label: 'المستحق الآن', cell: (r) =>
         `<span class="money">${money(num(r, 'amount'))}</span>`, numeric: true },
+      // مجموع ما دُفع فعلاً من دفتر الاستحقاقات — عرضٌ فقط، لا يُعاد بناؤه هنا.
+      { key: 'prev', label: 'مدفوع سابقاً', cell: (r) =>
+        num(r, 'previous_paid')
+          ? `<span class="muted money">${money(num(r, 'previous_paid'))}</span>`
+          : '<span class="muted">لا شيء</span>', numeric: true },
+      { key: 'rem', label: 'المتبقّي الكلّي', cell: (r) =>
+        `<span class="muted">${money(num(r, 'remaining'))}</span>`, numeric: true },
+      { key: 'inv', label: 'الفاتورة', cell: (r) =>
+        r['invoice_ok'] === true ? chip('مدقَّقة', 'success') : chip('غير مدقَّقة', 'warning') },
+      { key: 'hold', label: 'التعليق', cell: (r) =>
+        r['held'] === true ? chip('معلَّق', 'critical') : chip('لا تعليق', 'success') },
       // كل ما يحجب السطر، لا أوّل سبب فقط.
       { key: 'blockers', label: 'ما الذي يمنعه', cell: (r) => {
         const list = (r['blockers'] || []) as string[];
