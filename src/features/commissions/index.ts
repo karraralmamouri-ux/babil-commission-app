@@ -67,6 +67,13 @@ export const overview: Route = {
     if (!list.length) { view.write(empty('لا توجد دورات عمولة بعد')); return; }
     const current = list[0] as Cycle;
 
+    // بطاقةٌ توجيهية فقط. القرار — DRAFT + القدرة — هو نفس شرط ظهور زرّ
+    // الإلغاء في تبويب المراجعة والاعتماد، فيُعاد استعماله لا يُكتب ثانيةً.
+    // ولا RPC هنا ولا منطق إلغاء: مجرّد رابطٍ إلى حيث يعيشان.
+    const draftCard = canCancelDraft(current.status, can('commission.manage_cycle'))
+      ? draftActionsCard(current)
+      : '';
+
     // قراءةٌ واحدة بعقدٍ واحد. والعطل يُعرَض عطلاً: «تعذّر التحميل» و«لا
     // بيانات» حالتان مختلفتان، وعرضُ الشرطة لكليهما يُخفي الأولى.
     let result: CycleResult | null;
@@ -84,6 +91,7 @@ export const overview: Route = {
 
     if (!result) {
       view.write(pageHeader('عمولات الوكلاء', current.name)
+        + draftCard
         + empty('لا نتيجة محسوبة لهذه الدورة بعد', 'تُحسب الدورة من شاشتها'));
       return;
     }
@@ -95,6 +103,8 @@ export const overview: Route = {
     view.write(pageHeader('عمولات الوكلاء',
       `${esc(result.cycle.name)} · ${esc(cycleStatusAr(result.cycle.status))}`,
       projected ? projectedTag() : chip('معتمدة', 'success'))
+
+      + draftCard
 
       // النتيجة المالية أولاً: محسوب، معتمد، مدفوع.
       + kpiRow([
@@ -127,6 +137,23 @@ export const overview: Route = {
             (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`)}</div>`);
   },
 };
+
+/**
+ * بطاقة توجيهٍ لدورةٍ لا تزال مسوّدة.
+ *
+ * لا تنادي `cancel_empty_commission_cycle` ولا تُعيد رسم التأكيد — كلاهما
+ * يعيش في تبويب المراجعة والاعتماد (`workflowPanel`/`wireWorkflow`). هذه
+ * إشارةٌ فقط: أنت هنا، والإجراء هناك.
+ */
+function draftActionsCard(cycle: Cycle): string {
+  return `<div class="box" style="margin-top:12px" id="draftActionsBox">
+    <h3>إجراءات الدورة</h3>
+    <p class="muted" style="font-size:11px;margin:0 0 10px">
+      هذه الدورة مسوّدة. إجراءاتها — ومنها إلغاؤها إن كانت فارغة — في تبويب المراجعة والاعتماد.
+    </p>
+    <a class="btn" href="${esc(href(`/commissions/cycles/${cycle.id}/review`))}">افتح المراجعة والاعتماد</a>
+  </div>`;
+}
 
 /**
  * المصالحة المرئية.
