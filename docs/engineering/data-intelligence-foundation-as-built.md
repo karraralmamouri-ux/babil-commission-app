@@ -246,7 +246,14 @@ still returns data, and no view exposes an identity column.
 
 ## 10. Not built here
 
-- No UI. The tables are readable; no screen consumes them yet.
+- **UI added in Batch 2:** `/system/identities` (`src/features/system/identities.ts`),
+  gated on `subscriber.match`. It runs `bootstrap_subscriber_identities()` through a new
+  capability-gated wrapper (`run_identity_bootstrap`, idempotent on `request_id`) and
+  browses the result via a new paginated `page_subscriber_identities()`. The screen is a
+  read/run surface only — it never writes `installation_subscribers`, an entitlement, or
+  a payment; "bootstrap" links existing SaaS users to the existing registry, it does not
+  create subscribers. `action_center()`'s `IDENTITY_CONFLICT` decision now opens this
+  screen (`?status=CONFLICT`) instead of the generic subscriber list.
 - No production ingestion. Deployment installs structure and master data only.
 - No attribution write path — `subscriber_attribution_history` exists and is
   constrained, but the RPC that writes it belongs with the screen that uses it.

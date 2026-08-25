@@ -27,6 +27,7 @@ import { routes as decisionRoutes } from './features/work/decisions';
 import { routes as productDecisionRoutes } from './features/work/product';
 import { routes as auditRoutes } from './features/audit';
 import { routes as systemRoutes } from './features/system/users';
+import { routes as identityRoutes } from './features/system/identities';
 import { routes as importRoutes } from './features/system/imports';
 import { routes as importRunRoutes } from './features/system/import-run';
 import { routes as reportRoutes } from './features/reports';
@@ -63,6 +64,7 @@ const ROUTES: Route[] = [
   ...productDecisionRoutes,
   ...auditRoutes,
   ...systemRoutes,
+  ...identityRoutes,
   ...importRunRoutes,
   ...importRoutes,
   ...reportRoutes,
