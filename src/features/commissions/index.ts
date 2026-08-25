@@ -15,6 +15,7 @@ import {
 } from '../../domain/cycle';
 import { dateTime } from '../../domain/time';
 import { packageLabel } from '../../domain/presentation';
+import { canCancelDraft, cancelDraftError, cancelDraftSuccess } from './cancelDraft';
 import {
   esc, loading, empty, errorState, pageHeader, table, pager, kpiRow,
   chip, projectedTag, filterBar, wireFilters, type Column,
@@ -898,6 +899,17 @@ function workflowPanel(cycle: Cycle, blockers: number): string {
       <button class="btn" id="wfReopen">أعد الفتح</button></div>`);
   }
 
+  // مسوّدةٌ فُتحت سهواً تُلغى ولا تُحذف. والشاشة لا تدّعي معرفةً بفراغها:
+  // تعرض الإجراء لمن يملك القدرة وللمسوّدة وحدها، ويبقى `cancel_empty_commission_cycle`
+  // هو الحكم على ما إذا كانت فارغةً فعلاً.
+  if (canCancelDraft(cycle.status, can('commission.manage_cycle'))) {
+    rows.push(`<div class="minirow">
+      <span><b>⊘ ألغِ المسوّدة</b>
+        <div class="muted" style="font-size:11px">لمسوّدةٍ فُتحت سهواً ولم يُحسب لها شيء.
+          الإلغاء يحفظ الدورة في السجلّ ولا يحذف تاريخ إنشائها.</div></span>
+      <button class="btn" id="wfCancelDraft">إلغاء المسودة</button></div>`);
+  }
+
   if (!rows.length) {
     return `<div class="box" style="margin-bottom:12px">
       <p class="muted">لا إجراء متاح لك على هذه الدورة في حالتها الحالية.</p></div>`;
@@ -907,7 +919,7 @@ function workflowPanel(cycle: Cycle, blockers: number): string {
     <h3>إجراءات الدورة</h3>
     ${rows.join('')}
     <div class="toolbar" style="margin-top:10px">
-      <input class="search" id="wfReason" placeholder="السبب — إلزامي للإقفال وإعادة الفتح"
+      <input class="search" id="wfReason" placeholder="السبب — إلزامي للإقفال وإعادة الفتح وإلغاء المسوّدة"
         aria-label="سبب الإجراء">
     </div>
     <div id="wfResult"></div>
@@ -1036,6 +1048,74 @@ function wireWorkflow(view: View, cycle: Cycle, blockers: number): void {
       p_cycle_id: cycle.id, p_reason: why, p_request_id: crypto.randomUUID(),
     }),
     'أُعيد فتح الدورة'));
+
+  // الإلغاء خطوتان: السبب أوّلاً، ثم تأكيدٌ يعرض ما يُلغى بالضبط قبل التنفيذ.
+  const cancelDraft = box.querySelector<HTMLButtonElement>('#wfCancelDraft');
+  cancelDraft?.addEventListener('click', () => {
+    const why = reason?.value.trim() || '';
+    if (!why) {
+      const need = cancelDraftError('needs a reason');
+      out.innerHTML = insight('warn', need.title, need.detail);
+      reason?.focus();
+      return;
+    }
+    out.innerHTML = cancelDraftConfirm(cycle, why);
+
+    out.querySelector<HTMLButtonElement>('#wfCancelBack')
+      ?.addEventListener('click', () => { out.innerHTML = ''; });
+
+    const go = out.querySelector<HTMLButtonElement>('#wfCancelGo');
+    go?.addEventListener('click', async () => {
+      // ضغطتان لا تصيران طلبين: الحارس هنا، ومعرّف الطلب يحرس الخادم لو سبق أحدهما.
+      if (go.disabled) return;
+      go.disabled = true;
+      cancelDraft.disabled = true;
+      out.innerHTML = loading('جارٍ إلغاء المسودة…');
+      try {
+        const res = await rpc<Record<string, unknown>>('cancel_empty_commission_cycle', {
+          p_cycle_id: cycle.id,
+          p_reason: why,
+          p_request_id: crypto.randomUUID(),
+        });
+        if (!view.live) return;
+        const done = cancelDraftSuccess(!!res && res['replayed'] === true);
+        out.innerHTML = insight('good', done.title, done.detail);
+        // الدورة لم تعد عاملة، فلا يُترك المستخدم واقفاً على تفاصيلها.
+        window.setTimeout(() => {
+          if (view.live) window.location.hash = href('/commissions/cycles');
+        }, 1300);
+      } catch (error) {
+        if (!view.live) return;
+        // النصّ الخام يبقى للمهندس في الـconsole، ويُعرض للمستخدم سببٌ تشغيلي.
+        console.error('cancel_empty_commission_cycle', error);
+        const failed = cancelDraftError(error instanceof Error ? error.message : '');
+        out.innerHTML = insight('danger', failed.title, failed.detail);
+        // لم يتغيّر شيء على الخادم، فلا تُغيَّر حالة الدورة على الشاشة.
+        cancelDraft.disabled = false;
+      }
+    });
+  });
+}
+
+/**
+ * تأكيدُ الإلغاء يعرض ما يُلغى بالضبط.
+ *
+ * `window.confirm` تكفي لسؤالٍ من سطر، ولا تكفي هنا: التأكيد يجب أن يريَ اسم
+ * الدورة وفترتها وحالتها والسبب المكتوب، وأن يحمل زرّه اسم فعله لا كلمة
+ * «موافق». واللون وحده لا يُعوَّل عليه — النصّ والرمز يقولان ما يجري.
+ */
+function cancelDraftConfirm(cycle: Cycle, why: string): string {
+  return `<div class="insight warn" style="margin-top:10px"><span class="insight-dot"></span><span>
+    <b>⊘ تأكيد إلغاء المسودة</b>
+    <small>الدورة: ${esc(cycle.name)}</small>
+    <small>الفترة: ${esc(cycle.period_start)} — ${esc(cycle.period_end)}</small>
+    <small>الحالة الحالية: مسودة</small>
+    <small>الإلغاء يحفظ الدورة في السجل ولا يحذف تاريخ إنشائها.</small>
+    <small>السبب: ${esc(why)}</small>
+    <div class="toolbar" style="margin-top:8px">
+      <button class="btn" id="wfCancelGo">تأكيد إلغاء المسودة</button>
+      <button class="btn" id="wfCancelBack">تراجع</button>
+    </div></span></div>`;
 }
 
 /** التصدير يُنزَّل كما ردّه الخادم، دون إعادة تشكيلٍ في المتصفّح. */
