@@ -64,8 +64,8 @@ jobs:
           shopt -s nullglob
           migrations=(supabase/migrations/*.sql)
 
-          if [[ "${#migrations[@]}" -ne 67 ]]; then
-            echo "Expected exactly 67 migrations, found ${#migrations[@]}" >&2
+          if [[ "${#migrations[@]}" -ne 68 ]]; then
+            echo "Expected exactly 68 migrations, found ${#migrations[@]}" >&2
             exit 1
           fi
 
@@ -85,13 +85,13 @@ jobs:
           done
 
           unique_count=$(printf '%s\n' "${migrations[@]##*/}" | sort -u | wc -l)
-          if [[ "$unique_count" -ne 67 ]]; then
+          if [[ "$unique_count" -ne 68 ]]; then
             echo "Migration filenames are not unique" >&2
             exit 1
           fi
 
           sha256sum "${migrations[@]}" > migration-manifest.sha256
-          echo "Verified 67 unique migrations in deterministic filename order"
+          echo "Verified 68 unique migrations in deterministic filename order"
 
       - name: Start isolated PostgreSQL 16
         run: npm run localdb:up
@@ -130,8 +130,8 @@ jobs:
             echo "DB regression runner did not report an assertion count" >&2
             exit 1
           fi
-          if [[ "$assertion_count" -ne 816 ]]; then
-            echo "Expected exactly 816 DB assertions, got $assertion_count" >&2
+          if [[ "$assertion_count" -ne 837 ]]; then
+            echo "Expected exactly 837 DB assertions, got $assertion_count" >&2
             exit 1
           fi
           echo "Authoritative DB assertions passed: $assertion_count"

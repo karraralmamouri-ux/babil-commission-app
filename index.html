@@ -685,7 +685,7 @@ const ROLE_PERMISSIONS={
 };
 let managedUsers=[],managedPasswordTarget=null;
 function roleAllows(p){return !!(authProfile&&ROLE_PERMISSIONS[authProfile.role]?.[p])}
-function hasPermission(p){if(p==='payment')return centralPreview.active&&roleAllows(p);if(['users','backup'].includes(p))return roleAllows(p);return !centralPreview.active&&roleAllows(p)}
+function hasPermission(p){if(['users','backup'].includes(p))return roleAllows(p);return !centralPreview.active&&roleAllows(p)}
 function showLogin(){document.getElementById('resetPasswordScreen').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('appShell').style.display='none';applyLanguage()}
 function showResetPassword(){document.getElementById('loginScreen').style.display='none';document.getElementById('appShell').style.display='none';document.getElementById('resetPasswordScreen').style.display='flex';applyLanguage()}
 function showApp(){
@@ -1391,7 +1391,6 @@ async function toggleCentralPreview(){if(centralPreview.active)prepareSelectedCe
 function fmt(n){return Math.round(Number(n)||0).toLocaleString('en-US')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function canEdit(){return hasPermission('edit')}
-function canPay(){return hasPermission('payment')}
 function canDelete(){return hasPermission('delete')}
 
 async function ensurePermission(permission){
@@ -1441,22 +1440,15 @@ async function ensurePermission(permission){
       toast(
         permission==='edit'
           ? 'ليس لديك صلاحية التعديل'
-          : permission==='payment'
-            ? 'ليس لديك صلاحية الصرف'
-            : permission==='delete'
-              ? 'ليس لديك صلاحية الحذف'
-              : 'ليس لديك صلاحية تنفيذ هذا الإجراء'
+          : permission==='delete'
+            ? 'ليس لديك صلاحية الحذف'
+            : 'ليس لديك صلاحية تنفيذ هذا الإجراء'
       );
       return false;
     }
 
-    if(permission==='payment'&&!centralPreview.active){
-      toast('لحفظ الصرف ومشاركته، افتح البيانات المركزية أولاً.');
-      return false;
-    }
-
-    if(centralPreview.active&&!['payment','users','backup'].includes(permission)){
-      toast('في البيانات المركزية يتاح الصرف فقط حالياً. بقية التعديل والحذف معطل.');
+    if(centralPreview.active&&!['users','backup'].includes(permission)){
+      toast('البيانات المركزية للعرض. انتقل إلى وضع تجهيز الشهر للتعديل، وإلى «دفعات الصرف» للصرف.');
       return false;
     }
 
@@ -1637,7 +1629,7 @@ function renderZone(zone){
  const arr=filtered(zone),all=state.data[zone],panel=document.getElementById('panel-'+zone);let rows='',zoneTotal=0,zonePaid=0,zoneRemaining=0;
  all.forEach(r=>{const c=calc(r);zoneTotal+=c.total;zonePaid+=c.paid;zoneRemaining+=c.remaining});
  arr.forEach(({r,i})=>{
-  const c=calc(r),st=status(r),stText={pending:'غير مدفوع',partial:'جزئي',paid:'مدفوع'}[st],stClass={pending:'bpending',partial:'bpartial',paid:'bpaid'}[st],disabled=canEdit()?'':'disabled',quantityDisabled=canEdit()&&!(Array.isArray(r.sourceBreakdown)&&r.sourceBreakdown.length)?'':'disabled',payDisabled=canPay()?'':'disabled',delDisabled=canDelete()?'':'disabled';
+  const c=calc(r),st=status(r),stText={pending:'غير مدفوع',partial:'جزئي',paid:'مدفوع'}[st],stClass={pending:'bpending',partial:'bpartial',paid:'bpaid'}[st],disabled=canEdit()?'':'disabled',quantityDisabled=canEdit()&&!(Array.isArray(r.sourceBreakdown)&&r.sourceBreakdown.length)?'':'disabled',delDisabled=canDelete()?'':'disabled';
   rows+=`<tr>
   <td><input class="name" value="${esc(r.name)}" ${disabled} onchange="setField('${zone}',${i},'name',this.value)"></td>
   <td><div class="qwrap" title="${quantityDisabled&&canEdit()?'الكمية مرتبطة بالملف الخام؛ أعد رفع الملف لتعديلها':''}"><button class="step" ${quantityDisabled} onclick="step('${zone}',${i},'p35',-1)">−</button><input class="qty" type="number" min="0" value="${c.p35}" ${quantityDisabled} onchange="setNum('${zone}',${i},'p35',this.value)"><button class="step" ${quantityDisabled} onclick="step('${zone}',${i},'p35',1)">+</button></div></td>
@@ -1645,7 +1637,7 @@ function renderZone(zone){
   <td><div class="qwrap" title="${quantityDisabled&&canEdit()?'الكمية مرتبطة بالملف الخام؛ أعد رفع الملف لتعديلها':''}"><button class="step" ${quantityDisabled} onclick="step('${zone}',${i},'p65',-1)">−</button><input class="qty" type="number" min="0" value="${c.p65}" ${quantityDisabled} onchange="setNum('${zone}',${i},'p65',this.value)"><button class="step" ${quantityDisabled} onclick="step('${zone}',${i},'p65',1)">+</button></div></td>
   <td>${c.qty}</td><td><select class="tier" ${disabled} onchange="setField('${zone}',${i},'customTier',this.value)"><option value="auto" ${r.customTier==='auto'?'selected':''}>تلقائي${r.tierGroupId?' مجمّع':''} (${c.t?c.t.label:'-'})</option><option value="t1" ${r.customTier==='t1'?'selected':''}>يدوي T1</option><option value="t2" ${r.customTier==='t2'?'selected':''}>يدوي T2</option><option value="t3" ${r.customTier==='t3'?'selected':''}>يدوي T3</option></select>${r.tierGroupId?`<div class="muted" style="font-size:9px">مجموعة ${esc(r.tierGroupName)}: ${c.tierQty}</div>`:''}</td>
   <td class="money">${fmt(c.total)}</td><td>${fmt(c.paid)}</td><td class="money">${fmt(c.remaining)}</td><td><span class="badge ${stClass}">${stText}</span></td>
-  <td><button class="smallbtn" ${payDisabled} title="${centralPreview.active?'حفظ الصرف مركزياً':'افتح البيانات المركزية للصرف'}" onclick="editPayment('${zone}',${i})">💳 صرف</button> <button class="smallbtn" onclick="details('${zone}',${i})">👁</button> <button class="smallbtn" ${delDisabled} onclick="removeAgent('${zone}',${i})">✕</button></td></tr>`
+  <td><a class="smallbtn" href="#/finance/payment-batches" title="الصرف يجري من «دفعات الصرف» — هذه الشاشة للعرض التاريخي">↗ دفعات الصرف</a> <button class="smallbtn" onclick="details('${zone}',${i})">👁</button> <button class="smallbtn" ${delDisabled} onclick="removeAgent('${zone}',${i})">✕</button></td></tr>`
  });
  panel.innerHTML=`<table><thead><tr><th>اسم الوكيل / FDT</th><th>P35</th><th>P45</th><th>P65</th><th>الكمية</th><th>الفئة</th><th>المستحق</th><th>المدفوع</th><th>المتبقي</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="6">إجمالي المنطقة</td><td class="money">${fmt(zoneTotal)} د.ع</td><td>${fmt(zonePaid)} د.ع</td><td class="money">${fmt(zoneRemaining)} د.ع</td><td colspan="2"></td></tr></tfoot></table><div class="zoneActions"><div class="actions"><button class="btn gold" ${canEdit()?'':'disabled'} onclick="addAgent('${zone}')">+ إضافة وكيل</button><button class="btn" onclick="exportZone('${zone}')">📤 تصدير المنطقة</button></div><span class="muted" style="font-size:10px">يظهر ${arr.length} من ${all.length} سجل</span></div>`
 }
@@ -1861,77 +1853,23 @@ async function undoDelete(){
   renderAll();
 }
 function toast(msg,undo=false){const t=document.getElementById('toast');t.innerHTML=esc(msg)+(undo?' <button class="smallbtn" onclick="undoDelete();this.parentElement.classList.remove(\'show\')">تراجع</button>':'');t.classList.add('show');if(!undo)setTimeout(()=>t.classList.remove('show'),3500)}
-const pendingPaymentRequests=new Map();
-function createRequestId(){
- if(typeof crypto.randomUUID==='function')return crypto.randomUUID();
- const bytes=crypto.getRandomValues(new Uint8Array(16));bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
- return [...bytes].map((value,index)=>(index===4||index===6||index===8||index===10?'-':'')+value.toString(16).padStart(2,'0')).join('');
-}
-function paymentRequestId(row,paid,paymentDate){
- const signature=JSON.stringify([row.centralUpdatedAt,paid,paymentDate||null]),existing=pendingPaymentRequests.get(row.centralId);
- if(existing?.signature===signature)return existing.requestId;
- const requestId=createRequestId();pendingPaymentRequests.set(row.centralId,{signature,requestId});return requestId;
-}
-/* محرّك الشهر السابق تقاعد. بياناته تبقى للقراءة التاريخية، وكتابته
-   توقّفت: محرّكان يكتبان المال نفسه ينتهيان إلى رقمين. */
-function recordCentralPayment(row,paid,paymentDate,requestId){
- toast("تسجيل الدفع يجري من دفعات الصرف — محرّك الشهر السابق للقراءة فقط");
-}
-function applyCentralPaymentResult(row,result){
- const after=result?.row;
- if(!after||String(after.id||'')!==String(row.centralId))throw new Error('استجابة حفظ الصرف غير صالحة');
- row.paid=centralNumber(after.paid,'paid');
- row.paymentDate=after.payment_date||'';
- row.centralUpdatedAt=after.updated_at||'';
- const archived=state.archive[state.month];
- const archivedRow=['old','new'].flatMap(zone=>archived?.data?.[zone]||[]).find(item=>item.centralId===row.centralId);
- if(archivedRow){archivedRow.paid=row.paid;archivedRow.paymentDate=row.paymentDate;archivedRow.centralUpdatedAt=row.centralUpdatedAt}
-}
-async function editPayment(z,i){
-  if(!(await ensurePermission('payment')))return;
-  const r=state.data[z][i],c=calc(r);
-  openModal(
-    `💳 صرف — ${r.name}`,
-    `<div class="formgrid">
-      <label>المستحق<input class="input" value="${c.total}" disabled></label>
-      <label>المدفوع الحالي<input id="payInput" class="input" type="number" min="0" value="${c.paid}"></label>
-      <label>تاريخ الصرف<input id="payDate" class="input" type="date" value="${r.paymentDate||''}"></label>
-    </div>
-    <div class="actions" style="margin-top:14px">
-      <button id="savePaymentButton" class="btn gold" onclick="savePayment('${z}',${i})">حفظ الصرف مركزياً</button>
-      <button class="btn" onclick="closeModal()">إلغاء</button>
-    </div>`
-  );
-}
-async function savePayment(z,i){
-  if(!(await ensurePermission('payment')))return;
-  const r=state.data[z][i],c=calc(r),payInput=document.getElementById('payInput'),dateInput=document.getElementById('payDate');
-  const rawPaid=String(payInput.value||'').trim(),newPaid=Number(rawPaid),newDate=dateInput.value;
-  if(rawPaid===''||!Number.isFinite(newPaid)||newPaid<0){toast('أدخل مبلغ صرف صحيحاً غير سالب');return}
-  if(newPaid>c.total){toast('لا يمكن أن يتجاوز المدفوع مبلغ الاستحقاق');return}
-  const button=document.getElementById('savePaymentButton'),requestId=paymentRequestId(r,newPaid,newDate);
-  if(button){button.disabled=true;button.textContent='جاري الحفظ المركزي...'}
-  try{
-    const result=await recordCentralPayment(r,newPaid,newDate,requestId);
-    applyCentralPaymentResult(r,result);
-    pendingPaymentRequests.delete(r.centralId);
-    closeModal();renderAll();
-    try{await refreshCentralData(true)}catch(refreshError){console.warn('Payment saved; refresh deferred:',refreshError)}
-    toast(result?.replayed?'الصرف محفوظ مركزياً مسبقاً وتم تأكيده':'تم حفظ الصرف مركزياً وأصبح ظاهراً للجميع');
-  }catch(error){
-    console.error('Central payment error:',error);
-    const message=error?.message||'';
-    if(error?.status>=400&&error?.status<500)pendingPaymentRequests.delete(r.centralId);
-    if(message.includes('changed since it was loaded')){
-      closeModal();try{await refreshCentralData(true)}catch(_){}
-      toast('تغيّر هذا السجل عند مستخدم آخر. تم تحديث البيانات؛ راجعها ثم أعد الصرف.');
-    }else if(message.includes('exceed commission due'))toast('لا يمكن أن يتجاوز المدفوع مبلغ الاستحقاق');
-    else if(message.includes('Payment permission is required'))toast('ليس لديك صلاحية الصرف');
-    else toast(`تعذر حفظ الصرف مركزياً: ${message}`);
-  }finally{
-    const current=document.getElementById('savePaymentButton');if(current){current.disabled=false;current.textContent='حفظ الصرف مركزياً'}
-  }
-}
+/* ---- الصرف: انتقل، ولم يُعطَّل فحسب ---------------------------------------
+   محرّك الشهر السابق تقاعد: `recordCentralPayment` توقّفت عن نداء الشبكة
+   وصارت تُظهر رسالةً وتنتهي. لكن الواجهة بقيت كاملةً فوقها — زرّ «💳 صرف»
+   يفتح نموذجاً بحقل مبلغٍ وتاريخٍ وزرّ «حفظ الصرف مركزياً» — فكان المستخدم
+   يملأ صرفاً ويضغط الحفظ ثم يقرأ «تعذر حفظ الصرف مركزياً». إجراءٌ يبدو نافذاً
+   ولا ينفذ، وخطؤه يُقرأ عطلاً عابراً لا تقاعداً.
+
+   وأدقّ ما فيه أنّ `canPay()` وحدها بين الصلاحيات كانت تشترط
+   `centralPreview.active` بدل نفيها: فالزرّ يُفعَّل في الوضع المركزي وحده —
+   أي في الحالة التي لا كتابة فيها أصلاً — ويُعطَّل حيث لا ضرر منه.
+
+   فحُذفت الآليّة كلّها: مُعرّفات الطلب المعلّقة، ودالّة التسجيل المتقاعدة،
+   وتطبيقُ نتيجتها، والنموذج، والحفظ. ولم يُترك مكانها فراغ: خليّة الإجراء
+   تحمل الآن رابطاً إلى «دفعات الصرف»، وهو المسار الذي يملك الحكم فعلاً.
+
+   لا مساس بدلالات الصرف الحديثة — هذا حذفُ طريقٍ ميّت، وتوجيهٌ إلى الحيّ.
+   ------------------------------------------------------------------------ */
 function details(z,i){const r=state.data[z][i],c=calc(r),prev=getPreviousRow(z,r.name);openModal(`📋 ${r.name}`,`<div class="detailgrid"><div class="detailcard">المنطقة<b>${z==='old'?'OLD':'NEW'}</b></div><div class="detailcard">الفئة<b>${c.t?c.t.label:'-'}</b></div><div class="detailcard">إجمالي الكمية<b>${fmt(c.qty)}</b></div><div class="detailcard">المستحق<b class="money">${fmt(c.total)}</b></div><div class="detailcard">المدفوع<b>${fmt(c.paid)}</b></div><div class="detailcard">المتبقي<b class="money">${fmt(c.remaining)}</b></div><div class="detailcard">P35<b>${fmt(c.p35)}</b></div><div class="detailcard">P45 / P65<b>${fmt(c.p45)} / ${fmt(c.p65)}</b></div></div><div style="margin-top:14px" class="box"><h3>📈 مقارنة سريعة</h3>${prev?`<div class="minirow"><span>الشهر السابق</span><b>${fmt(prev.total)} د.ع</b></div><div class="minirow"><span>التغيير</span><b>${fmt(c.total-prev.total)} د.ع</b></div>`:'<span class="muted">لا توجد بيانات للشهر السابق</span>'}</div>`)}
 function getPreviousRow(z,name){const current=monthOrder(state.month),key=Object.keys(state.archive).filter(k=>monthOrder(k)<current).sort(compareMonthKeys).pop();if(!key)return null;const snap=state.archive[key],r=(snap.data?.[z]||[]).find(x=>x.name===name);if(!r)return null;const backup=state.tiers;state.tiers=snap.tiers||state.tiers;const c=calc(r);state.tiers=backup;return c}
 function openModal(title,body){document.getElementById('modalTitle').textContent=title;document.getElementById('modalBody').innerHTML=body;document.getElementById('modal').classList.add('open')}

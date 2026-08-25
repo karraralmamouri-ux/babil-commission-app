@@ -16,10 +16,10 @@
 
 import type { Route } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, select } from '../../services/api';
+import { rpc } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { readCycleResult } from '../../domain/cycle';
-import { esc, loading, empty, pageHeader, chip, projectedTag } from '../../components/ui';
+import { esc, loading, pageHeader, chip, projectedTag } from '../../components/ui';
 
 type Row = Record<string, unknown>;
 const num = (r: Row, k: string) => Number(r[k] || 0);
@@ -51,23 +51,31 @@ export const home: Route = {
   async render(view) {
     view.write(loading('جارٍ تحميل النظرة التنفيذية…'));
 
-    const cycles = (await select<Row[]>('commission_cycles?select=id,name,status&order=period_start.desc&limit=1')) || [];
-    const cycle = cycles[0];
-    if (!cycle) { view.write(empty('لا توجد دورة بعد', 'ابدأ باستيراد ملف التفعيلات')); return; }
-
-    const cycleId = String(cycle['id']);
-    const status = String(cycle['status']);
-    const projected = !FINAL.has(status);
-
-    // نتيجة الدورة تُقرأ بعقدها الواحد لا بتقرير الإدارة: التقرير كان يُقرأ
-    // بمفتاحٍ لا ينتجه، فتصير البطاقات شرطات.
+    /* أيّ دورة؟ الخادم يقرّر، لا الشاشة.
+     *
+     * كانت الشاشة تختار بنفسها: `order=period_start.desc&limit=1`. وتلك قاعدة
+     * ثانية موازية لقاعدة الخادم — وحين فُتحت مسوّدة آب الفارغة اختارتها
+     * القاعدتان معاً فاختفت تموز خلفها وعادت البطاقات أصفاراً. الحكم الآن في
+     * مكانٍ واحد: `current_commission_cycle_id()` لا تعدّ المسوّدة التي لم
+     * يُشغَّل حسابها دورةً عاملة.
+     *
+     * ونتيجة الدورة تُقرأ بعقدها الواحد لا بتقرير الإدارة: التقرير كان يُقرأ
+     * بمفتاحٍ لا ينتجه، فتصير البطاقات شرطات. */
     const [result, action, pipeline, company] = await Promise.all([
-      readCycleResult(cycleId),
+      readCycleResult(),
       rpc<Row>('product_action_center', {}),
       rpc<Row>('installation_cycle_pipeline', {}),
       rpc<Row>('company_parent_breakdown', {}),
     ]);
     if (!view.live) return;
+
+    /* لا دورة عاملة = لم تبدأ، لا صفر.
+     *
+     * الصفر المعروض في خانة مالٍ يُقرأ مالاً. فحين لا تُرجع القاعدة دورةً
+     * عاملة تُقال الحقيقة باسمها، ويبقى ما لا يعتمد على الدورة ظاهراً. */
+    const cycleId = result ? result.cycle.id : '';
+    const status = result ? result.cycle.status : '';
+    const projected = !FINAL.has(status);
 
     const cycleTotals = result?.totals;
     const unresolvedAmount = result?.unresolved_ownership.amount ?? 0;
@@ -92,8 +100,10 @@ export const home: Route = {
     const companyTotal = company ? Number(company['total_subscribers'] || 0) : null;
 
     view.innerHTML = pageHeader('النظرة التنفيذية',
-      esc(String(cycle['name'])),
-      projected ? projectedTag() : chip('معتمدة', 'success'))
+      result ? esc(result.cycle.name) : 'لا دورة عمولة عاملة',
+      result
+        ? (projected ? projectedTag() : chip('معتمدة', 'success'))
+        : chip('لم تبدأ', 'neutral'))
 
       /* ١ · العمولات — بالمعنى المالي لا بالحالة التقنية.
        *
@@ -102,6 +112,14 @@ export const home: Route = {
        * هنا مراتب: محسوب ← معتمد ← جاهز ← مدفوع، ولكلٍّ منها معنى مختلف. */
       + `<section style="margin-top:4px">
         ${sectionTitle('العمولات')}
+        ${!result ? `<div class="insight warn">
+            <span class="insight-dot"></span><span>
+            <b>لا دورة عمولة عاملة</b>
+            <small>لا توجد دورة تجاوزت المسوّدة أو شُغِّل حسابها. المسوّدة الفارغة
+              لا تُعرض نتيجةً، ولا يُعرض عنها صفر. افتح دورة أو شغّل حسابها.</small></span>
+            <a class="btn gold" style="margin-inline-start:auto"
+               href="${esc(href('/commissions'))}">دورات العمولة</a>
+          </div>` : `
         <div class="cards cards-4">
           ${moneyCard('عمولات محسوبة', cycleTotals ? money(cycleTotals.gross) : 'لم تُحسب بعد',
             projected ? 'قيد المراجعة — لم تُعتمد' : 'معتمدة',
@@ -131,7 +149,7 @@ export const home: Route = {
               <a class="btn" style="margin-inline-start:auto"
                  href="${esc(href('/work/ownership'))}">افتح القرار</a>
             </div>`
-          : ''}
+          : ''}`}
       </section>`
 
       /* ٢ · تحتاج إجراء */
@@ -173,7 +191,9 @@ export const home: Route = {
               <span class="muted">التفعيلات المؤهَّلة</span>
               <b>${result ? count(result.volumes.qualifying_events) : 'لم تُحسب بعد'}</b></div>
             <div class="actions" style="margin-top:10px">
-              <a class="btn" href="${esc(href(`/commissions/cycles/${cycleId}/scopes`))}">النطاقات</a>
+              ${result
+                ? `<a class="btn" href="${esc(href(`/commissions/cycles/${cycleId}/scopes`))}">النطاقات</a>`
+                : ''}
               <a class="btn" href="${esc(href('/exceptions', { blocking: 'true' }))}">الاستثناءات</a>
             </div>
           </div>

@@ -11,7 +11,8 @@
 
 import type { Route } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, select } from '../../services/api';
+import { rpc } from '../../services/api';
+import { readCurrentCycle } from '../../domain/cycle';
 import { money, count } from '../../domain/money';
 import { esc, loading, empty, pageHeader, kpiRow, chip } from '../../components/ui';
 
@@ -35,14 +36,15 @@ export const workCenter: Route = {
   async render(view) {
     view.write(loading('جارٍ جمع ما ينتظر قراراً…'));
 
-    const [doc, cycles] = await Promise.all([
+    // الترويسة كانت تنادي «أحدث دورة» بنفسها بينما المحتوى يأتي من حكم
+    // الخادم، فتسمّي الشاشة دورةً وتَعُدّ قرارات دورةٍ أخرى.
+    const [doc, cycle] = await Promise.all([
       rpc<Row>('product_action_center', {}),
-      select<Row[]>('commission_cycles?select=id,name,status&order=period_start.desc&limit=1'),
+      readCurrentCycle(),
     ]);
     if (!view.live) return;
 
     const groups = (doc?.['groups'] || []) as Row[];
-    const cycle = (cycles || [])[0];
 
     const open = groups.filter((g) => num(g, 'decisions') > 0);
     const totalDecisions = open.reduce((a, g) => a + num(g, 'decisions'), 0);
@@ -58,7 +60,7 @@ export const workCenter: Route = {
     const done = groups.filter((g) => num(g, 'decisions') === 0);
 
     view.innerHTML = pageHeader('تحتاج إجراء',
-      cycle ? `الدورة الجارية: ${esc(str(cycle, 'name'))}` : 'لا دورة جارية')
+      cycle ? `الدورة العاملة: ${esc(cycle.name)}` : 'لا دورة عمولة عاملة')
 
       + kpiRow([
         { label: 'قرارات تنتظر', value: count(totalDecisions), tone: 'primary',

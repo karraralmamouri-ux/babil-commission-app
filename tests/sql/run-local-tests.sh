@@ -276,6 +276,18 @@ fi
 echo "$out30" | grep -E "^ {15,18}(ok|==) " || true
 passed=$((passed + $(echo "$out30" | grep -c "ok " || true)))
 
+echo "== current cycle and draft lifecycle =="
+if ! out31=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/current-cycle-and-draft-lifecycle.sql 2>&1); then
+  echo "$out31" >&2
+  echo "CURRENT CYCLE TESTS FAILED (psql exited non-zero)" >&2; exit 1
+fi
+if echo "$out31" | grep -qE "FAILED|ERROR"; then
+  echo "$out31" | grep -E "FAILED|ERROR" || true
+  echo "CURRENT CYCLE TESTS FAILED" >&2; exit 1
+fi
+echo "$out31" | grep -E "^ {17,20}(ok|==) " || true
+passed=$((passed + $(echo "$out31" | grep -c "                  ok " || true)))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh

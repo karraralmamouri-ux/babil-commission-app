@@ -68,7 +68,7 @@ test('central preview rejects invalid financial rows before rendering', () => {
   assert.throws(() => buildCentralPeriods(months, rows), /تعذر تحديد شريحة/);
 });
 
-test('central workspace is default, allows only audited payments, and preserves admin preparation state', () => {
+test('central workspace is default, is read-only, and preserves admin preparation state', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
   // كتلة «تجهيز الشهر» غادرت الشريط: كانت تظهر على كل مسار لأنها تقع بعد
@@ -82,7 +82,7 @@ test('central workspace is default, allows only audited payments, and preserves 
   assert.match(html, /async function ensureLegacyWorkspace\(\)/);
   assert.match(html, /await enterCentralPreview\(true\)/);
   assert.doesNotMatch(html, /النسخة المحلية/);
-  assert.match(html, /if\(p==='payment'\)return centralPreview\.active&&roleAllows\(p\)/);
+  assert.match(html, /function hasPermission\(p\)\{if\(\['users','backup'\]\.includes\(p\)\)return roleAllows\(p\)/);
   assert.match(html, /if\(centralPreview\.active\)\{toast\('انتقل إلى وضع تجهيز الشهر لإجراء التعديلات'\);return\}/);
   assert.match(html, /centralPreview\.localState=clone\(state\)/);
   assert.match(html, /state=clone\(centralPreview\.localState\)/);
@@ -139,27 +139,69 @@ test('central audit rows expose a readable shared payment action', () => {
   assert.equal(logs[0].newValue, '1000 / 2026-09-10');
 });
 
-test('the retired month engine no longer reaches the network to record a payment', async () => {
-  // كان هذا الاختبار يتحقّق من أن الصرف يمرّ بدالّة ذرّية بمعرّف طلبٍ
-  // وطابعِ تزامن. الحكم لم يسقط، بل انتقل: الصرف صار من دفعات الصرف،
-  // وهنا يبقى التحقّق من أن الطريق القديم لم يعد يصل إلى الشبكة أصلاً.
-  let called = false;
-  const app = loadCurrentApp({
-    fetch: async () => {
-      called = true;
-      return { ok: true, status: 200, async text() { return '{}'; } };
-    },
-  });
-  app.setSbSession({ access_token: 'access', refresh_token: 'refresh', expires_at: Math.floor(Date.now() / 1000) + 3600 });
+test('the retired month engine keeps no payment write path at all', () => {
+  // كان الصرف هنا يمرّ بدالّة ذرّية بمعرّف طلبٍ وطابعِ تزامن، ثم تقاعد المحرّك
+  // فصارت `recordCentralPayment` تُظهر رسالةً وتنتهي. لكن الواجهة بقيت فوقها
+  // كاملة: نموذجٌ بمبلغٍ وتاريخٍ وزرّ «حفظ الصرف مركزياً» ينتهي دائماً إلى
+  // «تعذر حفظ الصرف مركزياً» — أي فشلٌ يُقرأ عطلاً عابراً لا تقاعداً.
+  //
+  // فلم يعد المقياس «هل يصل إلى الشبكة؟» بل «هل بقي طريقٌ يُسلَك أصلاً؟».
+  const legacy = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
-  await app.recordCentralPayment(
-    { centralId: 'row-1', centralUpdatedAt: '2026-09-10T00:00:00.000Z' },
-    1000,
-    '2026-09-10',
-    'request-1',
-  );
+  for (const gone of ['recordCentralPayment', 'applyCentralPaymentResult',
+                      'editPayment', 'savePayment', 'paymentRequestId', 'createRequestId']) {
+    assert.doesNotMatch(legacy, new RegExp(`function\\s+${gone}\\s*\\(`),
+      `${gone} ما زالت معرَّفة في الشاشة المتقاعدة`);
+  }
+  assert.doesNotMatch(legacy, /const pendingPaymentRequests/);
 
-  assert.equal(called, false, 'الطريق المتقاعد ما زال يكتب');
+  // ولا عقد كتابةٍ ماليّ يُنادى من هنا: ما بقي من commission_rows قراءةٌ فقط.
+  assert.doesNotMatch(legacy, /record_commission_payment/);
+  const queries = [...legacy.matchAll(/commission_rows\?[^'"`\s]*/g)];
+  assert.ok(queries.length > 0, 'اختفت استعلامات commission_rows — تغيّر ما يقيسه الاختبار');
+  for (const [query] of queries) {
+    assert.match(query, /^commission_rows\?select=/,
+      'استعلام commission_rows لم يعد قراءةً خالصة');
+  }
+});
+
+test('the retired screen shows a route to the paying screen, not a button that cannot pay', () => {
+  // وأدقّ ما في العطل أنّ `canPay()` وحدها كانت تشترط الوضع المركزي بدل نفيه:
+  // فالزرّ يُفعَّل في الحالة التي لا كتابة فيها، ويُعطَّل حيث لا ضرر منه.
+  const elements = new Map([
+    ['searchInput', { value: '' }],
+    ['zoneFilter', { value: 'all' }],
+    ['statusFilter', { value: 'all' }],
+    ['panel-old', { innerHTML: '' }],
+  ]);
+  const app = loadCurrentApp({ elements });
+  app.__setAuthProfile({ role: 'admin', is_active: true });
+  app.state.tiers = tiers();
+  app.state.data.old = [{
+    name: 'Agent A', p35: 2, p45: 1, p65: 0, customTier: 'auto',
+    paid: 0, paymentDate: '', centralId: 'row-1',
+  }];
+
+  app.renderZone('old');
+  const html = elements.get('panel-old').innerHTML;
+
+  assert.match(html, /Agent A/, 'الصفّ نفسه لم يُعرض');
+  assert.doesNotMatch(html, /editPayment|savePayment/, 'ما زال في الصفّ إجراء صرف');
+  assert.doesNotMatch(html, /حفظ الصرف/);
+  assert.ok(html.includes('href="#/finance/payment-batches"'),
+    'لا طريق من الشاشة المتقاعدة إلى الشاشة التي تصرف فعلاً');
+
+  // والعرض التاريخي باقٍ: المستحق والمدفوع والمتبقي تُقرأ كما كانت.
+  assert.match(html, /المتبقي/);
+});
+
+test('the central mode no longer claims payment as the one thing it allows', () => {
+  // القاعدة القديمة كانت تستثني الصرف من التعطيل في الوضع المركزي، فتَعِد
+  // بما لا يقع. سقط الاستثناء مع الطريق الذي كان يبرّره.
+  const legacy = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.doesNotMatch(legacy, /payment'\)\s*return centralPreview\.active/);
+  assert.doesNotMatch(legacy, /يتاح الصرف فقط/);
+  assert.doesNotMatch(legacy, /function canPay\s*\(/);
 });
 
 test('commission payment posting keeps its request id and its reference', () => {

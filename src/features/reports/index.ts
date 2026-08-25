@@ -14,7 +14,7 @@ import { href } from '../../app/router';
 import { rpc, select, envelope } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { dateTime } from '../../domain/time';
-import { readCycleResult, knownAgentTotal, cycleStatusAr } from '../../domain/cycle';
+import { readCycleResult, knownAgentTotal, cycleStatusAr, currentCycleId } from '../../domain/cycle';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -73,9 +73,18 @@ export const commissionReport: Route = {
   ],
   async render(view, m) {
     view.write(loading('جارٍ تحميل نتيجة العمولات…'));
-    const cycles = await select<Row[]>('commission_cycles?select=id,name,status&order=period_start.desc');
-    const id = m.query.get('cycle') || str(cycles[0] || {}, 'id');
-    if (!id) { view.write(pageHeader('تقرير نتيجة العمولات') + empty('لا دورات عمولة')); return; }
+    // القائمة تبقى كاملةً ليُختار منها صراحةً، أمّا الافتراضي فمن الخادم:
+    // أحدثُ دورةٍ قد تكون مسوّدةً فارغة، وتقريرها حينئذٍ صفرٌ لدورةٍ خاطئة.
+    const [cycles, current] = await Promise.all([
+      select<Row[]>('commission_cycles?select=id,name,status&order=period_start.desc'),
+      currentCycleId(),
+    ]);
+    const id = m.query.get('cycle') || current || '';
+    if (!id) {
+      view.write(pageHeader('تقرير نتيجة العمولات')
+        + empty(cycles.length ? 'لا دورة عمولة عاملة — اختر دورةً صراحةً' : 'لا دورات عمولة'));
+      return;
+    }
     const report = await rpc<Row>('commission_report_product', { p_cycle_id: id });
     const result = await readCycleResult(id);
     if (!result) { view.write(pageHeader('تقرير نتيجة العمولات') + empty('لا نتيجة محسوبة للدورة')); return; }

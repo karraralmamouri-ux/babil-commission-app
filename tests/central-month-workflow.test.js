@@ -46,7 +46,9 @@ test('prepared rows freeze the server-verifiable applied tier and group basis', 
 
 test('admin operations, manual month selection, language and Excel report are exposed', () => {
   assert.match(html, /if\(\['users','backup'\]\.includes\(p\)\)return roleAllows\(p\)/);
-  assert.match(html, /centralPreview\.active&&!\['payment','users','backup'\]\.includes\(permission\)/);
+  // الصرف كان الاستثناء الوحيد المسموح في الوضع المركزي، وقد سقط مع الطريق
+  // الذي كان يبرّره: لم يبقَ في هذه الشاشة ما يكتب مالاً.
+  assert.match(html, /centralPreview\.active&&!\['users','backup'\]\.includes\(permission\)/);
   assert.match(html, /function publishCurrentMonth\(\)/);
   assert.match(html, /function exportExcelReport\(\)/);
   assert.match(html, /function toggleLanguage\(\)/);

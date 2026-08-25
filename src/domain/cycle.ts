@@ -14,7 +14,7 @@
  * مرّةً وتُعاد قسمته، والخطأ يُرفع لا يُبتلع.
  */
 
-import { rpc } from '../services/api';
+import { rpc, select } from '../services/api';
 
 export interface CycleTotals {
   gross: number;
@@ -164,9 +164,43 @@ const STATUS_AR: Record<string, string> = {
   PARTIALLY_PAID: 'مدفوعة جزئياً',
   PAID: 'مدفوعة',
   CLOSED: 'مقفلة',
+  CANCELLED: 'ملغاة',
 };
 
 export const cycleStatusAr = (s: string): string => STATUS_AR[s] || s;
+
+/* ---- الدورة العاملة ------------------------------------------------------ */
+
+/** ما يكفي لتسمية دورةٍ على الشاشة دون قراءة نتيجتها كاملة. */
+export interface CycleRef { id: string; name: string; status: string }
+
+/**
+ * الدورة العاملة — بحكم الخادم وحده.
+ *
+ * كانت أربع شاشات تختار كلٌّ منها بنفسها «أحدث period_start»، فحين فُتحت
+ * مسوّدة آب الفارغة ورثت مكان تموز فيها جميعاً دفعةً واحدة، وكلٌّ منها
+ * تعرض صفراً صحيحاً لدورةٍ خاطئة. أربع قواعد متطابقة ليست أربعة حرّاس، بل
+ * أربع نُسخ من الخطأ نفسه.
+ *
+ * القاعدة الآن في القاعدة: `current_commission_cycle_id()` لا تختار مسوّدةً
+ * لم يُشغَّل حسابها ولا ملغاة. وحين لا دورة عاملة تُعيد `null` — وهو جوابٌ
+ * صريح، لا صفرٌ يُقرأ مالاً.
+ */
+export async function currentCycleId(): Promise<string | null> {
+  const id = await rpc<string | null>('current_commission_cycle_id');
+  return id ? String(id) : null;
+}
+
+/** الدورة العاملة باسمها وحالتها — لتقول الشاشة أيّ دورة تعرض. */
+export async function readCurrentCycle(): Promise<CycleRef | null> {
+  const id = await currentCycleId();
+  if (!id) return null;
+  const rows = await select<Record<string, unknown>[]>(
+    `commission_cycles?select=id,name,status&id=eq.${encodeURIComponent(id)}`);
+  const row = (rows || [])[0];
+  if (!row) return null;
+  return { id: String(row['id']), name: String(row['name']), status: String(row['status']) };
+}
 
 /** ما قبل الاعتماد رقمٌ متوقَّع، وما بعده رقمٌ نهائي. */
 const FINAL = new Set(['FINALIZED', 'PARTIALLY_PAID', 'PAID', 'CLOSED']);
