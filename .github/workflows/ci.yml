@@ -91,7 +91,7 @@ jobs:
           fi
 
           sha256sum "${migrations[@]}" > migration-manifest.sha256
-          echo "Verified 68 unique migrations in deterministic filename order"
+          echo "Verified $unique_count unique migrations in deterministic filename order"
 
       - name: Start isolated PostgreSQL 16
         run: npm run localdb:up
