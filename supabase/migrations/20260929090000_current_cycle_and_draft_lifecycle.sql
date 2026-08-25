@@ -174,6 +174,23 @@ grant execute on function public.cancel_empty_commission_cycle(uuid, text, uuid)
 --
 -- فحص التداخل كان يمنع فتح أيّ دورة تتقاطع مع دورةٍ قائمة. ولو بقيت
 -- الملغاة في الفحص لتعذّر فتح آب من جديد إلى الأبد.
+--
+-- والفحص في الدالّة وحده لا يكفي: الحارس الفعليّ قيدُ الاستبعاد
+-- `commission_cycles_no_overlap`، وهو لا يعرف الحالات. فلو رُخِّص في الدالّة
+-- وحدها لرُفض الإدراج عند القيد برسالةٍ لا تقول شيئاً عن السبب.
+--
+-- وحجّة القيد نفسها هي التي تُخرج الملغاة منه: علّته أنّ «فترتين متقاطعتين
+-- تحسبان الحدث نفسه مرّتين»، والملغاة لا تحسب شيئاً.
+
+alter table public.commission_cycles
+  drop constraint if exists commission_cycles_no_overlap;
+alter table public.commission_cycles
+  add constraint commission_cycles_no_overlap
+  exclude using gist (daterange(period_start, period_end, '[]') with &&)
+  where (status <> 'CANCELLED');
+
+comment on constraint commission_cycles_no_overlap on public.commission_cycles is
+  'فترتان متقاطعتان تحسبان الحدث نفسه في دورتين. والملغاة لا تحسب، فلا تحجز فترتها.';
 
 create or replace function public.open_commission_cycle(
   p_name text, p_period_start date, p_period_end date,
