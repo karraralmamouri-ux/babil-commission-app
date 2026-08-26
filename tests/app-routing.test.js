@@ -319,7 +319,7 @@ test('الاستثناء يقود إلى شاشة حسمه', () => {
   const patterns = new Set(
     ['src/features/master/fdts.ts', 'src/features/master/agents.ts',
       'src/features/master/index.ts', 'src/features/system/imports.ts',
-      'src/features/installation/index.ts']
+      'src/features/system/identities.ts', 'src/features/installation/index.ts']
       .flatMap((f) => [...read(f).matchAll(/pattern:\s*'([^']+)'/g)].map((m) => m[1])));
 
   const map = s.slice(s.indexOf('const map: Record<string, string>'));
@@ -328,8 +328,11 @@ test('الاستثناء يقود إلى شاشة حسمه', () => {
   assert.ok(targets.length >= 4, `expected mapped targets, found ${targets.length}`);
 
   for (const target of targets) {
+    // معامل الاستعلام جزء من رابط الحسم (مثل ?status=CONFLICT)، لا من المسار
+    // نفسه — يُقارَن المسار وحده بما هو مسجَّل في المُوجِّه.
+    const base = target.split('?')[0];
     const known = [...patterns].some((p) =>
-      p === target || p.replace(/\/:[^/]+/g, '') === target.replace(/\/$/, ''));
+      p === base || p.replace(/\/:[^/]+/g, '') === base.replace(/\/$/, ''));
     assert.ok(known, `الاستثناء يقود إلى مسارٍ غير مسجَّل: ${target}`);
   }
 });

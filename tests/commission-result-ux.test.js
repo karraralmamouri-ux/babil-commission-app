@@ -36,6 +36,12 @@ test('الاستثناءات تقود بتسمية عمل بشرية وتبقي 
   assert.match(source, /<code>\$\{esc\(r\['reason_code'\]\)\}<\/code>/);
 });
 
+test('استثناء تعارض الهوية يقود إلى شاشة المطابقة، لا إلى سجلّ المشتركين العام', () => {
+  const body = source.slice(source.indexOf('function actionLink('), source.indexOf('function blockerColumns('));
+  assert.match(body, /IDENTITY_CONFLICT: href\('\/system\/identities\?status=CONFLICT'\)/);
+  assert.doesNotMatch(body, /IDENTITY_CONFLICT: href\('\/installation\/subscribers'\)/);
+});
+
 test('ملف الوكيل يستهلك الملخص المالي الخادمي ولا يجمعه في المتصفح', () => {
   assert.doesNotMatch(source, /cycleRows\.reduce/);
   assert.match(source, /agent_financial_profile_product/);

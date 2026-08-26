@@ -172,6 +172,10 @@ select pg_temp.assert_that('the identity conflict decision now opens the review 
   (select g ->> 'path' from jsonb_array_elements(:'center'::jsonb -> 'groups') g
    where g ->> 'key' = 'IDENTITY_CONFLICT') = '/system/identities?status=CONFLICT');
 
+select pg_temp.assert_that('the source-incomplete decision opens the import center, not the retired legacy workspace',
+  (select g ->> 'path' from jsonb_array_elements(:'center'::jsonb -> 'groups') g
+   where g ->> 'key' = 'SOURCE_INCOMPLETE') = '/system/imports');
+
 -- ---------------------------------------------------------------------------
 -- 7. لا أثر مالي — الغلاف لا يفتح باباً جانبياً إلى المال.
 -- ---------------------------------------------------------------------------

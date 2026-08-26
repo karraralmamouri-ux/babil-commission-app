@@ -682,7 +682,7 @@ function actionLink(reason: string, row: Record<string, unknown>): string {
     UNKNOWN_AGENT: href('/master/agents'),
     UNKNOWN_PACKAGE: href('/master/packages'),
     SOURCE_INCOMPLETE: href('/system/imports'),
-    IDENTITY_CONFLICT: href('/installation/subscribers'),
+    IDENTITY_CONFLICT: href('/system/identities?status=CONFLICT'),
   };
   const target = map[reason];
   return target ? `<a class="smallbtn" href="${esc(target)}">افتح</a>` : '';
