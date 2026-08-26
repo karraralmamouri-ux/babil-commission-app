@@ -9,10 +9,17 @@
  * موجباً، لا أنه افتراضٌ عند الشك.
  */
 
-import { esc, chip } from '../../components/ui';
+import type { View } from '../../app/router';
+import { esc, chip, loading } from '../../components/ui';
 import { count } from '../../domain/money';
+import { rpc, can, ApiError } from '../../services/api';
 
 type Row = Record<string, unknown>;
+
+function insight(tone: 'good' | 'danger', title: string, detail = ''): string {
+  return `<div class="insight ${tone}" style="margin-top:10px"><span class="insight-dot"></span><span>
+    <b>${esc(title)}</b>${detail ? `<small>${esc(detail)}</small>` : ''}</span></div>`;
+}
 
 export const REASON_AR: Record<string, string> = {
   REGISTRY_PREEXISTING: 'موجود سابقاً في سجلّ التنصيب',
@@ -60,4 +67,54 @@ export function classificationPanel(doc: Row | null): string {
     + `<div class="muted" style="font-size:10px;margin-top:8px">
         صُنِّف ${count(done)} من ${count(total)}.
         الجِدّة لا تُمنح من مصدرٍ غير مُثبت الاكتمال.</div>`;
+}
+
+/**
+ * تشغيل classify_newness() على من لم يُصنَّف بعد — دفعة محدودة، بلا أثر مالي.
+ *
+ * التصنيف مُدخَلٌ لقرارٍ بشري لاحق، لا استحقاقاً: الكتابة تصل فقط
+ * subscriber_classifications، ولا تُنشئ مشتركاً ولا استحقاقاً ولا دفعة.
+ * إعادة التشغيل آمنة — upsert بمفتاح username_key.
+ */
+export function classificationRunPanel(): string {
+  if (!can('saas.review')) return '';
+  return `<div class="box" style="margin-top:12px" id="classRunBox">
+    <h3>تشغيل التصنيف</h3>
+    <div class="insight warn"><span class="insight-dot"></span><span>
+      <b>التصنيف مُدخَلٌ للمراجعة، لا قرارٌ مالي</b>
+      <small>يحسب classify_newness() لمن لم يُصنَّف بعد ويحفظ الناتج بشواهده.
+        لا يُنشئ مشتركاً ولا استحقاقاً ولا دفعة. إعادة التشغيل آمنة.</small></span></div>
+    <button class="btn gold" id="classRunBtn" style="margin-top:10px">صنّف الدفعة التالية</button>
+    <div id="classRunResult"></div>
+  </div>`;
+}
+
+export function wireClassificationRun(view: View): void {
+  const btn = view.el.querySelector<HTMLButtonElement>('#classRunBtn');
+  const out = view.el.querySelector<HTMLElement>('#classRunResult');
+  if (!btn || !out) return;
+
+  btn.addEventListener('click', async () => {
+    if (!window.confirm('تشغيل التصنيف الآن؟ لن يُنشأ أي مشترك أو استحقاق أو دفعة.')) return;
+    btn.disabled = true;
+    out.innerHTML = loading('جارٍ التصنيف…');
+    try {
+      const res = await rpc<Row>('refresh_subscriber_classifications', {});
+      if (!view.live) return;
+      const remaining = Number(res?.['remaining'] || 0);
+      out.innerHTML = insight('good', 'انتهت هذه الدفعة',
+        `صُنِّف ${count(Number(res?.['evaluated'] || 0))}` +
+        ` · جديد ${count(Number(res?.['new'] || 0))}` +
+        ` · قديم ${count(Number(res?.['existing'] || 0))}` +
+        ` · يحتاج مراجعة ${count(Number(res?.['needs_review'] || 0))}` +
+        (remaining ? ` · متبقٍّ ${count(remaining)}` : ' · لا شيء متبقٍّ'));
+      window.setTimeout(() => { if (view.live) window.location.reload(); }, 1800);
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'تعذّر التشغيل',
+        error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }

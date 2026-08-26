@@ -16,6 +16,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 const corrSrc = read('src/features/finance/paymentCorrections.ts');
 const idSrc = read('src/features/system/identities.ts');
+const classSrc = read('src/features/installation/classification.ts');
 
 function slice(src, from, to) {
   const a = src.indexOf(from);
@@ -165,4 +166,32 @@ test('القراءة المُصفَّحة تمرّ عبر page_subscriber_identi
   const renderFn = slice(idSrc, 'async render(view, m)', '\n  },\n};');
   assert.match(renderFn, /pageRpc<Row>\('page_subscriber_identities'/);
   assert.doesNotMatch(renderFn, /\.from\(['"]subscriber_identities/);
+});
+
+/* ---------------------------------------------------------------------------
+   الدفعة ٣ — تصنيف الجِدّة: نفس الحرص، نفس التأكيد، بلا معرّف طلبٍ (لا
+   audit_logs يكتبه refresh_subscriber_classifications — upsert طبيعي الإعادة)
+   ------------------------------------------------------------------------ */
+
+const classRunPanel = slice(classSrc, 'export function classificationRunPanel', '\nexport function wireClassificationRun');
+const classRunWire = classSrc.slice(classSrc.indexOf('export function wireClassificationRun'));
+
+test('القدرة saas.review تُخفي لوحة تشغيل التصنيف كلّها بلا صلاحية', () => {
+  assert.match(classRunPanel, /if \(!can\('saas\.review'\)\) return '';/);
+});
+
+test('تشغيل التصنيف يحتاج تأكيد window.confirm قبل أيّ نداء', () => {
+  const confirmIdx = classRunWire.indexOf('window.confirm(');
+  const rpcIdx = classRunWire.indexOf("rpc<Row>('refresh_subscriber_classifications'");
+  assert.ok(confirmIdx > -1 && confirmIdx < rpcIdx);
+  assert.match(classRunWire, /if \(!window\.confirm\(.*\)\) return;/);
+});
+
+test('زرّ تشغيل التصنيف يُعطَّل أثناء التنفيذ ويُعاد تفعيله عبر finally', () => {
+  assert.match(classRunWire, /btn\.disabled = true;/);
+  assert.match(classRunWire, /finally \{\s*btn\.disabled = false;/);
+});
+
+test('لا إشارة لإنشاء مشترك أو استحقاق أو دفعة في لوحة تشغيل التصنيف — الكتابة تصل التصنيف فقط', () => {
+  assert.doesNotMatch(classSrc, /installation_entitlements|installation_payment|create_subscriber/);
 });
