@@ -288,12 +288,53 @@ Phase 4 only; it does not block Phases 1–3, which shipped independently.
 ## 4. Batch 3 business rule decision pack — August intake / NEW vs EXISTING
 
 **Raised during Batch 3 (2026-08-26), while wiring August SaaS intake all the way to a
-visible classification preview.** None of these four are implemented — the code below only
-*reads and displays* what the engine already decides today (rule 5 of `classify_newness()`,
-unchanged since Batch 1); it does not add, loosen, or guess a rule. Each entry below states
-what would have to be decided before any of these thresholds could be trusted for real money.
+visible classification preview.** At the time none of these four were implemented — the code
+then only *read and displayed* what the engine already decided (rule 5 of `classify_newness()`,
+unchanged since Batch 1); it did not add, loosen, or guess a rule. Each entry below states
+what had to be decided before any of these thresholds could be trusted for real money.
+
+**Update — Batch 4 (2026-08-26): all four (D-01, D-12, D-13, D-14) are now APPROVED and
+implemented** in development only (not linked to Production; no real August import or
+Production classification run). See the `> **APPROVED — Batch 4 …**` block under each heading
+below for the exact wording locked in and what shipped. The option analysis and "current
+backend behavior" text below each heading is left as-is as the historical record of what was
+undecided beforehand — it is superseded, not deleted. D-10 (§ below, "Odoo vs Babil invoice
+identity ownership") is unrelated to this pack and remains explicitly OPEN.
 
 ### D-01 — exact NEW-classification rule when there is no historical match
+
+> **APPROVED — Batch 4 (2026-08-26).** Verbatim: *"NEW only if (1) identity sufficiently
+> resolved/confirmed; (2) no historical record establishes existing before the
+> installation/newness boundary; (3) first qualifying activation after installation;
+> (4) source period formally COMPLETE. Historical registry hit remains decisive for EXISTING;
+> activations_count alone MUST NOT determine NEW/EXISTING; UNMATCHED MUST NOT silently become
+> NEW; CONFLICT/NEEDS_REVIEW MUST remain unresolved; incomplete/unknown source MUST NOT produce
+> NEW; Loan-3 alone MUST NOT create installation entitlement/P1; preserve every already-approved
+> Loan-3 rule."* Implemented as a sixth guard in the existing `classify_newness()` (no second
+> engine): `supabase/migrations/20261005090000_batch4_rule_engine.sql` §1, new reason code
+> `IDENTITY_UNRESOLVED`. Regression: `tests/sql/batch4-rule-engine.sql` §D-01. The analysis
+> below (options 1–3) is kept as the historical record of what was undecided before this; option
+> 3's spirit (identity must be resolved, not merely non-conflicting) is what shipped, expressed
+> as a hard server-side gate rather than a manual second approval step.
+>
+> **CLARIFICATION — 2026-08-26, alongside the D-12 fix.** NEWNESS and ACTIVATION ELIGIBILITY
+> are two separate questions and must not be conflated when reading this rule. NEWNESS —
+> "is this a new subscriber?" — is exactly what `classify_newness()` answers, unchanged by
+> this note: registry hit is still decisive for `EXISTING`; `UNMATCHED`/`CONFLICT` are still
+> review states; `activations_count` alone is still never authoritative; none of
+> `classify_newness()`'s guard order or reason codes changed. ACTIVATION ELIGIBILITY — "has
+> this candidate produced a qualifying activation yet?" — is a separate, later question that
+> `installation_grace_status()` answers for the population `classify_newness()` currently
+> reports as `NEEDS_REVIEW` / `NO_QUALIFYING_PAID_EVENT` (i.e. a candidate with real SaaS
+> history but no qualifying paid event yet — exactly D-12's target population). That function's
+> read-only `status` field now says `NEW_PENDING_ACTIVATION` or `NEW_ACTIVATED` instead of the
+> earlier generic `PENDING_ACTIVATION`/`QUALIFIED`, to name what it is: an operational view of
+> "new, and here is whether it has activated yet." This is a rename of that one read-only
+> status vocabulary, not a change to the `subscriber_classifications.classification` column,
+> its enum, or which rows are financially eligible — a Loan-only candidate is `NEW_PENDING_
+> ACTIVATION` operationally, but still `NEEDS_REVIEW` in `subscriber_classifications` and still
+> creates no entitlement until an actual qualifying activation lands. See D-12 below for the
+> corrected reference-date rule this status is computed from.
 
 **Exact decision needed.** `classify_newness()`'s rule 5 (`supabase/migrations/20260904090000_server_side_classification.sql:115-118`)
 already says: a subscriber whose lifetime activation counter equals what this batch observed,
@@ -328,6 +369,83 @@ declarations — but this is a recommendation for review, not a decision made he
 
 ### D-12 — grace period before a pending review escalates
 
+> **APPROVED — Batch 4 (2026-08-26).** Verbatim: *"30 calendar days from installation date.
+> Deterministic, server-side deadline semantics. Explicitly forbidden: end-of-next-month /
+> billing-month approximation / commission-cycle approximation — must use actual installation
+> date + 30 calendar days. UI must show installation date, deadline, days remaining/overdue,
+> qualifying activation state. No client-side authoritative date calculation."* Installation
+> date anchor: `saas_user_snapshots.saas_created_at` (no `installation_date` column exists
+> pre-enrollment; this is the SaaS platform's own account-creation timestamp, the nearest
+> authoritative anchor for a not-yet-registered candidate). Implemented as new read-only RPC
+> `installation_grace_status()`: `supabase/migrations/20261005090000_batch4_rule_engine.sql`
+> §3. Regression: `tests/sql/batch4-rule-engine.sql` §D-12, including the day-30/day-31 boundary
+> (day 30 itself still pending; day 31 expired — no monthly rounding). Option 2 below is what
+> shipped, with the window fixed at 30 calendar days per the approved text rather than left
+> configurable.
+>
+> **CORRECTION — 2026-08-26, post-approval audit.** The paragraph above is retained verbatim
+> as a record of what was actually shipped, but its own reasoning is now known to be wrong and
+> must not be relied on. `saas_user_snapshots.saas_created_at` is the SaaS platform's own
+> **account-creation** timestamp — it is not, and was never verified to be, the subscriber's
+> **actual installation date** that the approved D-12 text requires ("30 calendar days from
+> installation date … must use actual installation date"). No field anywhere in the current
+> schema represents a real, evidenced installation/completion event for the SaaS-discovered
+> candidate population that D-12 exists to protect: `installation_subscribers.start_date` only
+> exists for the historical-registry population (a different, already-`EXISTING` population,
+> and its own real-world meaning is itself undocumented); `installation_enrollments.enrolled_at`
+> is a system-processing timestamp, not a real-world event; the first qualifying activation
+> event necessarily occurs *after* installation per D-01's own wording, so it is at best a
+> lower bound, never the date itself; `first_confirmed_installation_at`
+> (`docs/engineering/financial-domain-model-vnext.md` §2.3) is an unbuilt, unsourced vNext
+> placeholder that appears nowhere else in the repository. **Conclusion: D-12 is
+> implementation-blocked pending an authoritative installation-date source** (a real column
+> fed by an actual installation/completion event, or a defined ingestion contract from an
+> external system such as field-ops/Taskati/Odoo installation tracking — none of which
+> currently exists). `installation_grace_status()` and the duplicate day-30 check inside
+> `action_center()`'s `grace_expired` CTE must not be patched to "fix" this by picking a
+> different existing column, since none of the existing columns are the right one; a new
+> regression in `tests/sql/batch4-rule-engine.sql` (`D-12 BLOCKER`) is intentionally left
+> failing to keep this visible in CI until a true installation-date source is defined.
+>
+> **RESOLVED — 2026-08-26, authoritative business clarification.** The correction above stands
+> as the record of why `saas_created_at` had to be removed — it does. But the premise that no
+> reference date exists at all was narrowed by an explicit operational clarification: D-12's
+> anchor is **not** a physical installation timestamp (none exists, and none is required) but
+> the **first recorded SaaS operation for the subscriber once NEW is established** — the
+> operational/accounting start date the manual process always used, since a subscriber never
+> entered the installation-fee tracking workflow before *some* SaaS operation (a Loan/debt
+> activation, or a direct qualifying paid activation) put them on the radar. Renamed
+> end-to-end to `installation_reference_at` (never "installation date") to keep this
+> distinction from being re-lost. Rules: if the first operation is a Loan, the subscriber's
+> reference date is that Loan's date and the read-only status is `NEW_PENDING_ACTIVATION`
+> (Loan alone is still never a qualifying activation — D-04 unchanged); if the first operation
+> is itself a qualifying paid activation, the reference date is that same event and the status
+> is `NEW_ACTIVATED` immediately; if a Loan is followed later by a qualifying activation, the
+> reference date stays pinned to the Loan (does not shift forward); if no SaaS operation has
+> occurred at all, no date is fabricated and the status is `UNKNOWN`. Implemented as a single
+> shared source of truth — `installation_reference_dates()` (the date pair) and
+> `grace_status_from_dates()` (the +30-day decision) — called by both
+> `installation_grace_status()` and `action_center()`'s `grace_expired` CTE, so the threshold
+> is computed in exactly one place (previously duplicated, per the audit above).
+> `grace_status_from_dates()` deliberately carries no capability check so that
+> `action_center()` (gated on `report.view`) is not forced to also require
+> `installation.view` merely to reuse the date logic. Regression:
+> `tests/sql/batch4-rule-engine.sql` §D-12 (tests 10–21), covering: `saas_created_at` proven
+> to carry zero authority; no-operation ⇒ `UNKNOWN`; Loan-first, paid-first, and Loan-then-paid
+> orderings; the day-30/day-31 boundary measured from the reference date; multiple SaaS
+> identifiers sharing one `username_key` (earliest operation across all of them wins — this is
+> already how the whole rule engine resolves a subscriber; it is *not* the same thing as
+> merging two different usernames for one real person, which remains unsupported — see below);
+> a duplicated raw event not shifting the date; and Loan/`DEBT_SERVICE` never counting as a
+> qualifying activation. **Known, deliberately out-of-scope gap:** this schema has no mechanism
+> to merge two *different* usernames/`saas_user_id`s into one real-world subscriber before a
+> match exists — `subscriber_identities` only links a single `saas_user_id` to a single
+> `installation_subscriber_id`, 1:1, and only *after* a match. If the same physical subscriber
+> ever appears under two unrelated usernames pre-match, D-12 (and `classify_newness()`) will
+> currently treat them as two separate candidates. This is a pre-existing identity-resolution
+> limitation, not something D-12 introduced or can fix on its own; flagging it here rather than
+> inventing an ad hoc merge.
+
 **Exact decision needed.** How long may a subscriber sit in `NEEDS_REVIEW`, `UNMATCHED`, or
 `CONFLICT` before anything changes? Does it stay open indefinitely, or does some elapsed
 window change its handling?
@@ -353,6 +471,20 @@ alone carries no financial consequence.
 **What test locks it in.** None yet — a new test once a window and its effect are chosen.
 
 ### D-13 — permanent-block trigger
+
+> **APPROVED — Batch 4 (2026-08-26).** Verbatim: *"After grace-period expiry: no automatic
+> entitlement creation, no automatic permanent disqualification; transition/expose as
+> BLOCKED/NEEDS_REVIEW; reopening/override requires an authorized operator, mandatory reason,
+> actor/time/reason/request_id auditable. Permanent block MUST NOT happen automatically."*
+> Exposed as `installation_grace_status() → 'GRACE_EXPIRED_REVIEW'` (read-only; nothing is
+> written on expiry). `installation_holds` was evaluated and rejected as the override mechanism
+> — it requires a row in `installation_subscribers`, which a pre-enrollment SaaS candidate does
+> not have — so a small dedicated table `grace_period_overrides` plus RPC
+> `override_grace_expired_review()` was added instead (still the smallest addition, not a
+> parallel blocker system): `supabase/migrations/20261005090000_batch4_rule_engine.sql` §4.
+> Regression: `tests/sql/batch4-rule-engine.sql` §D-13 (unauthorized override rejected, empty
+> reason rejected, override of a non-expired subscriber rejected, authorized override audited
+> with actor/time/reason/request_id, replay-safe). Option 2 below is what shipped.
 
 **Exact decision needed.** Is there any condition under which a subscriber's path to
 classification/entitlement becomes permanently blocked, as distinct from `NEEDS_REVIEW`
@@ -384,6 +516,29 @@ codebase already holds correction/reversal actions to.
 **What test locks it in.** None yet.
 
 ### D-14 — source-completeness declaration timing
+
+> **APPROVED — Batch 4 (2026-08-26).** Verbatim: *"Uploading a file does not make it COMPLETE;
+> requires explicit authorized operator declaration after reviewing period/source/batches/
+> counts/duplicates/invalid rows/identity conflicts/errors/current state. Declaration must
+> record actor/timestamp/reason/request_id/audit event. Late data arriving after COMPLETE must
+> NOT silently preserve COMPLETE — the period/source must become NEEDS_REVALIDATION (or closest
+> canonical equivalent), trigger an operational alert, require explicit authorized
+> review/reclassification; previously created financial records must NOT be silently
+> deleted/rewritten (use the existing correction/reversal architecture); no automatic
+> destructive reconciliation."* `declare_import_completeness` already met the first half
+> (mandatory reason + audited row, existing RPC, unchanged). The second half — a fourth batch
+> state `NEEDS_REVALIDATION`, set only by a new `AFTER UPDATE OF status` trigger
+> (`flag_overlapping_batches_for_revalidation`) when a newly-imported batch's observed range
+> overlaps a prior `COMPLETE` batch's declared coverage, audited as
+> `import.completeness.needs_revalidation` — is new:
+> `supabase/migrations/20261005090000_batch4_rule_engine.sql` §2. `subscriber_classifications
+> .source_completeness` deliberately stays three-valued (`classify_newness()`'s roll-up treats
+> any non-`COMPLETE` batch, including the new state, as `PARTIAL`/`UNKNOWN` via an explicit
+> whitelist — no `else 'COMPLETE'` catch-all). Exiting `NEEDS_REVALIDATION` reuses
+> `declare_import_completeness` unchanged (it never validated `previous_status`). Regression:
+> `tests/sql/batch4-rule-engine.sql` §D-14. This closes the option analysis below in favour of
+> what is effectively option 1 plus a mandatory automatic-detection safety net on late data,
+> rather than options 2/3's calendar or four-eyes gate.
 
 **Exact decision needed.** When may an operator declare a SaaS import batch's
 `completeness_status` as `COMPLETE`? Immediately, on the operator's word alone? Only once the
