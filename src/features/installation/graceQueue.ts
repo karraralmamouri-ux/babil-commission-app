@@ -104,13 +104,19 @@ export const graceQueue: Route = {
     const limit = 50;
     const offset = Number(m.query.get('offset') || 0);
     const search = m.query.get('search') || undefined;
+    // الافتراض «مهلة منقضية» — لا «الكل» — فيبقى الرابط من مركز القرار ودورة
+    // التنصيب نازلاً مباشرةً على العمل المفتوح، كما تفعل شاشة الاستثناء اليدوي.
+    const query = new URLSearchParams(m.query);
+    if (!query.get('status')) query.set('status', 'EXPIRED');
+    const status = query.get('status') as string;
+    const isExpired = status === 'EXPIRED';
     view.write(loading('جارٍ تحميل الطابور…'));
 
     const page = await pageRpc<Row>('page_installation_grace_queue',
-      { p_search: search, p_limit: limit, p_offset: offset }, view.signal);
+      { p_search: search, p_limit: limit, p_offset: offset, p_status: status }, view.signal);
 
     const canOverride = can('installation.grace_override');
-    const columns: Array<Column<Row>> = [
+    const columns: Array<Column<Row>> = isExpired ? [
       { key: 'subscriber', label: 'المشترك', cell: (r) => r['installation_subscriber_id']
         ? `<a href="${esc(href(`/installation/subscribers/${r['installation_subscriber_id']}`))}">${esc(s(r, 'display_name') || s(r, 'username_key'))}</a>`
         : `<b dir="ltr">${esc(s(r, 'username_key'))}</b>` },
@@ -120,16 +126,30 @@ export const graceQueue: Route = {
       { key: 'status', label: 'الحالة', cell: () => chip('مهلة منقضية', 'critical') },
       { key: 'act', label: '', cell: (r) => canOverride
         ? `<button class="smallbtn grace-override-action" data-key="${esc(s(r, 'username_key'))}">تجاوز</button>` : '' },
+    ] : [
+      { key: 'subscriber', label: 'المشترك', cell: (r) => r['installation_subscriber_id']
+        ? `<a href="${esc(href(`/installation/subscribers/${r['installation_subscriber_id']}`))}">${esc(s(r, 'display_name') || s(r, 'username_key'))}</a>`
+        : `<b dir="ltr">${esc(s(r, 'username_key'))}</b>` },
+      { key: 'when', label: 'تاريخ التجاوز', cell: (r) => `<span dir="ltr">${esc(dateOnly(r['overridden_at']))}</span>` },
+      { key: 'who', label: 'من نفّذ', cell: (r) => esc(s(r, 'overridden_by_email') || '—') },
+      { key: 'reason', label: 'السبب', cell: (r) => esc(s(r, 'reason')) },
+      { key: 'status', label: 'الحالة', cell: () => chip('مُتجاوَز', 'success') },
     ];
 
     view.write(pageHeader('مهلة تفعيل منقضية', 'مرشّحون تجاوزوا ثلاثين يوماً من أوّل عملية بلا تفعيلٍ مؤهَّل مدفوع — D-12/D-13')
-      + filterBar([{ key: 'search', label: 'بحث بمعرّف المشترك', type: 'search' }], '/installation/grace-queue', m.query)
-      + (page.rows.length ? table(columns, page.rows) : empty('لا مهل منقضية بانتظار مراجعة'))
-      + pager(page.total, limit, offset, '/installation/grace-queue', m.query)
-      + `<div id="${OVERRIDE_BOX_ID}" style="margin-top:12px"></div>`);
+      + filterBar([
+        { key: 'search', label: 'بحث بمعرّف المشترك', type: 'search' },
+        { key: 'status', label: 'الحالة', type: 'select', options: [
+          { value: 'EXPIRED', label: 'مهلة منقضية' },
+          { value: 'OVERRIDDEN', label: 'مُتجاوَز' },
+        ] },
+      ], '/installation/grace-queue', query)
+      + (page.rows.length ? table(columns, page.rows) : empty(isExpired ? 'لا مهل منقضية بانتظار مراجعة' : 'لا تجاوزات بعد'))
+      + pager(page.total, limit, offset, '/installation/grace-queue', query)
+      + (isExpired ? `<div id="${OVERRIDE_BOX_ID}" style="margin-top:12px"></div>` : ''));
 
     wireFilters(view.el);
-    wireOverride(view, view.el);
+    if (isExpired) wireOverride(view, view.el);
   },
 };
 

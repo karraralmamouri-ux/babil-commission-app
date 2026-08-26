@@ -25,6 +25,12 @@ const STATE: Record<string, { label: string; tone: 'success' | 'warning' | 'neut
   PENDING: { label: 'لم تبدأ', tone: 'neutral', mark: '○' },
 };
 
+const OVERALL_STATE: Record<string, { label: string; tone: 'success' | 'warning' | 'critical' }> = {
+  READY_FOR_REVIEW: { label: 'جاهزة للمراجعة', tone: 'success' },
+  NEEDS_REVIEW:      { label: 'تحتاج مراجعة', tone: 'warning' },
+  NOT_READY:         { label: 'لم تبدأ بعد', tone: 'critical' },
+};
+
 export const cycle: Route = {
   pattern: '/installation/cycle',
   capability: 'installation.view',
@@ -46,6 +52,8 @@ export const cycle: Route = {
     const cand = (doc?.['candidate'] || {}) as Row;
     const ready = (doc?.['ready'] || {}) as Row;
     const hist = (doc?.['historical'] || {}) as Row;
+    const readiness = (doc?.['readiness'] || {}) as Row;
+    const checklist = (readiness['checklist'] || []) as Row[];
 
     const done = steps.filter((s) => str(s, 'state') === 'DONE').length;
     const active = steps.filter((s) => str(s, 'state') === 'ACTIVE');
@@ -71,6 +79,25 @@ export const cycle: Route = {
           sub: `${count(num(hist, 'rows'))} صفّاً — لا يُدفع ثانية`,
           link: href('/reports/historical') },
       ])
+
+      + `<div class="box" style="margin-top:14px">
+        <h3>الحواجز المفتوحة حالياً
+          ${chip(OVERALL_STATE[str(readiness, 'overall_state')]?.label || '—',
+                 OVERALL_STATE[str(readiness, 'overall_state')]?.tone || 'neutral')}</h3>
+        <p class="muted" style="font-size:11px;margin:0 0 12px">
+          تجميعٌ عرضيٌّ لما هو محسوبٌ أصلاً في كل شاشة — لا حسابٌ جديد ولا قرارٌ مالي هنا.
+          عبر كل الوقت (لا خاصّ بالفترة المختارة أعلاه — الفترة تحكم فقط عدّاد
+          الاستحقاق ضمن الخطوات أدناه). «جاهزة للمراجعة» تعني خلوّها من كل
+          حاجزٍ أدناه، لا أن الصرف تمّ.</p>
+        ${checklist.filter((c) => num(c, 'count') > 0).map((c) => `
+          <a class="minirow" style="text-decoration:none;color:inherit"
+              href="${esc(href(str(c, 'path')))}">
+            <span>${chip(str(c, 'label'), 'warning')}</span>
+            <span><b>${count(num(c, 'count'))}</b>
+              <span class="muted" style="font-size:11px">${esc(str(c, 'next_action'))}</span></span>
+          </a>`).join('')
+          || '<p class="muted">لا حاجز — كل ما يُقاس هنا خالٍ الآن.</p>'}
+      </div>`
 
       + `<div class="box" style="margin-top:14px">
         <h3>الخطوات</h3>

@@ -318,6 +318,15 @@ fi
 echo "$out34" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out34" | grep -c "            ok ")))
 
+echo "== monthly readiness + grace history (PR-B2) =="
+out35=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/monthly-readiness-and-grace-history.sql 2>&1) || true
+if echo "$out35" | grep -qE "FAILED|ERROR"; then
+  echo "$out35" | grep -E "FAILED|ERROR" || true
+  echo "MONTHLY READINESS TESTS FAILED" >&2; exit 1
+fi
+echo "$out35" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out35" | grep -c "            ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
