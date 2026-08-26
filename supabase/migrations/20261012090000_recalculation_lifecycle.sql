@@ -160,7 +160,16 @@ grant execute on function public.classify_parent(text,text,uuid,text,uuid) to au
 
 -- ---------------------------------------------------------------------------
 -- 3. إعادة الحساب المُخوَّلة تُطفئ العلم عند نجاحها فقط.
+--
+-- المعامل الثالث p_reason جديد وله قيمة افتراضية، فلو بقي التوقيع الأصلي
+-- (uuid, uuid) قائماً بجانبه لصار أي نداء بمعاملين اثنين (كما تفعل الشاشة
+-- وكما يفعل tests/sql/fdt-onboarding.sql) غامضاً بين الدالّتين — وأسوأ من
+-- الغموض: لو انحلّ لصالح التوقيع القديم لعاد المرء إلى النسخة التي لا تُطفئ
+-- needs_recalculation، فيسقط إصلاح LIVE-03 صامتاً. يُسقَط التوقيع القديم
+-- هنا كي لا يبقى إلا واحد.
 -- ---------------------------------------------------------------------------
+
+drop function if exists public.recalculate_cycle_after_master_change(uuid, uuid);
 
 create or replace function public.recalculate_cycle_after_master_change(
   p_cycle_id uuid, p_request_id uuid, p_reason text default null)
