@@ -72,7 +72,7 @@ on conflict do nothing;
 insert into public.subscriber_ownership
   (username_key, ownership_type, agent_id, effective_from, effective_to, reason, performed_by)
 values
-  ('b3-sub-94dc','FTTH_USER', null, timestamptz '2026-01-01 00:00+03', null,
+  ('b3-sub-94dc','DIRECT_COMPANY', null, timestamptz '2026-01-01 00:00+03', null,
    'اختبار B3', '63000000-0000-0000-0000-0000000000c1');
 
 insert into public.commission_cycles (id, name, period_start, period_end, engine_version, created_by)
@@ -144,7 +144,7 @@ values
    timestamptz '2026-01-01 00:00+03', timestamptz '2026-06-01 00:00+03',
    'اختبار B3', '63000000-0000-0000-0000-0000000000c1'),
   ('b3-hist-1','RESELLER','63000000-0000-0000-0000-0000000000c3',
-   timestamptz '2026-06-01 00:00+03', null,
+   timestamptz '2026-06-01 00:00+03', timestamptz '2026-09-01 00:00+03',
    'اختبار B3', '63000000-0000-0000-0000-0000000000c1');
 
 insert into public.saas_activation_events
