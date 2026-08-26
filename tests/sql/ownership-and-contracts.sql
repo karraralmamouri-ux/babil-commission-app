@@ -116,11 +116,22 @@ set local request.jwt.claim.sub = '0c000000-0000-0000-0000-0000000000a1';
 
 select public.calculate_commission_cycle('0c000000-0000-0000-0000-0000000000a2', false);
 
+-- بعد LIVE-02 نطاق العمولة يُحسم برقم الكابينة وحده — والوكيلان هنا معروفان
+-- سلفاً بعائدية subscriber_identities، بصرف النظر عن تسجيل الكابينة. فلا
+-- UNKNOWN_FDT يُنتَج بعد اليوم (أُسقطت الدالة نفسها)، ولا حتى UNKNOWN_AGENT:
+-- العائدية وحدها كفت لحسم الوكيل لكلا الحدثين. البند الوحيد الباقي حقيقياً
+-- هو الأصلي: التابع المباشر للشركة يبقى بلا حاجب ولا عمولة (أدناه).
 select pg_temp.ok(
-  (select count(*) from public.commission_exceptions
+  not exists (
+    select 1 from public.commission_exceptions
+    where cycle_id = '0c000000-0000-0000-0000-0000000000a2' and status = 'OPEN'),
+  'لا حاجب إطلاقاً: كابينة غير مسجَّلة لم تعد تمنع حسم عائديةٍ معروفة سلفاً');
+
+select pg_temp.ok(
+  (select count(*) from public.commission_event_entitlements
    where cycle_id = '0c000000-0000-0000-0000-0000000000a2'
-     and reason_code = 'UNKNOWN_FDT' and status = 'OPEN') = 2,
-  'حاجبان لا أربعة: التابع للشركة لا يُنشئ حاجب كابينة');
+     and subscriber_key in ('oc-res1','oc-res2')) = 2,
+  'وحدثا الوكيل يصيران مستحقين الآن — العائدية وحدها كفت، لا تسجيل الكابينة');
 
 select pg_temp.ok(
   not exists (
