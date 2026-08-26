@@ -16,6 +16,8 @@ import { correctionActionsCell, correctionBox, wireCorrectionActions } from '../
 import { routes as payoutRoutes } from './payout';
 import { routes as invoiceRoutes } from './invoices';
 import { routes as cycleRoutes } from './cycle';
+import { routes as graceQueueRoutes } from './graceQueue';
+import { routes as manualExceptionRoutes } from './manualException';
 import {
   esc, loading, empty, errorState, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -108,6 +110,8 @@ export const controlCenter: Route = {
       + `<div class="actions installation-next-actions">
           <a class="btn" href="${esc(href('/installation/cycle'))}">افتح خطوات الدورة</a>
           <a class="btn gold" href="${esc(href('/installation/invoices', { status: 'NOT_CHECKED' }))}">راجع الفواتير</a>
+          <a class="btn" href="${esc(href('/installation/grace-queue'))}">مهلة تفعيل منقضية</a>
+          <a class="btn" href="${esc(href('/installation/manual-exception'))}">مراجعة استثناء يدوي</a>
         </div>`;
     wireClassificationRun(view);
   },
@@ -401,4 +405,5 @@ export const routes: Route[] = [
   ...invoiceRoutes,
   ...cycleRoutes,
   ...payoutRoutes, ...holdRoutes,
+  ...graceQueueRoutes, ...manualExceptionRoutes,
 ];

@@ -309,6 +309,15 @@ fi
 echo "$out33" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out33" | grep -c "            ok ")))
 
+echo "== manual exception intake + grace-expired queue (PR-B1) =="
+out34=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/manual-exception-and-grace-queue.sql 2>&1) || true
+if echo "$out34" | grep -qE "FAILED|ERROR"; then
+  echo "$out34" | grep -E "FAILED|ERROR" || true
+  echo "MANUAL EXCEPTION / GRACE QUEUE TESTS FAILED" >&2; exit 1
+fi
+echo "$out34" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out34" | grep -c "            ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
