@@ -324,7 +324,7 @@ grant select on table public.grace_period_overrides to authenticated;
 
 drop policy if exists grace_period_overrides_select on public.grace_period_overrides;
 create policy grace_period_overrides_select on public.grace_period_overrides
-  for select to authenticated using (public.has_capability('installation.view'));
+  for select to authenticated using ((select public.has_capability('installation.view')));
 
 insert into public.permission_capabilities (key, domain, label_ar, is_sensitive, is_self_protecting, scopeable)
 values ('installation.grace_override', 'installation', 'تجاوز مهلة التفعيل', true, false, false)
