@@ -50,7 +50,6 @@ insert into public.packages (code, semantic_category) values
   ('B4-DEBT-1', 'DEBT_SERVICE')
 on conflict (code) do nothing;
 
-set local role authenticated;
 set local request.jwt.claim.sub = 'b4000000-0000-0000-0000-0000000000a1';
 
 -- دفعات استيراد: مجهولة، ناقصة، مكتملة.
@@ -315,8 +314,7 @@ select pg_temp.ok(
 
 -- 19. التجاوز يرفض من لا يملك installation.grace_override.
 select pg_temp.must_fail(
-  'set local role authenticated;
-   set local request.jwt.claim.sub = ''b4000000-0000-0000-0000-0000000000a9'';
+  'set local request.jwt.claim.sub = ''b4000000-0000-0000-0000-0000000000a9'';
    select public.override_grace_expired_review(
      ''b4-grace-boundary31'', ''محاولة بلا صلاحية'', gen_random_uuid())',
   'D-13: التجاوز يرفض فاعلاً بلا installation.grace_override');
@@ -387,8 +385,7 @@ select pg_temp.ok(
 -- 25. التصريح باكتمالٍ يرفض فاعلاً بلا صلاحية saas.import.
 -- تغطيةٌ في حزيران، بعيدة عمداً عن نطاق آب أدناه (فقرة 27) كي لا يتقاطعا.
 select pg_temp.must_fail(
-  'set local role authenticated;
-   set local request.jwt.claim.sub = ''b4000000-0000-0000-0000-0000000000a9'';
+  'set local request.jwt.claim.sub = ''b4000000-0000-0000-0000-0000000000a9'';
    select public.declare_import_completeness(
      (select id from public.saas_import_batches
       where source_checksum = ''b4-checksum-just-uploaded''),
