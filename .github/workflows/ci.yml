@@ -64,8 +64,8 @@ jobs:
           shopt -s nullglob
           migrations=(supabase/migrations/*.sql)
 
-          if [[ "${#migrations[@]}" -ne 74 ]]; then
-            echo "Expected exactly 74 migrations, found ${#migrations[@]}" >&2
+          if [[ "${#migrations[@]}" -ne 76 ]]; then
+            echo "Expected exactly 76 migrations, found ${#migrations[@]}" >&2
             exit 1
           fi
 
@@ -85,7 +85,7 @@ jobs:
           done
 
           unique_count=$(printf '%s\n' "${migrations[@]##*/}" | sort -u | wc -l)
-          if [[ "$unique_count" -ne 74 ]]; then
+          if [[ "$unique_count" -ne 76 ]]; then
             echo "Migration filenames are not unique" >&2
             exit 1
           fi
