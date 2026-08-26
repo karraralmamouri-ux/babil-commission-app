@@ -300,6 +300,15 @@ fi
 echo "$out32" | grep -E "\| (pass|FAIL)" || true
 passed=$((passed + $(echo "$out32" | grep -c "| pass")))
 
+echo "== batch 4 rule engine (D-01/D-12/D-13/D-14) =="
+out33=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/batch4-rule-engine.sql 2>&1)
+if echo "$out33" | grep -qE "FAILED|ERROR"; then
+  echo "$out33" | grep -E "FAILED|ERROR" || true
+  echo "BATCH 4 RULE ENGINE TESTS FAILED" >&2; exit 1
+fi
+echo "$out33" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out33" | grep -c "            ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
