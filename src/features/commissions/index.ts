@@ -104,6 +104,14 @@ export const overview: Route = {
       `${esc(result.cycle.name)} · ${esc(cycleStatusAr(result.cycle.status))}`,
       projected ? projectedTag() : chip('معتمدة', 'success'))
 
+      // LIVE-03: قرارٌ يُحسَم لا يُعيد كتابة المال بصمت — لكن يجب أن يُقال إن
+      // الدورة صارت غير موثوقة. العلم من commission_cycle_result، وزرّ
+      // «أعد الحساب» أسفل لوحة الإجراءات هو الفعل الصريح المطلوب.
+      + (result.cycle.needs_recalculation
+        ? insight('warn', 'هذه الدورة صارت بحاجة لإعادة حساب',
+            `${esc(result.cycle.recalculation_reason || 'تغيّرت بيانات أساس منذ آخر حساب')} — استعمل «أعد الحساب» أدناه.`)
+        : '')
+
       + draftCard
 
       // النتيجة المالية أولاً: محسوب، معتمد، مدفوع.
