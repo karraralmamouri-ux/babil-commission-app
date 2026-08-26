@@ -103,6 +103,13 @@ export interface RouterOptions {
   routes: Route[];
   onNavigated?: (route: Route, m: RouteMatch) => void;
   can: (capability: string) => boolean;
+  /**
+   * هل وصلت الصلاحيات من الخادم بعد؟ غيابها اختياري: من لا يمرّره يقبل خطر
+   * "ممنوع" لحظياً قبل وصول الجلسة — كما كان الحال قبل LIVE-08.
+   */
+  capabilitiesReady?: () => boolean;
+  /** يُعرض بدل "ممنوع" ريثما تصل الصلاحيات — لا حكم نهائي بعد. */
+  renderCapabilityLoading?: (outlet: HTMLElement, capability: string) => void;
   renderForbidden: (outlet: HTMLElement, capability: string) => void;
   renderNotFound: (outlet: HTMLElement, path: string) => void;
   renderError: (outlet: HTMLElement, error: unknown) => void;
@@ -168,12 +175,22 @@ export class Router {
 
       const match: RouteMatch = { path, params, query };
 
-      if (route.capability && !this.options.can(route.capability)) {
-        if (!controller.signal.aborted) {
-          this.options.renderForbidden(outlet, route.capability);
-          this.options.onNavigated?.(route, match);
+      if (route.capability) {
+        const ready = this.options.capabilitiesReady?.() ?? true;
+        if (!ready && this.options.renderCapabilityLoading) {
+          if (!controller.signal.aborted) {
+            this.options.renderCapabilityLoading(outlet, route.capability);
+            this.options.onNavigated?.(route, match);
+          }
+          return;
         }
-        return;
+        if (ready && !this.options.can(route.capability)) {
+          if (!controller.signal.aborted) {
+            this.options.renderForbidden(outlet, route.capability);
+            this.options.onNavigated?.(route, match);
+          }
+          return;
+        }
       }
 
       try {

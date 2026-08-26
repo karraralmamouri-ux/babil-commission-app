@@ -273,7 +273,10 @@ test('ما لا صلاحية له يُخفى لا يُعطَّل فقط', () => 
   assert.match(shell, /capability: '[a-z.]+'/);
   assert.match(shell, /items\.filter\(\(i\) => !i\.capability \|\| can\(i\.capability\)\)/);
   const router = fs.readFileSync(path.join(root, 'src', 'app', 'router.ts'), 'utf8');
-  assert.match(router, /route\.capability && !this\.options\.can\(route\.capability\)/);
+  // مقسومٌ إلى فحصين منذ LIVE-08 (جارٍ التحقّق ← ثم ممنوع)، فالتوكيد يطابق
+  // شرط الحسم لا صياغته الحرفية القديمة.
+  assert.match(router, /if \(route\.capability\)/);
+  assert.match(router, /!this\.options\.can\(route\.capability\)/);
   // والشاشات التي لم تُهاجَر بعد تحتفظ بحارسها القديم في index.html.
   assert.match(html, /data-permission="edit"/);
   assert.match(html, /data-permission="rates"/);
