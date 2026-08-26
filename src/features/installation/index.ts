@@ -10,7 +10,7 @@ import { href } from '../../app/router';
 import { rpc, pageRpc } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { transferPanel, wireTransfer } from '../ownership/transfer';
-import { classificationPanel } from './classification';
+import { classificationPanel, classificationRunPanel, wireClassificationRun } from './classification';
 import { routes as holdRoutes, holdPanel, wireHoldPanel } from './holds';
 import { correctionActionsCell, correctionBox, wireCorrectionActions } from '../finance/paymentCorrections';
 import { routes as payoutRoutes } from './payout';
@@ -103,11 +103,13 @@ export const controlCenter: Route = {
               <a class="smallbtn" href="${esc(href('/work/historical'))}">راجع الحالات</a></span></div>
         </div>`
       + `<details class="box installation-source-diagnostics"><summary><b>تشخيصات المصدر والتصنيف</b></summary>
-          ${classificationPanel(classState)}</details>`
+          ${classificationPanel(classState)}
+          ${classificationRunPanel()}</details>`
       + `<div class="actions installation-next-actions">
           <a class="btn" href="${esc(href('/installation/cycle'))}">افتح خطوات الدورة</a>
           <a class="btn gold" href="${esc(href('/installation/invoices', { status: 'NOT_CHECKED' }))}">راجع الفواتير</a>
         </div>`;
+    wireClassificationRun(view);
   },
 };
 

@@ -220,7 +220,7 @@ Still unanswered but they block nothing in phases 0–5:
 
 | # | Decision | Needed by |
 |---|---|---|
-| D-01 | NEW vs NEEDS_REVIEW threshold when the registry has no hit | Phase 3 |
+| D-01 | NEW vs NEEDS_REVIEW threshold when the registry has no hit | Phase 3 — see §4 for the full decision pack now that Batch 3 has wired `classify_newness()`'s output into a visible UI panel |
 | D-07 | Is NEW ZONE tier per-FDT or per-FDT-owner? | Phase 8 |
 | D-10 | Does Odoo own invoice identity, or mirror Babil's? | Phase 10 |
 
@@ -285,7 +285,144 @@ Phase 4 only; it does not block Phases 1–3, which shipped independently.
 
 ---
 
-## 4. Hard scenarios
+## 4. Batch 3 business rule decision pack — August intake / NEW vs EXISTING
+
+**Raised during Batch 3 (2026-08-26), while wiring August SaaS intake all the way to a
+visible classification preview.** None of these four are implemented — the code below only
+*reads and displays* what the engine already decides today (rule 5 of `classify_newness()`,
+unchanged since Batch 1); it does not add, loosen, or guess a rule. Each entry below states
+what would have to be decided before any of these thresholds could be trusted for real money.
+
+### D-01 — exact NEW-classification rule when there is no historical match
+
+**Exact decision needed.** `classify_newness()`'s rule 5 (`supabase/migrations/20260904090000_server_side_classification.sql:115-118`)
+already says: a subscriber whose lifetime activation counter equals what this batch observed,
+**from a source declared `COMPLETE`**, is `NEW`. What is *not* decided is whether that single
+rule is sufficient the moment a source is `COMPLETE`, or whether a first-ever appearance needs
+something more before it is trusted as genuinely new (as opposed to genuinely old but simply
+absent from every file captured so far).
+
+**Current backend behavior.** Rule 5 as written, no grace window, no second signal. Because
+every batch imported to date has `completeness_status = 'UNKNOWN'` (§3 of the migration's own
+comment), rule 5 is **structurally inert today** — it cannot fire until D-14 below is resolved
+and an operator actually declares a batch `COMPLETE`.
+
+**Options.**
+1. Trust rule 5 as-is the instant a source is `COMPLETE` — no extra wait.
+2. Require the subscriber to appear as a first-time NEW candidate across **N consecutive**
+   `COMPLETE` periods before the classification is trusted (protects against one bad
+   `COMPLETE` declaration).
+3. Every `NEW` classification requires an explicit human confirmation regardless of rule 5 —
+   `classify_newness()` keeps computing `NEW`, but no entitlement may be built from it without
+   a second, audited approval step.
+
+**Financial consequence.** `NEW` is the sole gate for a first-time installation-fee
+entitlement. A false `NEW` risks paying a fee for a subscriber who existed before this file;
+a false `NEEDS_REVIEW` only delays payment — asymmetric risk, favouring the stricter option.
+
+**Recommended option.** Option 3, until there is a track record of reliable `COMPLETE`
+declarations — but this is a recommendation for review, not a decision made here.
+
+**What test locks it in.** `tests/sql/newness-parity-sql.js` / `tests/sql/newness-parity-js.js`
+(server/client parity of the existing rule); a new assertion once the option is chosen.
+
+### D-12 — grace period before a pending review escalates
+
+**Exact decision needed.** How long may a subscriber sit in `NEEDS_REVIEW`, `UNMATCHED`, or
+`CONFLICT` before anything changes? Does it stay open indefinitely, or does some elapsed
+window change its handling?
+
+**Current backend behavior.** No aging logic anywhere. `subscriber_identities` and
+`subscriber_classifications` carry no expiry or escalation field; a row stays exactly as
+classified until a human acts through `/system/identities` (conflict resolution) or a future
+review action — `refresh_subscriber_classifications` only re-evaluates, it does not age out.
+
+**Options.**
+1. No grace period — reviews stay open indefinitely (today's de facto behavior).
+2. A fixed calendar window (e.g. 30/60/90 days) after which a stale review is escalated to a
+   distinct, more visible queue — visibility only, not an automatic classification change.
+3. A window tied to commission-cycle boundaries instead of calendar days (escalate at cycle
+   close, not on a rolling clock).
+
+**Financial consequence.** None directly — a pending review earns nothing either way. The
+risk is entirely in what escalation is later allowed to *do* (see D-13); escalating visibility
+alone carries no financial consequence.
+
+**Recommended option.** None — flagging for review; no code currently depends on an answer.
+
+**What test locks it in.** None yet — a new test once a window and its effect are chosen.
+
+### D-13 — permanent-block trigger
+
+**Exact decision needed.** Is there any condition under which a subscriber's path to
+classification/entitlement becomes permanently blocked, as distinct from `NEEDS_REVIEW`
+(which stays recoverable pending more evidence)? For example: does a `CONFLICT` ever become
+unrecoverable, or is every conflict resolvable by an admin action, forever?
+
+**Current backend behavior.** No permanent-block state exists in the schema. Every outcome
+that is not `EXISTING` or `NEW` is `NEEDS_REVIEW` — in principle always recoverable by
+re-running `refresh_subscriber_classifications` once more evidence (a later, more complete
+import) arrives. The only "block" primitive in the system today is `installation_holds`, and
+it is scoped to already-registered `installation_subscribers`, not to SaaS-sourced candidates
+still awaiting classification.
+
+**Options.**
+1. Nothing is ever permanent — everything stays `NEEDS_REVIEW`/`CONFLICT` until a human
+   resolves it, however long that takes.
+2. A distinct terminal state (e.g. `BLOCKED`), reachable only through an explicit, audited
+   admin action — mirroring the correction/reversal pattern already used for financial
+   entries (R-03/S-16), never automatic.
+3. Auto-block after N failed review cycles.
+
+**Financial consequence.** A permanent block is a hard financial gate: it must guarantee no
+entitlement or payment can ever be created for that identity. It should not exist without a
+decided answer for who may set and clear it, and under what audit trail — the same bar this
+codebase already holds correction/reversal actions to.
+
+**Recommended option.** None — flagging for review.
+
+**What test locks it in.** None yet.
+
+### D-14 — source-completeness declaration timing
+
+**Exact decision needed.** When may an operator declare a SaaS import batch's
+`completeness_status` as `COMPLETE`? Immediately, on the operator's word alone? Only once the
+batch's declared coverage period has fully elapsed? Only after cross-checking against a second,
+independent source?
+
+**Current backend behavior.** `declare_import_completeness` (existing RPC, wired into
+`src/features/system/imports.ts`'s `declarePanel`/`wireDeclare`) lets any capability-holder
+(`saas.review`) mark a batch `COMPLETE`/`PARTIAL`/`UNKNOWN` at any time, with a mandatory
+reason and an audited row — but no calendar gate and no cross-source check. This is a
+deliberate existing design ("the operator declares, the system never auto-declares" — see
+Phase 5 of this batch's own scope), but the evidentiary bar for *when* that declaration should
+be trusted is exactly what is undecided.
+
+**Options.**
+1. Trust the operator's declaration unconditionally, as today — the mandatory reason and
+   audit trail are the only control.
+2. Require the batch's declared coverage window to have fully elapsed
+   (`declared_coverage_end < today − N days`) before `COMPLETE` is accepted.
+3. Require a second operator's confirmation (four-eyes) before `COMPLETE` takes effect.
+
+**Financial consequence.** `classify_newness()`'s rule 5 is gated entirely on
+`completeness_status = 'COMPLETE'` — this is the single switch that turns on installation-fee
+eligibility for first-time subscribers. Declaring `COMPLETE` too early risks paying a fee for
+a subscriber who existed in a not-yet-captured earlier file.
+
+**Recommended option.** None — flagging for review. Option 1 is today's shipped behavior and
+now carries materially more weight after Batch 3 wired its output into a visible
+classification panel (`src/features/installation/classification.ts`) and a per-batch identity
+match preview (`import_batch_detail`'s `identity_match` key) — it needs explicit sign-off to
+keep, not silent continuation.
+
+**What test locks it in.** `tests/sql/identity-operations.sql` and the Batch 2/3 declaration
+tests cover capability + mandatory-reason + audit today; a new assertion once (2) or (3) is
+chosen.
+
+---
+
+## 5. Hard scenarios
 
 For each: **source of truth · what is mutable · who may change it · what blocks payment ·
 what is audited · what stays immutable.**

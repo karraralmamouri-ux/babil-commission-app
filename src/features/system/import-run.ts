@@ -34,6 +34,9 @@ declare global {
       buildHistoricalPreview: (rows: Row[], options: Record<string, unknown>) => Row;
       buildHistoricalImportRows: (preview: Row) => Row[];
     };
+    SaasImport?: {
+      parseWorkbook: (sheets: Array<{ name: string; rows: Row[] }>, options: Record<string, unknown>) => Row;
+    };
   }
 }
 
@@ -45,7 +48,7 @@ async function checksum(buffer: ArrayBuffer): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-type Mode = 'ENTITLEMENTS' | 'HISTORY';
+type Mode = 'ENTITLEMENTS' | 'HISTORY' | 'SAAS';
 
 interface Parsed {
   fileName: string;
@@ -80,11 +83,14 @@ export const importRun: Route = {
           <select class="select" id="imMode" aria-label="نوع الاستيراد">
             <option value="ENTITLEMENTS">استحقاقات شهر — متبقٍّ لكل مشترك</option>
             <option value="HISTORY">الأساس التاريخي — دفعات مسجَّلة</option>
+            <option value="SAAS">ملف SaaS — أحداث تفعيل و/أو لقطة مستخدمين</option>
           </select>
           <input class="search" id="imPeriod" placeholder="الفترة YYYY-MM" dir="ltr"
             aria-label="الفترة">
           <input class="search" type="date" id="imAsOf" aria-label="تاريخ اللقطة"
             style="display:none">
+          <input class="search" type="datetime-local" id="imSnapshotAt"
+            aria-label="وقت لقطة المستخدمين" style="display:none">
         </div>
         <p class="muted" style="font-size:11px;margin-top:6px" id="imModeHint">
           استحقاقات الشهر: يكتب ما يستحقّه كل مشترك في الفترة المذكورة.</p>
@@ -125,16 +131,21 @@ function wireImport(view: View): void {
   const host = root.querySelector<HTMLElement>('#imPreview');
   const confirm = root.querySelector<HTMLButtonElement>('#imConfirm');
   const out = root.querySelector<HTMLElement>('#imResult');
+  const snapshotAt = root.querySelector<HTMLInputElement>('#imSnapshotAt');
   if (!mode || !parse || !host || !confirm || !out) return;
 
   let parsed: Parsed | null = null;
 
   const syncMode = () => {
     const isHistory = mode.value === 'HISTORY';
-    if (period) period.style.display = isHistory ? 'none' : '';
+    const isSaas = mode.value === 'SAAS';
+    if (period) period.style.display = (isHistory || isSaas) ? 'none' : '';
     if (asOf) asOf.style.display = isHistory ? '' : 'none';
+    if (snapshotAt) snapshotAt.style.display = isSaas ? '' : 'none';
     if (hint) {
-      hint.textContent = isHistory
+      hint.textContent = isSaas
+        ? 'ملف SaaS: يُقرأ بمحلِّل التفعيل نفسه المستخدَم في المعاينة. الأحداث تُميَّز بمعرّفها لا بالمشترك، فلا إزالة تكرار على مستوى المشترك أبداً. لقطة المستخدمين — إن وُجدت — تحتاج وقت لقطة صريحاً.'
+        : isHistory
         ? 'الأساس التاريخي: يبني ما دُفع سلفاً. تاريخ اللقطة يُختار ولا يُشتقّ من الملف.'
         : 'استحقاقات الشهر: يكتب ما يستحقّه كل مشترك في الفترة المذكورة.';
     }
@@ -151,7 +162,8 @@ function wireImport(view: View): void {
 
     const xlsx = window.XLSX;
     const fees = window.InstallationFees;
-    if (!xlsx || !fees) {
+    const saas = window.SaasImport;
+    if (!xlsx || (mode.value === 'SAAS' ? !saas : !fees)) {
       host.innerHTML = insight('danger', 'مكتبة القراءة غير محمَّلة',
         'أعِد تحميل الصفحة ثم حاول مرّةً أخرى.');
       return;
@@ -163,14 +175,30 @@ function wireImport(view: View): void {
       const buffer = await f.arrayBuffer();
       const sum = await checksum(buffer);
       const book = xlsx.read(buffer, { type: 'array' });
+
+      if (mode.value === 'SAAS') {
+        const sheets = book.SheetNames.map((name) => ({
+          name, rows: xlsx.utils.sheet_to_json(book.Sheets[name], { defval: '' }) as Row[],
+        }));
+        const preview = saas!.parseWorkbook(sheets, {});
+        if (!view.live) return;
+        parsed = { fileName: f.name, checksum: sum, sheetName: sheets.map((s) => s.name).join(', '), rows: [], preview };
+        if (info) {
+          info.textContent = `${f.name} · ${sheets.length} ورقة · بصمة ${sum.slice(0, 16)}…`;
+        }
+        host.innerHTML = renderSaasPreview(preview);
+        confirm.disabled = acceptedCount(preview, 'SAAS') === 0;
+        return;
+      }
+
       const sheetName = book.SheetNames[0] || '';
       const sheet = book.Sheets[sheetName];
       const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
 
       // المحلِّل نفسه الذي كانت تستدعيه الشاشة السابقة — لا نسخة ثانية.
       const preview = mode.value === 'HISTORY'
-        ? fees.buildHistoricalPreview(rows, { asOfDate: asOf?.value || null })
-        : fees.buildImportPreview(rows, { period: period?.value.trim() || '', existingKeys: [] });
+        ? fees!.buildHistoricalPreview(rows, { asOfDate: asOf?.value || null })
+        : fees!.buildImportPreview(rows, { period: period?.value.trim() || '', existingKeys: [] });
 
       if (!view.live) return;
       parsed = { fileName: f.name, checksum: sum, sheetName, rows, preview };
@@ -179,7 +207,7 @@ function wireImport(view: View): void {
           + `الورقة «${sheetName}» · بصمة ${sum.slice(0, 16)}…`;
       }
       host.innerHTML = renderPreview(preview, mode.value as Mode);
-      confirm.disabled = acceptedCount(preview) === 0;
+      confirm.disabled = acceptedCount(preview, mode.value as Mode) === 0;
     } catch (error) {
       if (!view.live) return;
       host.innerHTML = insight('danger', 'تعذّرت قراءة الملف',
@@ -195,7 +223,8 @@ function wireImport(view: View): void {
       return;
     }
     const isHistory = mode.value === 'HISTORY';
-    if (!isHistory && !/^\d{4}-(0[1-9]|1[0-2])$/.test(period?.value.trim() || '')) {
+    const isSaas = mode.value === 'SAAS';
+    if (!isHistory && !isSaas && !/^\d{4}-(0[1-9]|1[0-2])$/.test(period?.value.trim() || '')) {
       out.innerHTML = insight('warn', 'الفترة إلزامية', 'بصيغة YYYY-MM');
       return;
     }
@@ -203,12 +232,56 @@ function wireImport(view: View): void {
       out.innerHTML = insight('warn', 'تاريخ اللقطة إلزامي', 'لا يُشتقّ من الملف');
       return;
     }
+    const preview = parsed.preview;
+    if (isSaas && Array.isArray(preview['users']) && (preview['users'] as Row[]).length
+      && !snapshotAt?.value) {
+      out.innerHTML = insight('warn', 'وقت لقطة المستخدمين إلزامي',
+        'الملف يحمل صفّ مستخدمين، ولا يُشتقّ وقت اللقطة من الملف');
+      return;
+    }
 
     confirm.disabled = true;
     out.innerHTML = loading('جارٍ الاعتماد على الخادم…');
     try {
+      if (isSaas) {
+        const events = Array.isArray(preview['events']) ? (preview['events'] as Row[]) : [];
+        const users = Array.isArray(preview['users']) ? (preview['users'] as Row[]) : [];
+        const parts: string[] = [];
+
+        if (events.length) {
+          const r = await rpc<Row>('import_saas_activation_events', {
+            p_file_name: parsed.fileName,
+            p_file_checksum: parsed.checksum,
+            p_parser_version: 'saas-import.js',
+            p_rows: events,
+            p_request_id: crypto.randomUUID(),
+          });
+          const batch = (r?.['batch'] || {}) as Row;
+          parts.push(`أحداث: مقبول ${count(num(batch, 'accepted'))} · مكرّر ${count(num(batch, 'duplicates'))}`
+            + ` · مرفوض ${count(num(batch, 'rejected'))}`);
+        }
+        if (users.length) {
+          const r = await rpc<Row>('import_saas_user_snapshot', {
+            p_file_name: parsed.fileName,
+            p_file_checksum: parsed.checksum,
+            p_parser_version: 'saas-import.js',
+            p_snapshot_at: snapshotAt?.value ? new Date(snapshotAt.value).toISOString() : null,
+            p_rows: users,
+            p_request_id: crypto.randomUUID(),
+          });
+          const batch = (r?.['batch'] || {}) as Row;
+          parts.push(`مستخدمون: مقبول ${count(num(batch, 'accepted'))} · مكرّر ${count(num(batch, 'duplicates'))}`
+            + ` · مرفوض ${count(num(batch, 'rejected'))}`);
+        }
+        if (!view.live) return;
+        out.innerHTML = insight('good', 'اعتُمد الاستيراد', parts.join(' — '))
+          + `<div class="actions" style="margin-top:10px">
+              <a class="btn" href="${esc(href('/system/imports'))}">افتح مركز الاستيراد</a></div>`;
+        parsed = null;
+        return;
+      }
+
       const fees = window.InstallationFees;
-      const preview = parsed.preview;
       const result = isHistory
         ? await rpc<Row>('import_installation_history', {
             p_as_of_date: asOf?.value,
@@ -257,13 +330,58 @@ function entitlementRows(preview: Row): Row[] {
   }));
 }
 
-function acceptedCount(preview: Row | null): number {
+function acceptedCount(preview: Row | null, mode: Mode): number {
   if (!preview) return 0;
+  if (mode === 'SAAS') {
+    const events = Array.isArray(preview['events']) ? (preview['events'] as Row[]).length : 0;
+    const users = Array.isArray(preview['users']) ? (preview['users'] as Row[]).length : 0;
+    return events + users;
+  }
   const batch = (preview['batch'] || preview) as Row;
   const accepted = batch['accepted'];
   if (Array.isArray(accepted)) return accepted.length;
   const mapped = preview['mappedRows'];
   return Array.isArray(mapped) ? mapped.length : Number(accepted || 0);
+}
+
+/** معاينة ملف SaaS: عدّاد لكل ورقة، وما أُسقط بسببه، بلا أي كتابة بعد. */
+function renderSaasPreview(preview: Row): string {
+  const sheetResults = Array.isArray(preview['sheetResults']) ? (preview['sheetResults'] as Row[]) : [];
+  const events = Array.isArray(preview['events']) ? (preview['events'] as Row[]) : [];
+  const users = Array.isArray(preview['users']) ? (preview['users'] as Row[]) : [];
+  const unparsedDates = num(preview, 'unparsedDates');
+  const secretsDropped = num(preview, 'secretsDropped');
+  const duplicateCount = num(preview, 'duplicateCount');
+
+  return `<div class="box" style="margin-top:12px">
+    <h3>المعاينة</h3>
+    ${kpiRow([
+      { label: 'أحداث تفعيل', value: count(events.length), tone: 'green' },
+      { label: 'لقطة مستخدمين', value: count(users.length), tone: 'blue' },
+      { label: 'مكرّر عبر الأوراق', value: count(duplicateCount), tone: duplicateCount ? 'gold' : 'blue' },
+      { label: 'تاريخ غير مفهوم', value: count(unparsedDates), tone: unparsedDates ? 'red' : 'green',
+        sub: unparsedDates ? 'يُستبعد من كل حساب لاحق' : 'كل تاريخ فُهم' },
+    ])}
+    <p class="muted" style="font-size:11px;margin-top:8px">
+      ${secretsDropped ? `أُسقط ${count(secretsDropped)} عموداً سرّياً قبل القراءة — لا يُخزَّن ولا يُعرض. ` : ''}
+      هذه قراءةٌ للملف. الخادم يعيد الفرز ويكتب التكرار على مستوى الحدث لا المشترك.</p>
+
+    ${sheetResults.length ? `<div style="margin-top:10px">
+      <h3 style="font-size:13px">الأوراق</h3>
+      ${table<Row>([
+        { key: 'sheet', label: 'الورقة', cell: (r) => esc(str(r, 'sheet')) },
+        { key: 'kind', label: 'النوع', cell: (r) => {
+          const k = str(r, 'kind');
+          return k === 'REJECTED' ? chip('مرفوضة — ' + str(r, 'reason'), 'critical')
+            : chip(k === 'ACTIVATION_EVENTS' ? 'أحداث تفعيل' : 'لقطة مستخدمين', 'info');
+        } },
+        { key: 'rows', label: 'صفوف الملف', cell: (r) => count(num(r, 'rows')), numeric: true },
+        { key: 'imp', label: 'مقبول', cell: (r) => count(num(r, 'imported')), numeric: true },
+        { key: 'dup', label: 'مكرّر', cell: (r) => count(num(r, 'duplicates')), numeric: true },
+        { key: 'rej', label: 'مرفوض', cell: (r) => count(num(r, 'rejected')), numeric: true },
+      ], sheetResults)}
+    </div>` : ''}
+  </div>`;
 }
 
 function renderPreview(preview: Row, mode: Mode): string {
