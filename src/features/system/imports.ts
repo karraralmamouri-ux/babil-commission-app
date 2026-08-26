@@ -154,6 +154,7 @@ export const importDetail: Route = {
     const unknownFdts = (doc?.['unknown_fdts'] || []) as Row[];
     const unknownPkgs = (doc?.['unknown_packages'] || []) as Row[];
     const decls = (doc?.['declarations'] || []) as Row[];
+    const identityMatch = (doc?.['identity_match'] || {}) as Row;
     const comp = COMPLETENESS[str(b, 'completeness_status')];
 
     // الفارق بين الملف والقاعدة: يُحسب ويُعرض بدل أن يُترك للحساب الذهني.
@@ -224,6 +225,26 @@ export const importDetail: Route = {
             : '<p class="muted">كل الباقات معرَّفة</p>'}
         </div>
       </div>`
+
+      // مطابقة الهوية: حالة اليوم في subscriber_identities، لا تصنيف جِدّة.
+      + (str(b, 'source_kind') === 'ACTIVATION_EVENTS' && num(identityMatch, 'total_subscribers')
+        ? `<div class="box" style="margin-top:12px">
+          <h3>مطابقة الهوية لمشتركي هذه الدفعة</h3>
+          <p class="muted" style="font-size:11px;margin:0 0 8px">
+            حالة المطابقة كما هي في سجلّ الهوية اليوم — لا حكم جِدّة هنا.</p>
+          ${kpiRow([
+            { label: 'مطابَق', value: count(num(identityMatch, 'matched')), tone: 'green' },
+            { label: 'غير مطابَق', value: count(num(identityMatch, 'unmatched')), tone: 'blue',
+              sub: 'لا يُصنَّف جديداً تلقائياً' },
+            { label: 'تعارض', value: count(num(identityMatch, 'conflict')), tone: 'red',
+              sub: num(identityMatch, 'conflict') ? 'يحتاج حسماً' : '—' },
+            { label: 'يحتاج مراجعة', value: count(num(identityMatch, 'needs_review')), tone: 'gold' },
+          ])}
+          ${num(identityMatch, 'conflict') ? `<div class="actions" style="margin-top:10px">
+            <a class="btn" href="${esc(href('/system/identities?status=CONFLICT'))}">
+              افتح شاشة تعارض الهوية</a></div>` : ''}
+        </div>`
+        : '')
 
       + declarePanel(id, str(b, 'completeness_status'))
 
