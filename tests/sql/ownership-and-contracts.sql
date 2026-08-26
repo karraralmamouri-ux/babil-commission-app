@@ -127,10 +127,14 @@ select pg_temp.ok(
     where cycle_id = '0c000000-0000-0000-0000-0000000000a2' and status = 'OPEN'),
   'لا حاجب إطلاقاً: كابينة غير مسجَّلة لم تعد تمنع حسم عائديةٍ معروفة سلفاً');
 
+-- subscriber_key هنا هو si.id (uuid المطابقة) لا اسم المستخدم — كل صف في
+-- subscriber_identities يحمل id افتراضياً (gen_random_uuid()), فمطابقة
+-- subscriber_key باسم المستخدم حرفياً لا تُطابق شيئاً أبداً. activation_event_id
+-- هو المعرّف الثابت للحدث بصرف النظر عن حسم العائدية.
 select pg_temp.ok(
   (select count(*) from public.commission_event_entitlements
    where cycle_id = '0c000000-0000-0000-0000-0000000000a2'
-     and subscriber_key in ('oc-res1','oc-res2')) = 2,
+     and activation_event_id in ('OC-R1','OC-R2')) = 2,
   'وحدثا الوكيل يصيران مستحقين الآن — العائدية وحدها كفت، لا تسجيل الكابينة');
 
 select pg_temp.ok(
@@ -143,10 +147,13 @@ select pg_temp.ok(
       and si.source_classification = 'DIRECT_COMPANY'),
   'ولا حاجب واحد لتابعٍ مباشر في أي سبب');
 
+-- نفس التنبيه: subscriber_key ليس اسم المستخدم، فالمطابقة الحرفية أدناه كانت
+-- ستنجح صامتة حتى لو وُجد استحقاق فعلي لهذين الحدثين. activation_event_id
+-- هو الاختبار الحقيقي لعدم استحقاقهما.
 select pg_temp.ok(
   not exists (select 1 from public.commission_event_entitlements
               where cycle_id = '0c000000-0000-0000-0000-0000000000a2'
-                and subscriber_key in ('oc-dc1','oc-dc2')),
+                and activation_event_id in ('OC-D1','OC-D2')),
   'والتابع للشركة لا تنشأ عنه عمولة — كما كان');
 
 -- ------------------------------------------------------------------
