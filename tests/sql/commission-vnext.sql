@@ -156,8 +156,10 @@ insert into public.agent_aliases (agent_id, alias, resolution) values
   ('a2222222-2222-2222-2222-222222222222','r.new','mapped')
 on conflict (alias_key) do nothing;
 
+-- الكابينة 100 داخل مدى 94-119: نطاقها الكابينة بحكم الرقم وحده (LIVE-02)،
+-- بصرف النظر عمّا يقوله عمود fdts.zone التشغيلي هنا.
 insert into public.fdts (code, label, zone, agent_id)
-values ('900','FDT-900','new','a2222222-2222-2222-2222-222222222222')
+values ('100','FDT-100','new','a2222222-2222-2222-2222-222222222222')
 on conflict (code) do nothing;
 
 insert into public.saas_import_batches
@@ -186,12 +188,12 @@ insert into public.saas_activation_events
   (import_batch_id, saas_event_id, username, profile_name, canceled, raw_parent,
    event_created_at, fdt_code)
 values
-  ('b1111111-1111-1111-1111-111111111111','EV-N1','nsub1','P-35000',false,'r.new','2026-08-03','900'),
-  ('b1111111-1111-1111-1111-111111111111','EV-N2','nsub1','P-65000',false,'r.new','2026-08-15','900'),
-  ('b1111111-1111-1111-1111-111111111111','EV-N3','nsub2','P-35000',false,'r.new','2026-08-18','900'),
+  ('b1111111-1111-1111-1111-111111111111','EV-N1','nsub1','P-35000',false,'r.new','2026-08-03','100'),
+  ('b1111111-1111-1111-1111-111111111111','EV-N2','nsub1','P-65000',false,'r.new','2026-08-15','100'),
+  ('b1111111-1111-1111-1111-111111111111','EV-N3','nsub2','P-35000',false,'r.new','2026-08-18','100'),
   -- تابعٌ مباشر للشركة على الكابينة نفسها: لا يرفع أساس الشريحة ولا
   -- تنشأ عنه عمولة وكيل. وجوده هنا هو ما يجعل الرقمين أعلاه دليلاً.
-  ('b1111111-1111-1111-1111-111111111111','EV-N4','nsub3','P-35000',false,'r.new','2026-08-19','900')
+  ('b1111111-1111-1111-1111-111111111111','EV-N4','nsub3','P-35000',false,'r.new','2026-08-19','100')
 on conflict do nothing;
 
 insert into public.subscriber_identities (username, identity_status, match_method, source_classification, effective_agent_id)
@@ -266,7 +268,7 @@ select pg_temp.ok(
 -- لا يعود عليه منه شيء.
 select pg_temp.ok(
   (select unique_activated_subscribers from public.commission_cycle_snapshots
-   where scope_type='FDT' and scope_id='900') = 2,
+   where scope_type='FDT' and scope_id='100') = 2,
   'المنطقة الجديدة: الأساس يُحسب داخل الكابينة، والتابع المباشر لا يرفعه');
 
 select pg_temp.ok(
@@ -276,19 +278,19 @@ select pg_temp.ok(
 
 select pg_temp.ok(
   (select scope_type from public.commission_cycle_snapshots
-   where scope_id = '900') = 'FDT',
+   where scope_id = '100') = 'FDT',
   'نطاق المنطقة الجديدة يبقى الكابينة');
 
 select pg_temp.ok(
   (select qualifying_event_count from public.commission_cycle_snapshots
-   where scope_type='FDT' and scope_id='900') = 3,
+   where scope_type='FDT' and scope_id='100') = 3,
   'المنطقة الجديدة: ثلاثة أحداث مُعمَّلة');
 
 select pg_temp.ok(
-  (select zone from public.commission_cycle_snapshots where scope_type='FDT' and scope_id='900') = 'new'
+  (select zone from public.commission_cycle_snapshots where scope_type='FDT' and scope_id='100') = 'new'
   and (select zone from public.commission_cycle_snapshots
        where scope_type='AGENT' and scope_id='a1111111-1111-1111-1111-111111111111') = 'old',
-  'المنطقتان تُشتقّان من الكابينة لا من إدخال يدوي');
+  'المنطقتان تُشتقّان من رقم الكابينة (94-119) لا من عمود fdts.zone اليدوي');
 
 -- الشريحة من عدد المشتركين، والمبلغ من التهيئة.
 select pg_temp.ok(
@@ -357,9 +359,11 @@ select pg_temp.ok(
                 and e.reason_code='UNKNOWN_FDT' and s.fdt_code is null),
   'المنطقة القديمة لا تُطالَب بكابينة');
 
--- الكابينة غير المسجَّلة لا تسقط إلى المنطقة القديمة — القياس على تموز أظهر
--- 2,977 حدثاً على 92 كابينة غير مسجَّلة تحمل 40.8% من الإجمالي، كلها مُسعَّرة
--- بنطاق الوكيل بناءً على افتراض لم يخترْه أحد.
+-- LIVE-02: كابينة خارج 94-119 (مسجَّلة أو لا، سيّان) نطاقها وكيل بالتعريف —
+-- لا حالة "غير محسومة"، ولا استثناء UNKNOWN_FDT يحجب الاعتماد. القياس على
+-- تموز أظهر 2,977 حدثاً على 92 كابينة غير مسجَّلة تحمل 40.8% من الإجمالي،
+-- وكانت تُحجَب بالكامل بلا سبب تجاري: النطاق محسوم بالرقم وحده، فلا حاجة
+-- لتسجيل الكابينة لتحديده.
 insert into public.saas_activation_events
   (import_batch_id, saas_event_id, username, profile_name, canceled, raw_parent,
    event_created_at, fdt_code)
@@ -381,36 +385,30 @@ reset role;
 
 select pg_temp.ok(
   (select zone from public.commission_qualifying_events
-   where saas_event_id='EV-UNREG') = 'unresolved',
-  'كابينة غير مسجَّلة تُعطي منطقة غير محسومة لا قديمة');
+   where saas_event_id='EV-UNREG') = 'old',
+  'كابينة خارج 94-119 تعطي منطقة وكيل محسومة، لا حالة معلَّقة');
 
 select pg_temp.ok(
-  not exists (select 1 from public.commission_event_entitlements
-              where cycle_id='d1111111-1111-1111-1111-111111111111'
-                and activation_event_id='EV-UNREG'),
-  'الكابينة غير المحسومة لا تُنتج عمولة');
-
-select pg_temp.ok(
-  exists (select 1 from public.commission_exceptions
+  exists (select 1 from public.commission_event_entitlements
           where cycle_id='d1111111-1111-1111-1111-111111111111'
-            and activation_event_id='EV-UNREG' and reason_code='UNKNOWN_FDT'
-            and blocks_finalization),
-  'الكابينة غير المحسومة تُنتج استثناءً حاجباً');
+            and activation_event_id='EV-UNREG'),
+  'كابينة خارج السجل لم تعد تُحجَب — تُعمَّل بنطاق الوكيل مباشرة');
+
+select pg_temp.ok(
+  not exists (select 1 from public.commission_exceptions
+              where cycle_id='d1111111-1111-1111-1111-111111111111'
+                and activation_event_id='EV-UNREG' and reason_code='UNKNOWN_FDT'),
+  'لا استثناء UNKNOWN_FDT بعد اليوم — سقط بلا بديل');
+
+select pg_temp.ok(
+  not exists (select 1 from public.commission_exceptions
+              where reason_code='UNKNOWN_FDT'),
+  'UNKNOWN_FDT لا يُنشأ إطلاقاً بعد LIVE-02');
 
 select pg_temp.ok(
   (select count(*) from public.commission_qualifying_events
    where fdt_code is null and zone = 'old') > 0,
   'غياب الكابينة يبقى منطقةً قديمة مشروعة');
-
--- يُحسَم قبل خطوة الاعتماد لاحقاً، تماماً كما تُحسَم الباقة المجهولة.
-set local role authenticated;
-set local request.jwt.claim.sub = 'c1111111-1111-1111-1111-111111111111';
-select public.resolve_commission_exception(
-  (select id from public.commission_exceptions
-   where cycle_id='d1111111-1111-1111-1111-111111111111'
-     and reason_code='UNKNOWN_FDT' and status='OPEN' limit 1),
-  'WAIVED', 'كابينة تجربة خارج السجل', gen_random_uuid()) is not null as waived_fdt;
-reset role;
 
 -- ===========================================================================
 -- 42. الاعتماد واللقطة
@@ -491,9 +489,12 @@ insert into public.saas_activation_events
 values ('b1111111-1111-1111-1111-111111111111','EV-LATE','sub9','P-35000','r.old','2026-08-25')
 on conflict do nothing;
 
+-- الأربعة لا الثلاثة: منذ LIVE-02 تُحتسب EV-UNREG أيضاً ضمن نطاق الوكيل
+-- (كابينتها 99999 خارج 94-119)، فالأساس المجمَّد هنا أربعة لا ثلاثة —
+-- والمقصود يبقى نفسه: EV-LATE الوارد بعد الاعتماد لا يغيّر هذا الرقم.
 select pg_temp.ok(
   (select unique_activated_subscribers from public.commission_cycle_snapshots
-   where scope_type='AGENT' and scope_id='a1111111-1111-1111-1111-111111111111') = 3,
+   where scope_type='AGENT' and scope_id='a1111111-1111-1111-1111-111111111111') = 4,
   'حدث ورد بعد الاعتماد لا يُغيّر اللقطة');
 
 -- إعادة الفتح بلا مال مُرحَّل مسموحة ومُدقَّقة.
