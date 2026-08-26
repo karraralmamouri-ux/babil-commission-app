@@ -81,12 +81,14 @@ export const cycle: Route = {
       ])
 
       + `<div class="box" style="margin-top:14px">
-        <h3>جاهزية الدورة
+        <h3>الحواجز المفتوحة حالياً
           ${chip(OVERALL_STATE[str(readiness, 'overall_state')]?.label || '—',
                  OVERALL_STATE[str(readiness, 'overall_state')]?.tone || 'neutral')}</h3>
         <p class="muted" style="font-size:11px;margin:0 0 12px">
           تجميعٌ عرضيٌّ لما هو محسوبٌ أصلاً في كل شاشة — لا حسابٌ جديد ولا قرارٌ مالي هنا.
-          «جاهزة للمراجعة» تعني خلوّها من كل حاجزٍ أدناه، لا أن الصرف تمّ.</p>
+          عبر كل الوقت (لا خاصّ بالفترة المختارة أعلاه — الفترة تحكم فقط عدّاد
+          الاستحقاق ضمن الخطوات أدناه). «جاهزة للمراجعة» تعني خلوّها من كل
+          حاجزٍ أدناه، لا أن الصرف تمّ.</p>
         ${checklist.filter((c) => num(c, 'count') > 0).map((c) => `
           <a class="minirow" style="text-decoration:none;color:inherit"
               href="${esc(href(str(c, 'path')))}">
