@@ -115,11 +115,10 @@ select pg_temp.ok(
 
 select pg_temp.ok(
   not exists (select 1 from public.installation_entitlements ie
-              join public.installation_subscribers s on s.id = ie.subscriber_uuid
-              where lower(btrim(s.subscriber_id)) = 'me-subject-one')
+              where lower(btrim(ie.subscriber_id)) = 'me-subject-one')
   and not exists (select 1 from public.installation_payments p
-                  join public.installation_subscribers s on s.id = p.subscriber_uuid
-                  where lower(btrim(s.subscriber_id)) = 'me-subject-one'),
+                  join public.installation_entitlements ie on ie.id = p.entitlement_id
+                  where lower(btrim(ie.subscriber_id)) = 'me-subject-one'),
   'الإنشاء لا يُنشئ استحقاقاً ولا دفعة بأي شكل');
 
 /* ---------------------------------------------------------------------------
