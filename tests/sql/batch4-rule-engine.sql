@@ -215,7 +215,13 @@ select pg_temp.ok(
   'D-01: تاريخ باقة دين وحدها (Loan-3) لا يُنشئ استحقاق جِدّة');
 
 -- ---------------------------------------------------------------------------
--- D-12 — عقد قراءة المهلة: +30 يوماً تقويمياً بالضبط من saas_created_at.
+-- D-12 — عقد قراءة المهلة: +30 يوماً تقويمياً بالضبط.
+--
+-- ⚠ تحذيرٌ مسجَّلٌ عمداً: الاختبارات 10–16 أدناه تثبت فقط أن الحساب التقويمي
+-- (+30 يوماً، لا تقريب شهري) صحيحٌ حِسابياً على القيمة التي تُقرأ اليوم
+-- (saas_user_snapshots.saas_created_at). هي لا تُثبت — ولا يجوز أن تُقرأ
+-- كأنها تُثبت — أن تلك القيمة هي فعلاً "تاريخ التركيب" الذي اعتُمد نصّ D-12
+-- عليه. انظر قسم "D-12 BLOCKER" أسفله وrisk-and-open-decisions.md §D-12.
 -- ---------------------------------------------------------------------------
 
 insert into public.saas_import_batches
@@ -295,6 +301,43 @@ from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
 select pg_temp.ok(
   (public.installation_grace_status('b4-grace-blocked-identity') ->> 'status') = 'NOT_APPLICABLE',
   'D-12: مسدودٌ بتعارض هوية ⇒ ليس بانتظار تفعيل ولا مهلة منقضية');
+
+-- ---------------------------------------------------------------------------
+-- D-12 BLOCKER — installation date ≠ SaaS account creation.
+--
+-- هذا الاختبار مُتعمَّدٌ فشله. الغرض: إثبات أن installation_grace_status()
+-- تشتق مهلة التركيب حالياً من saas_user_snapshots.saas_created_at — وهو تاريخ
+-- إنشاء حساب SaaS، لا أي تاريخ تركيبٍ فعلي مُثبَت — رغم أن نص القاعدة
+-- المعتمد (D-12) يشترط صراحةً "30 يوماً تقويمياً من تاريخ التركيب الفعلي".
+--
+-- لا يوجد في المخطط الحالي أي عمود يمثّل تاريخ تركيب فعلي لهذه الفئة من
+-- المشتركين (انظر تدقيق المصادر في risk-and-open-decisions.md §D-12 وتقرير
+-- التدقيق المُرفَق بهذا PR). لذلك لا يمكن بناء ثابتة "التاريخ الصحيح" هنا؛
+-- بدلاً من ذلك نستخدم اختباراً تفاضلياً (metamorphic): مشتركان لا يملك أيٌّ
+-- منهما أي دليل تركيبٍ فعلي (لا سجل تاريخي، لا حدث تفعيل مؤهّل، لا تصنيف)،
+-- ويختلفان فقط في قِدَم حساب SaaS. بما أنه لا دليل تركيبٍ حقيقياً لأيٍّ
+-- منهما، يجب أن تتساوى حالتهما (الأصحّ منطقياً: كلاهما UNKNOWN، تماماً كما
+-- في الاختبار 10). التنفيذ الحالي يخالف ذلك: يُخرِج المشترك القديم الحساب
+-- كـ GRACE_EXPIRED_REVIEW والمشترك الحديث الحساب كـ PENDING_ACTIVATION، لمجرد
+-- فارق تاريخ إنشاء الحساب — أي أن saas_created_at يُحرِّك مهلة D-12 فعلياً،
+-- وهو بالضبط ما يمنعه نص القاعدة المعتمد. هذا الاختبار MUST FAIL حتى يُحدَّد
+-- مصدر تاريخ تركيبٍ حقيقي ويُستخدَم بدلاً من saas_created_at.
+-- ---------------------------------------------------------------------------
+insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, saas_created_at)
+select id, now(), 'B4-SU-BLOCKER-OLD', 'b4-blocker-old-account', now() - interval '40 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
+
+insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, saas_created_at)
+select id, now(), 'B4-SU-BLOCKER-NEW', 'b4-blocker-new-account', now() - interval '2 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
+
+select pg_temp.ok(
+  (public.installation_grace_status('b4-blocker-old-account') ->> 'status')
+  = (public.installation_grace_status('b4-blocker-new-account') ->> 'status'),
+  'D-12 BLOCKER (متوقَّع فشله): بلا أي دليل تركيبٍ فعلي لأيٍّ من المشتركين، '
+  || 'يجب أن تتطابق حالة المهلة بينهما — فارق تاريخ إنشاء حساب SaaS وحده '
+  || 'ليس له سلطة على موعد المهلة. الفشل الحالي يُثبت أن saas_created_at '
+  || 'يُعامَل خطأً كتاريخ تركيب.');
 
 -- ---------------------------------------------------------------------------
 -- D-13 — بعد انقضاء المهلة: لا استحقاق تلقائي، لا حجب دائم تلقائي، تجاوزٌ

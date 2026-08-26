@@ -363,6 +363,30 @@ declarations — but this is a recommendation for review, not a decision made he
 > (day 30 itself still pending; day 31 expired — no monthly rounding). Option 2 below is what
 > shipped, with the window fixed at 30 calendar days per the approved text rather than left
 > configurable.
+>
+> **CORRECTION — 2026-08-26, post-approval audit.** The paragraph above is retained verbatim
+> as a record of what was actually shipped, but its own reasoning is now known to be wrong and
+> must not be relied on. `saas_user_snapshots.saas_created_at` is the SaaS platform's own
+> **account-creation** timestamp — it is not, and was never verified to be, the subscriber's
+> **actual installation date** that the approved D-12 text requires ("30 calendar days from
+> installation date … must use actual installation date"). No field anywhere in the current
+> schema represents a real, evidenced installation/completion event for the SaaS-discovered
+> candidate population that D-12 exists to protect: `installation_subscribers.start_date` only
+> exists for the historical-registry population (a different, already-`EXISTING` population,
+> and its own real-world meaning is itself undocumented); `installation_enrollments.enrolled_at`
+> is a system-processing timestamp, not a real-world event; the first qualifying activation
+> event necessarily occurs *after* installation per D-01's own wording, so it is at best a
+> lower bound, never the date itself; `first_confirmed_installation_at`
+> (`docs/engineering/financial-domain-model-vnext.md` §2.3) is an unbuilt, unsourced vNext
+> placeholder that appears nowhere else in the repository. **Conclusion: D-12 is
+> implementation-blocked pending an authoritative installation-date source** (a real column
+> fed by an actual installation/completion event, or a defined ingestion contract from an
+> external system such as field-ops/Taskati/Odoo installation tracking — none of which
+> currently exists). `installation_grace_status()` and the duplicate day-30 check inside
+> `action_center()`'s `grace_expired` CTE must not be patched to "fix" this by picking a
+> different existing column, since none of the existing columns are the right one; a new
+> regression in `tests/sql/batch4-rule-engine.sql` (`D-12 BLOCKER`) is intentionally left
+> failing to keep this visible in CI until a true installation-date source is defined.
 
 **Exact decision needed.** How long may a subscriber sit in `NEEDS_REVIEW`, `UNMATCHED`, or
 `CONFLICT` before anything changes? Does it stay open indefinitely, or does some elapsed
