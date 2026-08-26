@@ -316,6 +316,25 @@ identity ownership") is unrelated to this pack and remains explicitly OPEN.
 > below (options 1–3) is kept as the historical record of what was undecided before this; option
 > 3's spirit (identity must be resolved, not merely non-conflicting) is what shipped, expressed
 > as a hard server-side gate rather than a manual second approval step.
+>
+> **CLARIFICATION — 2026-08-26, alongside the D-12 fix.** NEWNESS and ACTIVATION ELIGIBILITY
+> are two separate questions and must not be conflated when reading this rule. NEWNESS —
+> "is this a new subscriber?" — is exactly what `classify_newness()` answers, unchanged by
+> this note: registry hit is still decisive for `EXISTING`; `UNMATCHED`/`CONFLICT` are still
+> review states; `activations_count` alone is still never authoritative; none of
+> `classify_newness()`'s guard order or reason codes changed. ACTIVATION ELIGIBILITY — "has
+> this candidate produced a qualifying activation yet?" — is a separate, later question that
+> `installation_grace_status()` answers for the population `classify_newness()` currently
+> reports as `NEEDS_REVIEW` / `NO_QUALIFYING_PAID_EVENT` (i.e. a candidate with real SaaS
+> history but no qualifying paid event yet — exactly D-12's target population). That function's
+> read-only `status` field now says `NEW_PENDING_ACTIVATION` or `NEW_ACTIVATED` instead of the
+> earlier generic `PENDING_ACTIVATION`/`QUALIFIED`, to name what it is: an operational view of
+> "new, and here is whether it has activated yet." This is a rename of that one read-only
+> status vocabulary, not a change to the `subscriber_classifications.classification` column,
+> its enum, or which rows are financially eligible — a Loan-only candidate is `NEW_PENDING_
+> ACTIVATION` operationally, but still `NEEDS_REVIEW` in `subscriber_classifications` and still
+> creates no entitlement until an actual qualifying activation lands. See D-12 below for the
+> corrected reference-date rule this status is computed from.
 
 **Exact decision needed.** `classify_newness()`'s rule 5 (`supabase/migrations/20260904090000_server_side_classification.sql:115-118`)
 already says: a subscriber whose lifetime activation counter equals what this batch observed,
@@ -387,6 +406,45 @@ declarations — but this is a recommendation for review, not a decision made he
 > different existing column, since none of the existing columns are the right one; a new
 > regression in `tests/sql/batch4-rule-engine.sql` (`D-12 BLOCKER`) is intentionally left
 > failing to keep this visible in CI until a true installation-date source is defined.
+>
+> **RESOLVED — 2026-08-26, authoritative business clarification.** The correction above stands
+> as the record of why `saas_created_at` had to be removed — it does. But the premise that no
+> reference date exists at all was narrowed by an explicit operational clarification: D-12's
+> anchor is **not** a physical installation timestamp (none exists, and none is required) but
+> the **first recorded SaaS operation for the subscriber once NEW is established** — the
+> operational/accounting start date the manual process always used, since a subscriber never
+> entered the installation-fee tracking workflow before *some* SaaS operation (a Loan/debt
+> activation, or a direct qualifying paid activation) put them on the radar. Renamed
+> end-to-end to `installation_reference_at` (never "installation date") to keep this
+> distinction from being re-lost. Rules: if the first operation is a Loan, the subscriber's
+> reference date is that Loan's date and the read-only status is `NEW_PENDING_ACTIVATION`
+> (Loan alone is still never a qualifying activation — D-04 unchanged); if the first operation
+> is itself a qualifying paid activation, the reference date is that same event and the status
+> is `NEW_ACTIVATED` immediately; if a Loan is followed later by a qualifying activation, the
+> reference date stays pinned to the Loan (does not shift forward); if no SaaS operation has
+> occurred at all, no date is fabricated and the status is `UNKNOWN`. Implemented as a single
+> shared source of truth — `installation_reference_dates()` (the date pair) and
+> `grace_status_from_dates()` (the +30-day decision) — called by both
+> `installation_grace_status()` and `action_center()`'s `grace_expired` CTE, so the threshold
+> is computed in exactly one place (previously duplicated, per the audit above).
+> `grace_status_from_dates()` deliberately carries no capability check so that
+> `action_center()` (gated on `report.view`) is not forced to also require
+> `installation.view` merely to reuse the date logic. Regression:
+> `tests/sql/batch4-rule-engine.sql` §D-12 (tests 10–21), covering: `saas_created_at` proven
+> to carry zero authority; no-operation ⇒ `UNKNOWN`; Loan-first, paid-first, and Loan-then-paid
+> orderings; the day-30/day-31 boundary measured from the reference date; multiple SaaS
+> identifiers sharing one `username_key` (earliest operation across all of them wins — this is
+> already how the whole rule engine resolves a subscriber; it is *not* the same thing as
+> merging two different usernames for one real person, which remains unsupported — see below);
+> a duplicated raw event not shifting the date; and Loan/`DEBT_SERVICE` never counting as a
+> qualifying activation. **Known, deliberately out-of-scope gap:** this schema has no mechanism
+> to merge two *different* usernames/`saas_user_id`s into one real-world subscriber before a
+> match exists — `subscriber_identities` only links a single `saas_user_id` to a single
+> `installation_subscriber_id`, 1:1, and only *after* a match. If the same physical subscriber
+> ever appears under two unrelated usernames pre-match, D-12 (and `classify_newness()`) will
+> currently treat them as two separate candidates. This is a pre-existing identity-resolution
+> limitation, not something D-12 introduced or can fix on its own; flagging it here rather than
+> inventing an ad hoc merge.
 
 **Exact decision needed.** How long may a subscriber sit in `NEEDS_REVIEW`, `UNMATCHED`, or
 `CONFLICT` before anything changes? Does it stay open indefinitely, or does some elapsed

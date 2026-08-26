@@ -215,13 +215,9 @@ select pg_temp.ok(
   'D-01: تاريخ باقة دين وحدها (Loan-3) لا يُنشئ استحقاق جِدّة');
 
 -- ---------------------------------------------------------------------------
--- D-12 — عقد قراءة المهلة: +30 يوماً تقويمياً بالضبط.
---
--- ⚠ تحذيرٌ مسجَّلٌ عمداً: الاختبارات 10–16 أدناه تثبت فقط أن الحساب التقويمي
--- (+30 يوماً، لا تقريب شهري) صحيحٌ حِسابياً على القيمة التي تُقرأ اليوم
--- (saas_user_snapshots.saas_created_at). هي لا تُثبت — ولا يجوز أن تُقرأ
--- كأنها تُثبت — أن تلك القيمة هي فعلاً "تاريخ التركيب" الذي اعتُمد نصّ D-12
--- عليه. انظر قسم "D-12 BLOCKER" أسفله وrisk-and-open-decisions.md §D-12.
+-- D-12 (مصحَّح) — عقد قراءة المهلة: +30 يوماً تقويمياً بالضبط من أول عملية
+-- SaaS مسجَّلة (installation_reference_dates) — لا تاريخ تركيب فعلي، ولا
+-- تاريخ إنشاء حساب SaaS. انظر التصحيح في risk-and-open-decisions.md §D-12.
 -- ---------------------------------------------------------------------------
 
 insert into public.saas_import_batches
@@ -230,114 +226,164 @@ values ('USERS_SNAPSHOT', 'b4-snapshots.xlsx', 'b4-checksum-snapshots', 'v1',
         'b4000000-0000-0000-0000-0000000000a1')
 on conflict do nothing;
 
--- 10. لا لقطة SaaS إطلاقاً ⇒ لا مرساة تاريخ ⇒ UNKNOWN، لا تخمين.
-select pg_temp.ok(
-  (public.installation_grace_status('b4-grace-unknown') ->> 'status') = 'UNKNOWN',
-  'D-12: بلا تاريخ تركيب معروف، القراءة UNKNOWN لا تخمين');
-
--- 11. عشرة أيام منذ التركيب، بلا تفعيل مؤهّل ⇒ انتظارٌ، ومتبقٍّ 20 يوماً بالضبط.
+-- 10. saas_created_at يختلف جذرياً عن أول عملية SaaS ⇒ المهلة تتبع العملية
+--     فقط ولا سلطة إطلاقاً لتاريخ إنشاء الحساب. لو بقي الشِفرة القديمة
+--     تقرأ saas_created_at (منذ 400 يوم) لخرجت الحالة GRACE_EXPIRED_REVIEW؛
+--     الصحيح NEW_ACTIVATED لأن أول عملية فعلية كانت قبل 10 أيام فقط ومؤهّلة.
 insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, saas_created_at)
-select id, now(), 'B4-SU-PENDING', 'b4-grace-pending', now() - interval '10 days'
-from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
-
-select pg_temp.ok(
-  (public.installation_grace_status('b4-grace-pending') ->> 'status') = 'PENDING_ACTIVATION'
-  and (public.installation_grace_status('b4-grace-pending') ->> 'days_remaining')::int = 20,
-  'D-12: عشرة أيام من التركيب بلا تفعيل ⇒ انتظار، ومتبقٍّ 20 يوماً بالضبط');
-
--- 12. اليوم الثلاثون بالضبط لا يزال داخل المهلة — الحد الأدنى للانقضاء.
-insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, saas_created_at)
-select id, now(), 'B4-SU-B30', 'b4-grace-boundary30', now() - interval '30 days'
-from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
-
-select pg_temp.ok(
-  (public.installation_grace_status('b4-grace-boundary30') ->> 'status') = 'PENDING_ACTIVATION',
-  'D-12: اليوم الثلاثون تماماً لا يزال ضمن المهلة، لا منقضياً');
-
--- 13. اليوم الحادي والثلاثون: انقضت المهلة فعلاً — لا تقريبٌ شهري، تقويمٌ صرف.
-insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, saas_created_at)
-select id, now(), 'B4-SU-B31', 'b4-grace-boundary31', now() - interval '31 days'
-from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
-
-select pg_temp.ok(
-  (public.installation_grace_status('b4-grace-boundary31') ->> 'status') = 'GRACE_EXPIRED_REVIEW'
-  and (public.installation_grace_status('b4-grace-boundary31') ->> 'days_remaining')::int = -1,
-  'D-12: اليوم الحادي والثلاثون منقضٍ بالضبط (+30 يوماً تقويمياً، لا تقريب)');
-
--- 14. تفعيلٌ مؤهّل داخل المهلة يُنهي الانتظار فوراً، ولو لم يُحدَّث التصنيف بعد.
-insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, saas_created_at)
-select id, now(), 'B4-SU-QUAL', 'b4-grace-qualified', now() - interval '5 days'
+select id, now(), 'B4-SU-IGNORE', 'b4-grace-ignore-saas-created', now() - interval '400 days'
 from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
 
 insert into public.saas_activation_events
   (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
-select id, 'B4-EVT-GRACE-QUAL', 'b4-grace-qualified', 'B4-PAID-1', 1, false, now() - interval '1 day'
+select id, 'B4-EVT-IGNORE-SAAS', 'b4-grace-ignore-saas-created', 'B4-PAID-1', 1, false, now() - interval '10 days'
 from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
 
 select pg_temp.ok(
-  (public.installation_grace_status('b4-grace-qualified') ->> 'status') = 'QUALIFIED',
-  'D-12: تفعيلٌ مؤهّل داخل المهلة ⇒ QUALIFIED فوراً بالقراءة الحيّة');
+  (public.installation_grace_status('b4-grace-ignore-saas-created') ->> 'status') = 'NEW_ACTIVATED'
+  and (public.installation_grace_status('b4-grace-ignore-saas-created') ->> 'installation_reference_at')::timestamptz
+      > now() - interval '11 days',
+  'D-12: saas_created_at (منذ 400 يوم) لا سلطة له؛ المرجع أول عملية فعلية فقط');
 
--- 15. مشتركٌ محسومٌ NEW فعلاً: جِدّته لم تعد قيد الانتظار مهما تأخر تاريخه.
+-- 11. لا عملية SaaS إطلاقاً ⇒ لا مرجع ⇒ UNKNOWN، لا تخمين، لا مهلة تُختلَق.
+select pg_temp.ok(
+  (public.installation_grace_status('b4-grace-no-operation') ->> 'status') = 'UNKNOWN'
+  and (public.installation_grace_status('b4-grace-no-operation') ->> 'deadline') is null,
+  'D-12: بلا أي عملية SaaS مسجَّلة، القراءة UNKNOWN ولا مهلة مُختلَقة');
+
+-- 12. أول عملية = قرض (Loan/DEBT_SERVICE) ⇒ NEW_PENDING_ACTIVATION، والمهلة
+--     تبدأ من تاريخ القرض نفسه؛ القرض وحده لا يُعَدّ تفعيلاً مؤهّلاً.
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
+select id, 'B4-EVT-GRACE-LOAN-FIRST', 'b4-grace-loan-first', 'B4-DEBT-1', 1, false, now() - interval '10 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
+
+select pg_temp.ok(
+  (public.installation_grace_status('b4-grace-loan-first') ->> 'status') = 'NEW_PENDING_ACTIVATION'
+  and (public.installation_grace_status('b4-grace-loan-first') ->> 'days_remaining')::int = 20
+  and (public.installation_grace_status('b4-grace-loan-first') ->> 'qualifying_activation_at') is null,
+  'D-12: أول عملية قرضٌ فقط ⇒ NEW_PENDING_ACTIVATION، والمهلة من تاريخ القرض');
+
+-- 13. أول عملية = تفعيلٌ مؤهّل مباشر ⇒ NEW_ACTIVATED فوراً، والمرجع هو
+--     تاريخ ذلك التفعيل نفسه (لا فرق بين المرجع وتاريخ التأهّل هنا).
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
+select id, 'B4-EVT-GRACE-PAID-FIRST', 'b4-grace-qualifying-first', 'B4-PAID-1', 1, false, now() - interval '3 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
+
+select pg_temp.ok(
+  (public.installation_grace_status('b4-grace-qualifying-first') ->> 'status') = 'NEW_ACTIVATED'
+  and (public.installation_grace_status('b4-grace-qualifying-first') ->> 'installation_reference_at')
+      = (public.installation_grace_status('b4-grace-qualifying-first') ->> 'qualifying_activation_at'),
+  'D-12: أول عملية تفعيلٌ مؤهّل ⇒ NEW_ACTIVATED فوراً، المرجع = تاريخ التفعيل');
+
+-- 14. قرضٌ أولاً ثم تفعيلٌ مؤهّل لاحقاً ⇒ المرجع يبقى تاريخ القرض (لا يتزحزح)،
+--     وتاريخ التأهّل هو الحدث الثاني وحده.
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
+select id, 'B4-EVT-GRACE-LOAN-THEN-PAID-1', 'b4-grace-loan-then-paid', 'B4-DEBT-1', 1, false, now() - interval '20 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
+select id, 'B4-EVT-GRACE-LOAN-THEN-PAID-2', 'b4-grace-loan-then-paid', 'B4-PAID-1', 1, false, now() - interval '5 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
+
+select pg_temp.ok(
+  (public.installation_grace_status('b4-grace-loan-then-paid') ->> 'status') = 'NEW_ACTIVATED'
+  and (public.installation_grace_status('b4-grace-loan-then-paid') ->> 'installation_reference_at')::timestamptz
+      < now() - interval '19 days'
+  and (public.installation_grace_status('b4-grace-loan-then-paid') ->> 'qualifying_activation_at')::timestamptz
+      > now() - interval '6 days',
+  'D-12: قرضٌ أولاً ثم تفعيلٌ لاحقاً ⇒ المرجع يبقى تاريخ القرض، لا تاريخ التفعيل');
+
+-- 15. اليوم الثلاثون تماماً منذ أول عملية (قرض) لا يزال داخل المهلة.
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
+select id, 'B4-EVT-GRACE-B30', 'b4-grace-boundary30', 'B4-DEBT-1', 1, false, now() - interval '30 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
+
+select pg_temp.ok(
+  (public.installation_grace_status('b4-grace-boundary30') ->> 'status') = 'NEW_PENDING_ACTIVATION',
+  'D-12: اليوم الثلاثون تماماً منذ أول عملية لا يزال ضمن المهلة، لا منقضياً');
+
+-- 16. اليوم الحادي والثلاثون: انقضت المهلة — لا تقريبٌ شهري، تقويمٌ صرف.
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
+select id, 'B4-EVT-GRACE-B31', 'b4-grace-boundary31', 'B4-DEBT-1', 1, false, now() - interval '31 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
+
+select pg_temp.ok(
+  (public.installation_grace_status('b4-grace-boundary31') ->> 'status') = 'GRACE_EXPIRED_REVIEW'
+  and (public.installation_grace_status('b4-grace-boundary31') ->> 'days_remaining')::int = -1,
+  'D-12: اليوم الحادي والثلاثون منقضٍ بالضبط (+30 يوماً تقويمياً من أول عملية)');
+
+-- 17. أكثر من معرّف SaaS (saas_user_id) لنفس مفتاح اسم المستخدم (حسابٌ أُعيد
+--     إصداره في SaaS مثلاً) ⇒ أقدم عملية عبر كل المعرّفات تفوز بالمرجع،
+--     لا آخرها ولا معرّف بعينه.
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, saas_user_id, username, profile_name,
+   activations_count, canceled, event_created_at)
+select id, 'B4-EVT-MULTI-ID-A', 'B4-SU-ID-A', 'b4-grace-multi-saas-id', 'B4-DEBT-1',
+       1, false, now() - interval '25 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, saas_user_id, username, profile_name,
+   activations_count, canceled, event_created_at)
+select id, 'B4-EVT-MULTI-ID-B', 'B4-SU-ID-B', 'b4-grace-multi-saas-id', 'B4-PAID-1',
+       1, false, now() - interval '5 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
+
+select pg_temp.ok(
+  (public.installation_grace_status('b4-grace-multi-saas-id') ->> 'deadline')::date
+    = (now() - interval '25 days')::date + 30,
+  'D-12: معرّفا SaaS مختلفان لنفس username_key ⇒ أقدم عملية عبر كليهما تفوز بالمرجع');
+
+-- 18. حدثٌ مكرَّر (نفس اللحظة، سجلّان مستوردان) لا يزحزح التاريخ عن أقدم لحظة.
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
+select id, 'B4-EVT-DUP-1', 'b4-grace-duplicate-event', 'B4-DEBT-1', 1, false, now() - interval '15 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
+select id, 'B4-EVT-DUP-2', 'b4-grace-duplicate-event', 'B4-DEBT-1', 1, false, now() - interval '15 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
+
+select pg_temp.ok(
+  (public.installation_grace_status('b4-grace-duplicate-event') ->> 'deadline')::date
+    = (now() - interval '15 days')::date + 30,
+  'D-12: حدثٌ مكرَّر بنفس اللحظة لا يغيّر تاريخ المرجع (أقدم لحظة ثابتة)');
+
+-- 19. Loan-3 (DEBT_SERVICE) لا يصبح تفعيلاً مؤهّلاً أبداً، حتى وهو مرجع المهلة.
+select pg_temp.ok(
+  (public.installation_grace_status('b4-grace-loan-first') ->> 'qualifying_activation_at') is null
+  and (public.installation_grace_status('b4-grace-boundary31') ->> 'qualifying_activation_at') is null,
+  'D-12: القرض (Loan/DEBT_SERVICE) لا يُعَدّ تفعيلاً مؤهّلاً مهما كان مرجعاً للمهلة');
+
+-- 20. مشتركٌ محسومٌ NEW فعلاً: جِدّته لم تعد قيد الانتظار مهما تأخر تاريخه.
 insert into public.subscriber_classifications
   (username_key, classification, reason_code, source_completeness)
 values ('b4-grace-resolved-new', 'NEW', 'COMPLETE_LIFETIME_HISTORY_OBSERVED', 'COMPLETE');
-insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, saas_created_at)
-select id, now(), 'B4-SU-RESOLVED', 'b4-grace-resolved-new', now() - interval '90 days'
-from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
+select id, 'B4-EVT-GRACE-RESOLVED', 'b4-grace-resolved-new', 'B4-DEBT-1', 1, false, now() - interval '90 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
 
 select pg_temp.ok(
   (public.installation_grace_status('b4-grace-resolved-new') ->> 'status') = 'NOT_APPLICABLE',
   'D-12: تصنيفٌ محسوم NEW ⇒ ليس بانتظار تفعيل، بصرف النظر عن قِدَم التاريخ');
 
--- 16. مسدودٌ لسببٍ غير نقص التفعيل (تعارض هوية) ⇒ ليس ضمن قراءة المهلة أصلاً.
+-- 21. مسدودٌ لسببٍ غير نقص التفعيل (تعارض هوية) ⇒ ليس ضمن قراءة المهلة أصلاً.
 insert into public.subscriber_classifications
   (username_key, classification, reason_code, source_completeness)
 values ('b4-grace-blocked-identity', 'NEEDS_REVIEW', 'IDENTITY_CONFLICT', 'UNKNOWN');
-insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, saas_created_at)
-select id, now(), 'B4-SU-BLOCKED', 'b4-grace-blocked-identity', now() - interval '90 days'
-from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, activations_count, canceled, event_created_at)
+select id, 'B4-EVT-GRACE-BLOCKED', 'b4-grace-blocked-identity', 'B4-DEBT-1', 1, false, now() - interval '90 days'
+from public.saas_import_batches where source_checksum = 'b4-checksum-unknown';
 
 select pg_temp.ok(
   (public.installation_grace_status('b4-grace-blocked-identity') ->> 'status') = 'NOT_APPLICABLE',
   'D-12: مسدودٌ بتعارض هوية ⇒ ليس بانتظار تفعيل ولا مهلة منقضية');
-
--- ---------------------------------------------------------------------------
--- D-12 BLOCKER — installation date ≠ SaaS account creation.
---
--- هذا الاختبار مُتعمَّدٌ فشله. الغرض: إثبات أن installation_grace_status()
--- تشتق مهلة التركيب حالياً من saas_user_snapshots.saas_created_at — وهو تاريخ
--- إنشاء حساب SaaS، لا أي تاريخ تركيبٍ فعلي مُثبَت — رغم أن نص القاعدة
--- المعتمد (D-12) يشترط صراحةً "30 يوماً تقويمياً من تاريخ التركيب الفعلي".
---
--- لا يوجد في المخطط الحالي أي عمود يمثّل تاريخ تركيب فعلي لهذه الفئة من
--- المشتركين (انظر تدقيق المصادر في risk-and-open-decisions.md §D-12 وتقرير
--- التدقيق المُرفَق بهذا PR). لذلك لا يمكن بناء ثابتة "التاريخ الصحيح" هنا؛
--- بدلاً من ذلك نستخدم اختباراً تفاضلياً (metamorphic): مشتركان لا يملك أيٌّ
--- منهما أي دليل تركيبٍ فعلي (لا سجل تاريخي، لا حدث تفعيل مؤهّل، لا تصنيف)،
--- ويختلفان فقط في قِدَم حساب SaaS. بما أنه لا دليل تركيبٍ حقيقياً لأيٍّ
--- منهما، يجب أن تتساوى حالتهما (الأصحّ منطقياً: كلاهما UNKNOWN، تماماً كما
--- في الاختبار 10). التنفيذ الحالي يخالف ذلك: يُخرِج المشترك القديم الحساب
--- كـ GRACE_EXPIRED_REVIEW والمشترك الحديث الحساب كـ PENDING_ACTIVATION، لمجرد
--- فارق تاريخ إنشاء الحساب — أي أن saas_created_at يُحرِّك مهلة D-12 فعلياً،
--- وهو بالضبط ما يمنعه نص القاعدة المعتمد. هذا الاختبار MUST FAIL حتى يُحدَّد
--- مصدر تاريخ تركيبٍ حقيقي ويُستخدَم بدلاً من saas_created_at.
--- ---------------------------------------------------------------------------
-insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, saas_created_at)
-select id, now(), 'B4-SU-BLOCKER-OLD', 'b4-blocker-old-account', now() - interval '40 days'
-from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
-
-insert into public.saas_user_snapshots (import_batch_id, snapshot_at, saas_user_id, username, saas_created_at)
-select id, now(), 'B4-SU-BLOCKER-NEW', 'b4-blocker-new-account', now() - interval '2 days'
-from public.saas_import_batches where source_checksum = 'b4-checksum-snapshots';
-
-select pg_temp.ok(
-  (public.installation_grace_status('b4-blocker-old-account') ->> 'status')
-  = (public.installation_grace_status('b4-blocker-new-account') ->> 'status'),
-  'D-12 BLOCKER (متوقَّع فشله): بلا أي دليل تركيبٍ فعلي لأيٍّ من المشتركين، '
-  || 'يجب أن تتطابق حالة المهلة بينهما — فارق تاريخ إنشاء حساب SaaS وحده '
-  || 'ليس له سلطة على موعد المهلة. الفشل الحالي يُثبت أن saas_created_at '
-  || 'يُعامَل خطأً كتاريخ تركيب.');
 
 -- ---------------------------------------------------------------------------
 -- D-13 — بعد انقضاء المهلة: لا استحقاق تلقائي، لا حجب دائم تلقائي، تجاوزٌ
@@ -369,7 +415,7 @@ select pg_temp.must_fail(
 
 -- 21. التجاوز يرفض مشتركاً ليس في حالة GRACE_EXPIRED_REVIEW فعلاً (يعيد التحقق خادمياً).
 select pg_temp.must_fail(
-  'select public.override_grace_expired_review(''b4-grace-pending'', ''سببٌ ما'', gen_random_uuid())',
+  'select public.override_grace_expired_review(''b4-grace-loan-first'', ''سببٌ ما'', gen_random_uuid())',
   'D-13: التجاوز يرفض مشتركاً لم تنقضِ مهلته فعلاً');
 
 -- 22. التجاوز المصرَّح يقع، وسببه محفوظ، وحالته تصير PENDING_ACTIVATION (لا NEW ولا EXISTING).
@@ -385,7 +431,7 @@ select pg_temp.ok(
   'D-13: التجاوز المصرَّح محفوظٌ بسببه وفاعله وطلبه');
 
 select pg_temp.ok(
-  (public.installation_grace_status('b4-grace-boundary31') ->> 'status') = 'PENDING_ACTIVATION',
+  (public.installation_grace_status('b4-grace-boundary31') ->> 'status') = 'NEW_PENDING_ACTIVATION',
   'D-13: بعد التجاوز، الحالة تصير انتظاراً — لا استحقاقاً ولا حجباً دائماً');
 
 select pg_temp.ok(

@@ -207,12 +207,80 @@ create trigger trg_flag_overlapping_batches
 -- NEEDS_REVALIDATION، فالمشغّل التشغيلي لا يُعلنها بنفسه أبداً.
 
 -- ---------------------------------------------------------------------------
--- 3. D-12 — عقد قراءة مهلة التفعيل: 30 يوماً تقويمياً من إنشاء حساب SaaS.
+-- 3. D-12 — عقد قراءة مهلة التفعيل: 30 يوماً تقويمياً من أول عملية SaaS
+--    مسجَّلة للمشترك، بعد أن يثبت جِدّته المنطق القائم في classify_newness().
 --
--- لا عمود installation_date قائم قبل التسجيل؛ أقرب مرساة موثوقة لمرشّح لم
--- يُسجَّل بعد هي saas_user_snapshots.saas_created_at — تاريخ إنشاء الحساب
--- في منصّة SaaS نفسها، لا تاريخ أي حدث لاحق.
+-- هذا ليس تاريخ تركيبٍ فعلي (لا وجود لعمودٍ كهذا في هذا المخطط ولا حاجة
+-- إليه هنا) وليس تاريخ إنشاء حساب SaaS (saas_user_snapshots.saas_created_at
+-- — استُعمل خطأً في نسخةٍ سابقة من هذه الدالة وصُحِّح؛ انظر
+-- risk-and-open-decisions.md §D-12). المرجع الصحيح، بحسب التوضيح التجاري
+-- المعتمد، هو التاريخ التشغيلي/المحاسبي المستعمل تاريخياً في العملية
+-- اليدوية: لا يدخل المشترك سير عمل رسم التركيب حتى تقع أول عملية SaaS له —
+-- قرضٌ (Loan) أو تفعيلٌ مؤهّل مباشر. القرض وحده لا يُعَدّ تفعيلاً مؤهّلاً،
+-- لكنه يُثبت المرجع الزمني (installation_reference_at) الذي تُقاس منه
+-- الثلاثون يوماً.
+--
+-- المصدر التجميعي (installation_reference_dates) هو المرجع الوحيد لهذا
+-- الحساب: يستدعيه installation_grace_status() هنا وaction_center() أدناه
+-- كلاهما، فلا يُعاد تنفيذ حساب اليوم الثلاثين في مكانين (تكرارٌ كان قائماً
+-- في نسخةٍ سابقة وأُزيل).
+--
+-- التجميع بمستوى username_key، وهو مفتاح الحسم نفسه في classify_newness():
+-- أي saas_user_id متعدد لنفس username_key (حساب أُعيد إصداره في SaaS مثلاً)
+-- يدخل تلقائياً لأن saas_activation_events مفهرَسٌ بـusername_key لا
+-- بـsaas_user_id. هذا لا يحلّ دمج أكثر من username مختلف لشخصٍ واحد — ذلك
+-- خارج نطاق D-12، ولا آلية له في هذا المخطط (subscriber_identities تربط
+-- saas_user_id بمشتركٍ مُطابَقٍ بعلاقة 1:1 فقط، بعد الحسم، لا قبله).
 -- ---------------------------------------------------------------------------
+
+create or replace function public.installation_reference_dates(p_username_key text)
+returns table (reference_at timestamptz, qualifying_at timestamptz)
+language sql
+stable
+security definer
+set search_path = ''
+as $fn$
+  select
+    (select min(e.event_created_at)
+     from public.saas_activation_events e
+     where e.username_key = lower(btrim(coalesce(p_username_key, '')))),
+    (select min(e.event_created_at)
+     from public.saas_activation_events e
+     left join public.packages pk on pk.code = e.profile_name
+     where e.username_key = lower(btrim(coalesce(p_username_key, '')))
+       and coalesce(e.canceled, false) = false
+       and coalesce(pk.semantic_category, 'UNKNOWN') = 'PAID_PACKAGE');
+$fn$;
+
+revoke execute on function public.installation_reference_dates(text) from public, anon;
+grant execute on function public.installation_reference_dates(text) to authenticated;
+
+-- حساب الحالة من التاريخين وحدهما — لا صلاحية هنا عمداً، فتُستدعى من
+-- installation_grace_status() (تتحقق هي نفسها من installation.view) ومن
+-- action_center() (يتحقق هو من report.view) بلا ازدواج صلاحيات: لو تحقّقت
+-- هذه الدالة من installation.view لانكسر action_center() على أي ممثّل
+-- يملك report.view دون installation.view.
+create or replace function public.grace_status_from_dates(
+  p_reference_at timestamptz,
+  p_qualifying_at timestamptz,
+  p_overridden boolean
+)
+returns text
+language sql
+stable
+set search_path = ''
+as $fn$
+  select case
+    when p_reference_at is null then 'UNKNOWN'
+    when p_qualifying_at is not null then 'NEW_ACTIVATED'
+    when coalesce(p_overridden, false) then 'NEW_PENDING_ACTIVATION'
+    when now()::date > (p_reference_at::date + 30) then 'GRACE_EXPIRED_REVIEW'
+    else 'NEW_PENDING_ACTIVATION'
+  end;
+$fn$;
+
+revoke execute on function public.grace_status_from_dates(timestamptz, timestamptz, boolean) from public, anon;
+grant execute on function public.grace_status_from_dates(timestamptz, timestamptz, boolean) to authenticated;
 
 create or replace function public.installation_grace_status(p_username_key text)
 returns jsonb
@@ -224,7 +292,7 @@ as $fn$
 declare
   v_key         text := lower(btrim(coalesce(p_username_key, '')));
   v_class       public.subscriber_classifications%rowtype;
-  v_install_at  timestamptz;
+  v_reference_at timestamptz;
   v_qualify_at  timestamptz;
   v_overridden  boolean;
   v_deadline    date;
@@ -239,18 +307,9 @@ begin
 
   select * into v_class from public.subscriber_classifications where username_key = v_key;
 
-  select s.saas_created_at into v_install_at
-  from public.saas_user_snapshots s
-  where s.username_key = v_key
-  order by s.snapshot_at asc, s.created_at asc
-  limit 1;
-
-  select min(e.event_created_at) into v_qualify_at
-  from public.saas_activation_events e
-  left join public.packages pk on pk.code = e.profile_name
-  where e.username_key = v_key
-    and coalesce(e.canceled, false) = false
-    and coalesce(pk.semantic_category, 'UNKNOWN') = 'PAID_PACKAGE';
+  select d.reference_at, d.qualifying_at
+  into v_reference_at, v_qualify_at
+  from public.installation_reference_dates(v_key) d;
 
   select exists (
     select 1 from public.grace_period_overrides o where o.username_key = v_key
@@ -263,27 +322,16 @@ begin
         and coalesce(v_class.reason_code, '') <> 'NO_QUALIFYING_PAID_EVENT' then
     -- مسدودٌ لسببٍ آخر (تعارض هوية، مصدر غير مكتمل...) — ليس انتظار تفعيل.
     v_status := 'NOT_APPLICABLE';
-  elsif v_install_at is null then
-    v_status := 'UNKNOWN';
-  elsif v_qualify_at is not null then
-    v_status := 'QUALIFIED';
   else
-    v_deadline := (v_install_at::date) + 30;
-    if v_overridden then
-      v_status := 'PENDING_ACTIVATION';
-    elsif now()::date > v_deadline then
-      v_status := 'GRACE_EXPIRED_REVIEW';
-    else
-      v_status := 'PENDING_ACTIVATION';
-    end if;
+    v_status := public.grace_status_from_dates(v_reference_at, v_qualify_at, v_overridden);
   end if;
 
-  v_deadline := case when v_install_at is null then null else (v_install_at::date) + 30 end;
+  v_deadline := case when v_reference_at is null then null else (v_reference_at::date) + 30 end;
   v_days := case when v_deadline is null then null else (v_deadline - now()::date) end;
 
   return jsonb_build_object(
     'username_key', v_key,
-    'installation_date', v_install_at,
+    'installation_reference_at', v_reference_at,
     'deadline', v_deadline,
     'qualifying_activation_at', v_qualify_at,
     'days_remaining', v_days,
@@ -376,7 +424,7 @@ begin
     entity_type, entity_id, request_id, extra
   ) values (
     v_actor, 'installation.grace.overridden', 'status',
-    'GRACE_EXPIRED_REVIEW', 'PENDING_ACTIVATION', 'subscriber_classification', null,
+    'GRACE_EXPIRED_REVIEW', 'NEW_PENDING_ACTIVATION', 'subscriber_classification', null,
     p_request_id, p_reason
   );
 
@@ -508,22 +556,19 @@ begin
     where b.completeness_status = 'NEEDS_REVALIDATION'
   ),
   -- D-12/D-13: مرشّحون بانتظار تفعيلٍ مؤهّل انقضت مهلتهم بلا تجاوزٍ مدقَّق.
+  -- المصدر الوحيد للتاريخ والحالة: installation_reference_dates() +
+  -- grace_status_from_dates()، نفس الزوج الذي يستعمله installation_grace_status().
+  -- لا يُعاد تنفيذ حساب اليوم الثلاثين هنا بأي شكل.
   grace_expired as (
     select count(*)::bigint as decisions, count(*)::bigint as subscribers
     from public.subscriber_classifications c
-    join public.saas_user_snapshots s on s.username_key = c.username_key
+    cross join lateral public.installation_reference_dates(c.username_key) d
     where c.classification = 'NEEDS_REVIEW'
       and c.reason_code = 'NO_QUALIFYING_PAID_EVENT'
-      and s.saas_created_at is not null
-      and now()::date > (s.saas_created_at::date + 30)
-      and not exists (
-        select 1 from public.grace_period_overrides o where o.username_key = c.username_key)
-      and not exists (
-        select 1 from public.saas_activation_events e
-        left join public.packages pk on pk.code = e.profile_name
-        where e.username_key = c.username_key
-          and coalesce(e.canceled, false) = false
-          and coalesce(pk.semantic_category, 'UNKNOWN') = 'PAID_PACKAGE')
+      and public.grace_status_from_dates(
+            d.reference_at, d.qualifying_at,
+            exists (select 1 from public.grace_period_overrides o where o.username_key = c.username_key))
+          = 'GRACE_EXPIRED_REVIEW'
   )
   select jsonb_build_object(
     'cycle_id', v_cid,
