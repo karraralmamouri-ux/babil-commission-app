@@ -34,17 +34,17 @@ select '           == manual exception intake + grace-expired queue (PR-B1) ==';
 -- ---------------------------------------------------------------------------
 
 insert into auth.users (id, email) values
-  ('me000000-0000-0000-0000-0000000000a1', 'me-admin@fixture.invalid')
+  ('ee000000-0000-0000-0000-0000000000a1', 'me-admin@fixture.invalid')
 on conflict do nothing;
 insert into public.profiles (id, full_name, email, role, is_active)
-values ('me000000-0000-0000-0000-0000000000a1', 'ME Admin', 'me-admin@fixture.invalid', 'admin', true)
+values ('ee000000-0000-0000-0000-0000000000a1', 'ME Admin', 'me-admin@fixture.invalid', 'admin', true)
 on conflict (id) do update set role = 'admin', is_active = true;
 
 insert into auth.users (id, email) values
-  ('me000000-0000-0000-0000-0000000000a9', 'me-viewer@fixture.invalid')
+  ('ee000000-0000-0000-0000-0000000000a9', 'me-viewer@fixture.invalid')
 on conflict do nothing;
 insert into public.profiles (id, full_name, email, role, is_active)
-values ('me000000-0000-0000-0000-0000000000a9', 'ME Viewer', 'me-viewer@fixture.invalid', 'viewer', true)
+values ('ee000000-0000-0000-0000-0000000000a9', 'ME Viewer', 'me-viewer@fixture.invalid', 'viewer', true)
 on conflict (id) do update set role = 'viewer', is_active = true;
 
 insert into public.packages (code, semantic_category) values
@@ -52,14 +52,14 @@ insert into public.packages (code, semantic_category) values
   ('ME-DEBT-1', 'DEBT_SERVICE')
 on conflict (code) do nothing;
 
-set local request.jwt.claim.sub = 'me000000-0000-0000-0000-0000000000a1';
+set local request.jwt.claim.sub = 'ee000000-0000-0000-0000-0000000000a1';
 
 /* ---------------------------------------------------------------------------
    1. الإنشاء يرفض فاعلاً بلا installation.manual_exception_create.
    ------------------------------------------------------------------------- */
 
 select pg_temp.must_fail(
-  'set local request.jwt.claim.sub = ''me000000-0000-0000-0000-0000000000a9'';
+  'set local request.jwt.claim.sub = ''ee000000-0000-0000-0000-0000000000a9'';
    select public.create_manual_exception_intake(
      ''NOT_VISIBLE_IN_SAAS'', ''me-unauthorized'', ''محاولة بلا صلاحية'', null, null, null, null, null,
      gen_random_uuid())',
@@ -160,7 +160,7 @@ select pg_temp.ok(
    ------------------------------------------------------------------------- */
 
 select pg_temp.must_fail(
-  format('set local request.jwt.claim.sub = ''me000000-0000-0000-0000-0000000000a9'';
+  format('set local request.jwt.claim.sub = ''ee000000-0000-0000-0000-0000000000a9'';
    select public.resolve_manual_exception_intake(%L, ''REJECTED_INVALID'', ''محاولة بلا صلاحية'', null, gen_random_uuid())',
    (select id from public.manual_exception_intakes where username_key = 'me-subject-one')),
   'الحسم يرفض فاعلاً بلا installation.manual_exception_resolve');
@@ -293,7 +293,7 @@ insert into public.saas_import_batches
   (source_kind, source_filename, source_checksum, parser_version, imported_by, completeness_status)
 values
   ('ACTIVATION_EVENTS', 'me-grace.xlsx', 'me-grace-checksum', 'v1',
-   'me000000-0000-0000-0000-0000000000a1', 'COMPLETE')
+   'ee000000-0000-0000-0000-0000000000a1', 'COMPLETE')
 on conflict do nothing;
 
 -- مرشّحٌ تجاوز 30 يوماً بلا تفعيلٍ مؤهَّل مدفوع — قرضٌ فقط، منذ 40 يوماً.
