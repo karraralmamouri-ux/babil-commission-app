@@ -130,8 +130,8 @@ jobs:
             echo "DB regression runner did not report an assertion count" >&2
             exit 1
           fi
-          if [[ "$assertion_count" -ne 899 ]]; then
-            echo "Expected exactly 899 DB assertions, got $assertion_count" >&2
+          if [[ "$assertion_count" -ne 932 ]]; then
+            echo "Expected exactly 932 DB assertions, got $assertion_count" >&2
             exit 1
           fi
           echo "Authoritative DB assertions passed: $assertion_count"
