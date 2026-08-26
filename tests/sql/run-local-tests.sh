@@ -327,6 +327,42 @@ fi
 echo "$out35" | grep -E "^ {11,13}(ok|==) " || true
 passed=$((passed + $(echo "$out35" | grep -c "            ok ")))
 
+echo "== pr-b3: live-01 effective ownership + live-02 fdt 94-119 scope =="
+out36=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/pr-b3-live01-live02.sql 2>&1) || true
+if echo "$out36" | grep -qE "FAILED|ERROR"; then
+  echo "$out36" | grep -E "FAILED|ERROR" || true
+  echo "PR-B3 LIVE-01/LIVE-02 TESTS FAILED" >&2; exit 1
+fi
+echo "$out36" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out36" | grep -c "            ok ")))
+
+echo "== pr-b3: live-03 recalculation lifecycle =="
+out37=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/pr-b3-recalculation-lifecycle.sql 2>&1) || true
+if echo "$out37" | grep -qE "FAILED|ERROR"; then
+  echo "$out37" | grep -E "FAILED|ERROR" || true
+  echo "PR-B3 LIVE-03 TESTS FAILED" >&2; exit 1
+fi
+echo "$out37" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out37" | grep -c "            ok ")))
+
+echo "== pr-b3: live-04 manual exception page total =="
+out38=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/pr-b3-manual-exception-page-total.sql 2>&1) || true
+if echo "$out38" | grep -qE "FAILED|ERROR"; then
+  echo "$out38" | grep -E "FAILED|ERROR" || true
+  echo "PR-B3 LIVE-04 TESTS FAILED" >&2; exit 1
+fi
+echo "$out38" | grep -E "^ {11,13}(ok|==) " || true
+passed=$((passed + $(echo "$out38" | grep -c "            ok ")))
+
+echo "== pr-b3: activation corrections scope + kpi =="
+out39=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/pr-b3-activation-corrections-kpi.sql 2>&1) || true
+if echo "$out39" | grep -qE "FAILED|ERROR"; then
+  echo "$out39" | grep -E "FAILED|ERROR" || true
+  echo "PR-B3 ACTIVATION CORRECTIONS SCOPE + KPI TESTS FAILED" >&2; exit 1
+fi
+echo "$out39" | grep -E "^ {18,19}(ok|==) " || true
+passed=$((passed + $(echo "$out39" | grep -c "                   ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
