@@ -58,27 +58,39 @@ select
   coalesce(si.id::text, e.saas_user_id, e.username_key) as subscriber_key,
   si.id as subscriber_identity_id,
   si.identity_status,
-  -- فترة صريحة تغطّي توقيت الحدث تسود؛ غيابها يُبقي الاشتقاق كما كان.
-  coalesce(
-    case eo.ownership_type
-      when 'RESELLER' then 'RESELLER'
-      when 'FTTH_USER' then 'DIRECT_COMPANY'
-      when 'OFFICE' then 'DIRECT_COMPANY'
-      when 'NEEDS_REVIEW' then 'UNKNOWN_PARENT'
-    end,
-    si.source_classification) as source_classification,
-  coalesce(
-    case when eo.ownership_type = 'RESELLER' then eo.agent_id end,
-    si.effective_agent_id, al.agent_id) as effective_agent_id,
+  -- فترة صريحة تغطّي توقيت الحدث تسود كاملةً — تصنيفاً ووكيلاً معاً — ولا
+  -- تُستكمَل جزئياً بعائدية subscriber_identities/agent_aliases عند وجودها.
+  -- DIRECT_COMPANY هي القيمة القانونية الحالية لعمود ownership_type (كانت
+  -- تسقط بلا فرع مطابق فتُهمَل الفترة الصريحة صامتة)، وFTTH_USER/OFFICE تبقى
+  -- لتوافق مدخلات قديمة محتملة فقط. غياب الفترة الصريحة (eo.ownership_type
+  -- فارغ) وحده هو ما يُبقي الاشتقاق القديم من subscriber_identities/aliases.
+  case
+    when eo.ownership_type is not null then
+      case eo.ownership_type
+        when 'RESELLER' then 'RESELLER'
+        when 'DIRECT_COMPANY' then 'DIRECT_COMPANY'
+        when 'FTTH_USER' then 'DIRECT_COMPANY'
+        when 'OFFICE' then 'DIRECT_COMPANY'
+        when 'NEEDS_REVIEW' then 'UNKNOWN_PARENT'
+      end
+    else si.source_classification
+  end as source_classification,
+  case
+    when eo.ownership_type is not null then
+      case when eo.ownership_type = 'RESELLER' then eo.agent_id end
+    else coalesce(si.effective_agent_id, al.agent_id)
+  end as effective_agent_id,
   ag.official_name as agent_name,
   f.zone as fdt_zone,
   case when public.fdt_commission_scope(e.fdt_code) = 'FDT' then 'new' else 'old' end as zone,
   public.fdt_commission_scope(e.fdt_code) as scope_type,
   case
     when public.fdt_commission_scope(e.fdt_code) = 'FDT' then e.fdt_code
-    else coalesce(
-      case when eo.ownership_type = 'RESELLER' then eo.agent_id end,
-      si.effective_agent_id, al.agent_id)::text
+    else (case
+      when eo.ownership_type is not null then
+        case when eo.ownership_type = 'RESELLER' then eo.agent_id end
+      else coalesce(si.effective_agent_id, al.agent_id)
+    end)::text
   end as scope_id,
   p.semantic_category as package_category,
   al.resolution as parent_resolution
@@ -88,9 +100,11 @@ left join public.agent_aliases al
   on al.alias_key = pg_catalog.lower(pg_catalog.btrim(coalesce(e.raw_parent, '')))
  and al.active
 left join lateral public.subscriber_ownership_at(e.username_key, e.event_created_at) eo on true
-left join public.agents ag on ag.id = coalesce(
-    case when eo.ownership_type = 'RESELLER' then eo.agent_id end,
-    si.effective_agent_id, al.agent_id)
+left join public.agents ag on ag.id = (case
+    when eo.ownership_type is not null then
+      case when eo.ownership_type = 'RESELLER' then eo.agent_id end
+    else coalesce(si.effective_agent_id, al.agent_id)
+  end)
 left join public.fdts f on f.code = e.fdt_code
 left join public.packages p on p.code = e.profile_name
 where coalesce(e.canceled, false) = false;
@@ -192,26 +206,33 @@ begin
     coalesce(si.id::text, lower(btrim(c.subscriber_username))),
     si.id,
     si.identity_status,
-    coalesce(
-      case eo.ownership_type
-        when 'RESELLER' then 'RESELLER'
-        when 'FTTH_USER' then 'DIRECT_COMPANY'
-        when 'OFFICE' then 'DIRECT_COMPANY'
-        when 'NEEDS_REVIEW' then 'UNKNOWN_PARENT'
-      end,
-      si.source_classification),
-    coalesce(
-      case when eo.ownership_type = 'RESELLER' then eo.agent_id end,
-      si.effective_agent_id, al.agent_id),
+    case
+      when eo.ownership_type is not null then
+        case eo.ownership_type
+          when 'RESELLER' then 'RESELLER'
+          when 'DIRECT_COMPANY' then 'DIRECT_COMPANY'
+          when 'FTTH_USER' then 'DIRECT_COMPANY'
+          when 'OFFICE' then 'DIRECT_COMPANY'
+          when 'NEEDS_REVIEW' then 'UNKNOWN_PARENT'
+        end
+      else si.source_classification
+    end,
+    case
+      when eo.ownership_type is not null then
+        case when eo.ownership_type = 'RESELLER' then eo.agent_id end
+      else coalesce(si.effective_agent_id, al.agent_id)
+    end,
     ag.official_name,
     f.zone,
     case when public.fdt_commission_scope(c.fdt_code) = 'FDT' then 'new' else 'old' end,
     public.fdt_commission_scope(c.fdt_code),
     case
       when public.fdt_commission_scope(c.fdt_code) = 'FDT' then c.fdt_code
-      else coalesce(
-        case when eo.ownership_type = 'RESELLER' then eo.agent_id end,
-        si.effective_agent_id, al.agent_id)::text
+      else (case
+        when eo.ownership_type is not null then
+          case when eo.ownership_type = 'RESELLER' then eo.agent_id end
+        else coalesce(si.effective_agent_id, al.agent_id)
+      end)::text
     end,
     p.semantic_category,
     al.resolution
@@ -222,9 +243,11 @@ begin
     on al.alias_key = lower(btrim(coalesce(c.raw_parent, ''))) and al.active
   left join lateral public.subscriber_ownership_at(
     lower(btrim(c.subscriber_username)), c.event_at) eo on true
-  left join public.agents ag on ag.id = coalesce(
-      case when eo.ownership_type = 'RESELLER' then eo.agent_id end,
-      si.effective_agent_id, al.agent_id)
+  left join public.agents ag on ag.id = (case
+      when eo.ownership_type is not null then
+        case when eo.ownership_type = 'RESELLER' then eo.agent_id end
+      else coalesce(si.effective_agent_id, al.agent_id)
+    end)
   left join public.fdts f on f.code = c.fdt_code
   left join public.packages p on p.code = c.package_code
   where c.cycle_id = p_cycle_id
