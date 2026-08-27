@@ -136,5 +136,109 @@ select pg_temp.ok(
     -> 'cycle') ->> 'needs_recalculation')::boolean = false,
   'الدورة المعتمدة لا تُوسَم — تصحيحها أداةٌ أخرى');
 
+-- ---------------------------------------------------------------------------
+-- الإضافة اليدوية (Manual ADD) تخضع لنفس آلية الوسم — لا أحداث SaaS وحدها.
+-- calculate_commission_cycle() يستهلك مالياً كل تصحيح ACTIVE من نوع ADD، فأيّ
+-- تصنيف أبٍ يغيّر عائديته يجب أن يَسِم دورته أيضاً.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+insert into public.commission_cycles (id, name, period_start, period_end, engine_version, created_by)
+values ('64000000-0000-0000-0000-0000000000d5','B3L إضافة يدوية', date '2026-12-01', date '2026-12-31',
+        'VNEXT','64000000-0000-0000-0000-0000000000d1')
+on conflict do nothing;
+
+insert into public.activation_corrections
+  (cycle_id, correction_type, subscriber_username, package_code, event_at,
+   raw_parent, reason, request_id, created_by, status)
+values
+  ('64000000-0000-0000-0000-0000000000d5','ADD','b3l-manual-sub','P-35000',
+   timestamptz '2026-12-10 10:00+03','B3L.ManualAdd.Parent','اختبار إضافة يدوية',
+   '64000000-0000-0000-0000-000000000e01','64000000-0000-0000-0000-0000000000d1','ACTIVE')
+on conflict do nothing;
+
+set local role authenticated;
+set local request.jwt.claim.sub = '64000000-0000-0000-0000-0000000000d1';
+
+select public.calculate_commission_cycle('64000000-0000-0000-0000-0000000000d5') is not null as manual_ran;
+
+select pg_temp.ok(
+  ((public.commission_cycle_result('64000000-0000-0000-0000-0000000000d5')
+    -> 'cycle') ->> 'needs_recalculation')::boolean = false,
+  'دورة الإضافة اليدوية قبل أي قرار لا تحمل علم إعادة حساب');
+
+select (public.classify_parent('B3L.ManualAdd.Parent', 'RESELLER',
+   '64000000-0000-0000-0000-0000000000d2', 'اختبار', gen_random_uuid())
+   ->> 'cycles_flagged_for_recalculation')::int as manual_flagged;
+
+select pg_temp.ok(
+  ((public.commission_cycle_result('64000000-0000-0000-0000-0000000000d5')
+    -> 'cycle') ->> 'needs_recalculation')::boolean = true,
+  'تصنيف أبٍ لإضافة يدوية فعّالة يَسِم دورتها — لا SaaS فقط');
+
+-- فحص داخلي: القرار وحده لم يُنتج بعد استحقاقاً — لا حساب صامت.
+reset role;
+select pg_temp.ok(
+  not exists (select 1 from public.commission_event_entitlements
+              where cycle_id = '64000000-0000-0000-0000-0000000000d5'
+                and effective_agent_id = '64000000-0000-0000-0000-0000000000d2'),
+  'القرار وحده لم يُنتج استحقاقاً للإضافة اليدوية — لا حساب صامت');
+
+set local role authenticated;
+set local request.jwt.claim.sub = '64000000-0000-0000-0000-0000000000d1';
+
+select public.recalculate_cycle_after_master_change(
+  '64000000-0000-0000-0000-0000000000d5', gen_random_uuid(), 'اختبار') is not null as manual_recalculated;
+
+select pg_temp.ok(
+  ((public.commission_cycle_result('64000000-0000-0000-0000-0000000000d5')
+    -> 'cycle') ->> 'needs_recalculation')::boolean = false,
+  'إعادة الحساب المُخوَّلة تُطفئ علم الإضافة اليدوية');
+
+reset role;
+select pg_temp.ok(
+  exists (select 1 from public.commission_event_entitlements
+          where cycle_id = '64000000-0000-0000-0000-0000000000d5'
+            and activation_event_id like 'MANUAL-%'
+            and effective_agent_id = '64000000-0000-0000-0000-0000000000d2'),
+  'وتُنتج الآن استحقاقاً صحيحاً للوكيل المُصنَّف على الإضافة اليدوية');
+
+-- إضافة يدوية مُلغاة وحدها في دورةٍ مستقلّة: تصنيف نفس الأب يجب ألّا يَسِمها.
+insert into public.commission_cycles (id, name, period_start, period_end, engine_version, created_by)
+values ('64000000-0000-0000-0000-0000000000d6','B3L إضافة ملغاة', date '2026-12-01', date '2026-12-31',
+        'VNEXT','64000000-0000-0000-0000-0000000000d1')
+on conflict do nothing;
+
+insert into public.activation_corrections
+  (cycle_id, correction_type, subscriber_username, package_code, event_at,
+   raw_parent, reason, request_id, created_by, status)
+values
+  ('64000000-0000-0000-0000-0000000000d6','ADD','b3l-manual-sub-revoked','P-35000',
+   timestamptz '2026-12-12 10:00+03','B3L.ManualAdd.Revoked','مُلغاة عمداً للاختبار',
+   '64000000-0000-0000-0000-000000000e02','64000000-0000-0000-0000-0000000000d1','ACTIVE')
+on conflict do nothing;
+
+-- انتقال ACTIVE -> REVOKED منسوب بالكامل دفعة واحدة، لا إدراج REVOKED مباشرة
+-- (activation_corrections_revoked_is_attributed يرفض REVOKED بلا انتساب).
+update public.activation_corrections
+set status = 'REVOKED',
+    revoked_by = '64000000-0000-0000-0000-0000000000d1',
+    revoked_at = now(),
+    revoke_reason = 'اختبار'
+where request_id = '64000000-0000-0000-0000-000000000e02';
+
+set local role authenticated;
+set local request.jwt.claim.sub = '64000000-0000-0000-0000-0000000000d1';
+
+select (public.classify_parent('B3L.ManualAdd.Revoked', 'RESELLER',
+   '64000000-0000-0000-0000-0000000000d2', 'اختبار', gen_random_uuid())
+   ->> 'cycles_flagged_for_recalculation')::int as revoked_flagged;
+
+select pg_temp.ok(
+  ((public.commission_cycle_result('64000000-0000-0000-0000-0000000000d6')
+    -> 'cycle') ->> 'needs_recalculation')::boolean = false,
+  'إضافة يدوية مُلغاة وحدها لا تَسِم دورتها عند تصنيف أبيها');
+
 reset role;
 rollback;

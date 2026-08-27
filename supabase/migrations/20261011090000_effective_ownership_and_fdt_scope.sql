@@ -32,8 +32,14 @@ language sql
 immutable
 set search_path = ''
 as $fn$
+  -- ترتيب WHEN داخل CASE واحد مضمونٌ متسلسلاً (بخلاف AND، الذي التوثيق نفسه
+  -- ينصح باستبداله بـCASE متى أمكن لتعبير قد يفشل): مدخل غير رقمي أو أطول من
+  -- 18 خانة يُرَدّ AGENT دون أي محاولة تحويل، فلا "integer out of range" على
+  -- سلسلة أرقام ضخمة مستوردة. 18 خانة تتّسع دوماً داخل bigint دون فيضان.
   select case
-    when p_fdt_code ~ '^[0-9]+$' and p_fdt_code::integer between 94 and 119 then 'FDT'
+    when p_fdt_code !~ '^[0-9]+$' then 'AGENT'
+    when length(p_fdt_code) > 18 then 'AGENT'
+    when p_fdt_code::bigint between 94 and 119 then 'FDT'
     else 'AGENT'
   end;
 $fn$;

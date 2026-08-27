@@ -60,12 +60,29 @@ begin
            -- الحدث الأصلي كما هو دون تغيير.
            coalesce(q.scope_type,
              public.fdt_commission_scope(coalesce(c.fdt_code, q.fdt_code))) as scope_type,
+           -- خارج 94–119 ولا q لها: نفس سلطة العائدية المؤرَّخة التي تعتمدها
+           -- الترحيلة 78 — فترة صريحة تسود كاملةً (RESELLER فقط تحمل وكيلاً؛
+           -- DIRECT_COMPANY/NEEDS_REVIEW صفر وكيل، بلا تسريب عائدية حالية)،
+           -- وغيابها وحده يُبقي احتياط subscriber_identities/agent_aliases.
            coalesce(q.scope_id,
-             case when public.fdt_commission_scope(coalesce(c.fdt_code, q.fdt_code)) = 'FDT'
-                  then coalesce(c.fdt_code, q.fdt_code) else null end) as scope_id
+             case
+               when public.fdt_commission_scope(coalesce(c.fdt_code, q.fdt_code)) = 'FDT'
+                 then coalesce(c.fdt_code, q.fdt_code)
+               else (case
+                 when eo.ownership_type is not null then
+                   case when eo.ownership_type = 'RESELLER' then eo.agent_id end
+                 else coalesce(si.effective_agent_id, al.agent_id)
+               end)::text
+             end) as scope_id
     from public.activation_corrections c
     left join public.profiles p on p.id = c.created_by
     left join public.commission_qualifying_events q on q.saas_event_id = c.source_event_id
+    left join public.subscriber_identities si
+      on si.username_key = lower(btrim(c.subscriber_username))
+    left join public.agent_aliases al
+      on al.alias_key = lower(btrim(coalesce(c.raw_parent, ''))) and al.active
+    left join lateral public.subscriber_ownership_at(
+      lower(btrim(c.subscriber_username)), c.event_at) eo on true
     where c.cycle_id = p_cycle_id
       and (p_status is null or c.status = p_status)
   ),

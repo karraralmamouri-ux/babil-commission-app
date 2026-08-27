@@ -149,5 +149,137 @@ select pg_temp.ok(
   (select jsonb_array_length(doc->'rows') from tiny_page) = 1,
   'الصفحة الصغيرة تُعيد صفّاً واحداً فقط رغم أن الإجمالي أكبر');
 
+-- ---------------------------------------------------------------------------
+-- إضافات يدوية خارج ٩٤–١١٩: نفس سلطة العائدية المؤرَّخة التي يعتمدها المحرّك
+-- (الترحيلة 78) — فترة صريحة تسود كاملةً، وغيابها وحده يُبقي احتياط الهوية.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+insert into public.agents (id, code, official_name) values
+  ('66000000-0000-0000-0000-0000000000a5','B3AK-OWN','وكيل عائدية'),
+  ('66000000-0000-0000-0000-0000000000a6','B3AK-STALE','وكيل قديم — يجب ألّا يظهر')
+on conflict (code) do nothing;
+
+-- فترة صريحة RESELLER تسود: الوكيل الفعّال هو eo.agent_id.
+insert into public.subscriber_ownership
+  (username_key, ownership_type, agent_id, effective_from, effective_to, reason, performed_by)
+values
+  ('b3ak-sub-reseller','RESELLER','66000000-0000-0000-0000-0000000000a5',
+   timestamptz '2027-01-01 00:00+03', null, 'اختبار', '66000000-0000-0000-0000-0000000000a1');
+
+-- فترة صريحة DIRECT_COMPANY تسود: صفر وكيل، رغم عائدية حالية تُشير لوكيلٍ آخر.
+insert into public.subscriber_identities
+  (username, identity_status, match_method, source_classification, effective_agent_id)
+values ('b3ak-sub-direct','MATCHED','EXACT_USERNAME','RESELLER',
+        '66000000-0000-0000-0000-0000000000a6');
+insert into public.subscriber_ownership
+  (username_key, ownership_type, agent_id, effective_from, effective_to, reason, performed_by)
+values
+  ('b3ak-sub-direct','DIRECT_COMPANY', null,
+   timestamptz '2027-01-01 00:00+03', null, 'اختبار', '66000000-0000-0000-0000-0000000000a1');
+
+-- فترة صريحة NEEDS_REVIEW تسود: صفر وكيل أيضاً، رغم عائدية حالية.
+insert into public.subscriber_identities
+  (username, identity_status, match_method, source_classification, effective_agent_id)
+values ('b3ak-sub-review','MATCHED','EXACT_USERNAME','RESELLER',
+        '66000000-0000-0000-0000-0000000000a6');
+insert into public.subscriber_ownership
+  (username_key, ownership_type, agent_id, effective_from, effective_to, reason, performed_by)
+values
+  ('b3ak-sub-review','NEEDS_REVIEW', null,
+   timestamptz '2027-01-01 00:00+03', null, 'اختبار', '66000000-0000-0000-0000-0000000000a1');
+
+-- بلا فترة عائدية صريحة إطلاقاً: احتياط subscriber_identities وحده يُحسم.
+insert into public.subscriber_identities
+  (username, identity_status, match_method, source_classification, effective_agent_id)
+values ('b3ak-sub-fallback','MATCHED','EXACT_USERNAME','RESELLER',
+        '66000000-0000-0000-0000-0000000000a5');
+
+insert into public.activation_corrections
+  (cycle_id, correction_type, subscriber_username, package_code, event_at,
+   reason, request_id, created_by, status)
+values
+  ('66000000-0000-0000-0000-0000000000a2','ADD','b3ak-sub-reseller','B3AK-PKG','2027-06-10',
+   'عائدية RESELLER صريحة','66000000-0000-0000-0000-000000000f07',
+   '66000000-0000-0000-0000-0000000000a1','ACTIVE'),
+  ('66000000-0000-0000-0000-0000000000a2','ADD','b3ak-sub-direct','B3AK-PKG','2027-06-11',
+   'عائدية DIRECT_COMPANY صريحة','66000000-0000-0000-0000-000000000f08',
+   '66000000-0000-0000-0000-0000000000a1','ACTIVE'),
+  ('66000000-0000-0000-0000-0000000000a2','ADD','b3ak-sub-review','B3AK-PKG','2027-06-12',
+   'عائدية NEEDS_REVIEW صريحة','66000000-0000-0000-0000-000000000f09',
+   '66000000-0000-0000-0000-0000000000a1','ACTIVE'),
+  ('66000000-0000-0000-0000-0000000000a2','ADD','b3ak-sub-fallback','B3AK-PKG','2027-06-13',
+   'بلا فترة عائدية صريحة — احتياط الهوية','66000000-0000-0000-0000-000000000f10',
+   '66000000-0000-0000-0000-0000000000a1','ACTIVE')
+on conflict do nothing;
+
+set local role authenticated;
+set local request.jwt.claim.sub = '66000000-0000-0000-0000-0000000000a1';
+
+with owns as (
+  select public.page_activation_corrections(
+    p_cycle_id => '66000000-0000-0000-0000-0000000000a2', p_limit => 50, p_offset => 0) as doc
+),
+reseller_row as (
+  select r from owns, jsonb_array_elements(doc->'rows') r
+  where r->>'subscriber' = 'b3ak-sub-reseller' limit 1
+),
+direct_row as (
+  select r from owns, jsonb_array_elements(doc->'rows') r
+  where r->>'subscriber' = 'b3ak-sub-direct' limit 1
+),
+review_row as (
+  select r from owns, jsonb_array_elements(doc->'rows') r
+  where r->>'subscriber' = 'b3ak-sub-review' limit 1
+),
+fallback_row as (
+  select r from owns, jsonb_array_elements(doc->'rows') r
+  where r->>'subscriber' = 'b3ak-sub-fallback' limit 1
+)
+select pg_temp.ok(
+  (select (r->>'scope_type') = 'AGENT'
+     and (r->>'scope_id') = '66000000-0000-0000-0000-0000000000a5' from reseller_row),
+  'عائدية RESELLER صريحة خارج ٩٤–١١٩ — نطاق وكيل بمعرّف eo.agent_id')
+union all
+select pg_temp.ok(
+  (select (r->>'scope_type') = 'AGENT' and r->>'scope_id' is null from direct_row),
+  'عائدية DIRECT_COMPANY صريحة — صفر وكيل رغم عائدية حالية لوكيلٍ آخر')
+union all
+select pg_temp.ok(
+  (select (r->>'scope_type') = 'AGENT' and r->>'scope_id' is null from review_row),
+  'عائدية NEEDS_REVIEW صريحة — صفر وكيل، لا وراثة وكيل حالي')
+union all
+select pg_temp.ok(
+  (select (r->>'scope_type') = 'AGENT'
+     and (r->>'scope_id') = '66000000-0000-0000-0000-0000000000a5' from fallback_row),
+  'بلا فترة عائدية صريحة — احتياط subscriber_identities يبقى كما كان');
+
+with scoped as (
+  select public.page_activation_corrections(
+    p_cycle_id => '66000000-0000-0000-0000-0000000000a2',
+    p_scope_type => 'AGENT', p_scope_id => '66000000-0000-0000-0000-0000000000a5',
+    p_limit => 50, p_offset => 0) as doc
+),
+scoped_tiny as (
+  select public.page_activation_corrections(
+    p_cycle_id => '66000000-0000-0000-0000-0000000000a2',
+    p_scope_type => 'AGENT', p_scope_id => '66000000-0000-0000-0000-0000000000a5',
+    p_limit => 1, p_offset => 0) as doc
+)
+select pg_temp.ok(
+  exists (select 1 from scoped, jsonb_array_elements(doc->'rows') r
+          where r->>'subscriber' = 'b3ak-sub-reseller'),
+  'تصفية بمعرّف وكيل خارج ٩٤–١١٩ تُعيد الإضافة اليدوية المطابقة')
+union all
+select pg_temp.ok(
+  (select (doc->>'active_additions')::int from scoped) = 2,
+  'active_additions للتصفية بوكيل يُحسب على كامل المجموعة المُرشَّحة، لا الصفحة')
+union all
+select pg_temp.ok(
+  (select (doc->>'active_additions')::int from scoped_tiny) = 2
+    and (select jsonb_array_length(doc->'rows') from scoped_tiny) = 1,
+  'وصفحة صغيرة من نفس التصفية لا تُغيّر الإجمالي رغم صفٍّ واحد فقط بالنتيجة');
+
 reset role;
 rollback;

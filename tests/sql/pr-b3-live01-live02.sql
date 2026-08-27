@@ -94,6 +94,12 @@ select pg_temp.ok(
   and public.fdt_commission_scope('ABC') = 'AGENT',
   'حدود ٩٣/٩٤/١١٩/١٢٠ ومدخل غير رقمي — الدالّة وحدها');
 
+-- رقمٌ صرفٌ يفوق سعة bigint بأشواط (٤٠ خانة): يجب أن يُرَدّ AGENT دون أي
+-- محاولة تحويل تُفشِل الدالّة بـ"integer out of range" على كابينة مستوردة.
+select pg_temp.ok(
+  public.fdt_commission_scope(repeat('9', 40)) = 'AGENT',
+  'رقمٌ ضخمٌ يفوق سعة bigint — AGENT دون أي فيضان');
+
 select pg_temp.ok(
   (select scope_type from public.commission_event_entitlements where activation_event_id = 'B3-EV-93') = 'AGENT'
   and (select scope_id from public.commission_event_entitlements where activation_event_id = 'B3-EV-93')

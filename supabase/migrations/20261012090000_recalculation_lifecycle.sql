@@ -51,13 +51,29 @@ begin
       recalculation_request_id = p_request_id
   where c.engine_version = 'VNEXT'
     and c.status not in ('FINALIZED', 'PARTIALLY_PAID', 'PAID', 'CLOSED')
-    and exists (
-      select 1
-      from public.saas_activation_events e
-      where pg_catalog.lower(pg_catalog.btrim(coalesce(e.raw_parent, ''))) = v_key
-        and coalesce(e.canceled, false) = false
-        and e.event_created_at >= public.cycle_window_start(c.period_start)
-        and e.event_created_at < public.cycle_window_end(c.period_end));
+    and (
+      exists (
+        select 1
+        from public.saas_activation_events e
+        where pg_catalog.lower(pg_catalog.btrim(coalesce(e.raw_parent, ''))) = v_key
+          and coalesce(e.canceled, false) = false
+          and e.event_created_at >= public.cycle_window_start(c.period_start)
+          and e.event_created_at < public.cycle_window_end(c.period_end))
+      -- calculate_commission_cycle() يستهلك مالياً إضافات ACTIVE يدوية أيضاً
+      -- (فرع MANUAL-ADD)، لا أحداث SaaS المستوردة وحدها؛ فتصنيف أبٍ يغيّر
+      -- عائديتها يجب أن يَسِم الدورة نفسها، وإلا بقيت دورةٌ مُحتسَبة تحمل
+      -- مالاً باطلاً بصمت. المُلغاة (REVOKED) لا تُستهلَك مالياً فلا تُوسَم،
+      -- وEXCLUDE لا يحمل raw_parent فلا يدخل هذا الفرع أصلاً.
+      or exists (
+        select 1
+        from public.activation_corrections ac
+        where ac.cycle_id = c.id
+          and ac.correction_type = 'ADD'
+          and ac.status = 'ACTIVE'
+          and pg_catalog.lower(pg_catalog.btrim(coalesce(ac.raw_parent, ''))) = v_key
+          and ac.event_at >= public.cycle_window_start(c.period_start)
+          and ac.event_at < public.cycle_window_end(c.period_end))
+    );
   get diagnostics v_n = row_count;
   return v_n;
 end;
