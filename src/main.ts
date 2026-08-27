@@ -9,8 +9,8 @@
 import { Router, readLocation, type Route } from './app/router';
 import { renderNav, renderBreadcrumbs } from './app/shell';
 import { mountSearch } from './app/search';
-import { can } from './services/api';
-import { errorState, forbidden, empty } from './components/ui';
+import { can, capabilitiesReady } from './services/api';
+import { errorState, forbidden, empty, loading } from './components/ui';
 
 import { routes as homeRoutes } from './features/home';
 import { routes as commissionRoutes } from './features/commissions';
@@ -81,6 +81,8 @@ function boot(): void {
     outlet,
     routes: ROUTES,
     can,
+    capabilitiesReady,
+    renderCapabilityLoading: (host) => { host.innerHTML = loading('جارٍ التحقّق من الصلاحيات…'); },
     onNavigated: (route, match) => {
       document.body.classList.toggle('legacy-visible', route.pattern === '/legacy');
       renderNav(navHost, can);

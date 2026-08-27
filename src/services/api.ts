@@ -15,6 +15,8 @@ declare global {
     sbRequest?: (path: string, init?: RequestInit) => Promise<unknown>;
     opsCan?: (capability: string) => boolean;
     opsCapabilities?: Map<string, boolean>;
+    /** true بعد أول محاولة قراءة صلاحيات — نجحت أو فشلت. راجع capabilitiesReady أدناه. */
+    opsCapabilitiesReady?: boolean;
     /** يبني مساحة الشهر السابقة عند فتح #/legacy، لا عند الدخول. */
     ensureLegacyWorkspace?: () => Promise<void>;
   }
@@ -129,6 +131,17 @@ export function can(capability: string): boolean {
     try { return Boolean(fn(capability)); } catch { return false; }
   }
   return false;
+}
+
+/**
+ * هل وصلت الصلاحيات من الخادم بعد؟ (نجاحاً أو فشلاً — كلاهما "وصل").
+ *
+ * قبل هذا الوصول، `can()` وعدم امتلاك القدرة يتماثلان: كلاهما `false`. فالموجِّه
+ * كان يعرض "ممنوع" لشاشةٍ المستخدم يملك صلاحيتها فعلاً، فقط لأن الصلاحيات لم
+ * تصل من الجلسة بعد — سباقٌ يظهر خصوصاً على تحديث الصفحة والاتصال البطيء.
+ */
+export function capabilitiesReady(): boolean {
+  return window.opsCapabilitiesReady === true;
 }
 
 /* -------------------------------------------------------------------------

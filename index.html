@@ -717,7 +717,7 @@ function setWorkspaceMode(mode){
  workspaceMode=mode;
  const shell=document.getElementById('appShell');
  if(!shell)return;
- shell.classList.remove('workspace-loading','workspace-central','workspace-preparation','workspace-unavailable');
+ shell.classList.remove('workspace-loading','workspace-idle','workspace-central','workspace-preparation','workspace-unavailable');
  shell.classList.add(`workspace-${mode}`);
 }
 
@@ -1309,10 +1309,14 @@ function applyCentralSnapshot(snapshot,preferredMonth){
  hasUnsavedChanges=false;
 }
 function updateCentralPreviewUI(){
+ // زرّ الشريط تقاعد مع محرّك تجهيز الشهر (central-preview.test.js)، فلم يعد
+ // في الصفحة أصلاً؛ اشتراطه هنا كان يُخرج الدالّة قبل أن تصل إلى banner/status
+ // فتجمّد "جاري الاتصال" أبداً — هذا هو سبب LIVE-09 الفعلي، لا مجرّد
+ // workspaceMode. الشرط يبقى فقط على ما لا يزال في الصفحة فعلاً.
  const button=document.getElementById('centralPreviewButton'),banner=document.getElementById('centralPreviewBanner'),status=document.getElementById('centralStatus');
- if(!button||!banner||!status)return;
+ if(!banner||!status)return;
  const updated=centralPreview.lastUpdatedAt?new Intl.DateTimeFormat('ar-IQ',{hour:'2-digit',minute:'2-digit'}).format(centralPreview.lastUpdatedAt):'';
- button.textContent=centralPreview.active?'⚙ فتح وضع تجهيز الشهر':'☁ عرض البيانات المركزية';
+ if(button)button.textContent=centralPreview.active?'⚙ فتح وضع تجهيز الشهر':'☁ عرض البيانات المركزية';
  document.getElementById('monthInput').disabled=false;
  document.getElementById('applyMonthButton').disabled=false;
  banner.classList.toggle('show',workspaceMode==='preparation');
@@ -1322,6 +1326,8 @@ function updateCentralPreviewUI(){
  if(workspaceMode==='central')status.innerHTML=`<span class="status-dot"></span><span><b>البيانات المركزية</b><small>${updated?`آخر تحديث ${updated}`:'متصلة وجاهزة للاستخدام'}</small></span>`;
  else if(workspaceMode==='preparation')status.innerHTML='<span class="status-dot" style="background:var(--yellow);box-shadow:0 0 10px var(--yellow)"></span><span><b>وضع تجهيز الشهر</b><small>خاص بالإدارة • غير معتمد مركزياً</small></span>';
  else if(workspaceMode==='unavailable')status.innerHTML='<span class="status-dot" style="background:var(--red);box-shadow:0 0 10px var(--red)"></span><span><b>تعذر الاتصال بالمركز</b><small>أعد المحاولة أو راجع الاتصال</small></span>';
+ else if(workspaceMode==='idle')status.innerHTML='<span class="status-dot"></span><span><b>متصل</b><small>البيانات محمَّلة</small></span>';
+ else if(workspaceMode==='offline')status.innerHTML='<span class="status-dot" style="background:var(--red);box-shadow:0 0 10px var(--red)"></span><span><b>تعذر التحقّق من الاتصال</b><small>أعد تحميل الصفحة أو راجع الشبكة</small></span>';
  else status.innerHTML='<span class="status-dot"></span><span><b>جاري الاتصال</b><small>تحميل البيانات المركزية...</small></span>';
 }
 async function enterCentralPreview(silent=false){
@@ -1880,9 +1886,19 @@ let opsCapabilities=new Map(),opsQueues=[],opsSchemes=[],opsUsers=[],opsPermTarg
 function opsCan(key){return typeof Operations!=="undefined"&&Operations.can(opsCapabilities,key)}
 function switchOpsTab(k){document.querySelectorAll("#operationsTabs .tab").forEach(b=>b.classList.toggle("active",b.dataset.ops===k));document.querySelectorAll(".ops-panel").forEach(p=>p.classList.toggle("active",p.id==="ops-"+k))}
 async function loadMyCapabilities(){
+ let reachable=true;
  try{const rows=await sbRequest("/rest/v1/rpc/my_capabilities",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
-  opsCapabilities=Operations.indexCapabilities(Array.isArray(rows)?rows:[]);applyCapabilityVisibility();window.dispatchEvent(new CustomEvent("babil:capabilities"))}
- catch(error){if(error?.status!==404)console.warn("capabilities:",error)}}
+  opsCapabilities=Operations.indexCapabilities(Array.isArray(rows)?rows:[]);applyCapabilityVisibility();window.opsCapabilitiesReady=true;window.dispatchEvent(new CustomEvent("babil:capabilities"))}
+ // الفشل "وصل" أيضاً بمعنى العلم (opsCapabilitiesReady): الموجّه ينتظر هذا
+ // العلم لا مجرّد وجود opsCan، وإلا بقي معلّقاً على "جارٍ التحقّق" إلى الأبد
+ // عند انقطاع الطلب. لكن "وصل الفحص" لا يعني "متّصل" — 404 يعني حساباً بلا
+ // صلاحيات مسجّلة (وضعٌ طبيعي)، وما عداه عطلٌ شبكي حقيقي لا يصحّ أن يُعرَض
+ // بوصفه "متصل" في شارة الحالة أدناه.
+ catch(error){
+   if(error?.status!==404){console.warn("capabilities:",error);reachable=false}
+   window.opsCapabilitiesReady=true;window.dispatchEvent(new CustomEvent("babil:capabilities"))
+ }
+ if(workspaceMode==='loading'){setWorkspaceMode(reachable?'idle':'offline');updateCentralPreviewUI()}}
 function applyCapabilityVisibility(){
  const show=(id,cap)=>{const el=document.querySelector(id);if(el)el.style.display=opsCan(cap)?"":"none"};
  show("#operationsTabs [data-ops=import]","saas.import");

@@ -64,8 +64,8 @@ jobs:
           shopt -s nullglob
           migrations=(supabase/migrations/*.sql)
 
-          if [[ "${#migrations[@]}" -ne 77 ]]; then
-            echo "Expected exactly 77 migrations, found ${#migrations[@]}" >&2
+          if [[ "${#migrations[@]}" -ne 81 ]]; then
+            echo "Expected exactly 81 migrations, found ${#migrations[@]}" >&2
             exit 1
           fi
 
@@ -85,7 +85,7 @@ jobs:
           done
 
           unique_count=$(printf '%s\n' "${migrations[@]##*/}" | sort -u | wc -l)
-          if [[ "$unique_count" -ne 77 ]]; then
+          if [[ "$unique_count" -ne 81 ]]; then
             echo "Migration filenames are not unique" >&2
             exit 1
           fi
@@ -130,8 +130,8 @@ jobs:
             echo "DB regression runner did not report an assertion count" >&2
             exit 1
           fi
-          if [[ "$assertion_count" -ne 964 ]]; then
-            echo "Expected exactly 964 DB assertions, got $assertion_count" >&2
+          if [[ "$assertion_count" -ne 1012 ]]; then
+            echo "Expected exactly 1012 DB assertions, got $assertion_count" >&2
             exit 1
           fi
           echo "Authoritative DB assertions passed: $assertion_count"

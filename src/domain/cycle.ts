@@ -67,6 +67,9 @@ export interface CycleResult {
     period_start: string; period_end: string;
     window_start: string; window_end: string;
     finalized_at: string | null; closed_at: string | null;
+    needs_recalculation: boolean;
+    recalculation_reason: string | null;
+    recalculation_flagged_at: string | null;
   };
   totals: CycleTotals;
   volumes: CycleVolumes;

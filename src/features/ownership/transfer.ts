@@ -57,7 +57,7 @@ export async function wireTransfer(view: View, subscriberKey: string): Promise<v
     }
     if (!view.live) return;
     host.innerHTML = render(preview, target, agentId, from, error);
-    await wire(target);
+    await wire(target, agentId);
   };
 
   const render = (p: Row | null, target: string, agentId: string, from: string, error: string): string => {
@@ -136,7 +136,7 @@ export async function wireTransfer(view: View, subscriberKey: string): Promise<v
       </div>`;
   };
 
-  const wire = async (target: string) => {
+  const wire = async (target: string, agentId: string) => {
     const t = view.el.querySelector<HTMLSelectElement>('#trTarget');
     const agent = view.el.querySelector<HTMLSelectElement>('#trAgent');
     const from = view.el.querySelector<HTMLInputElement>('#trFrom');
@@ -150,7 +150,10 @@ export async function wireTransfer(view: View, subscriberKey: string): Promise<v
         const list = await rpc<Row[]>('list_agents_for_pick', {});
         if (!view.live) return;
         agent.innerHTML = '<option value="">— اختر الوكيل —</option>'
-          + (list || []).map((a) => `<option value="${esc(str(a, 'id'))}">${esc(str(a, 'official_name'))}</option>`).join('');
+          + (list || []).map((a) => {
+            const id = str(a, 'id');
+            return `<option value="${esc(id)}"${id === agentId ? ' selected' : ''}>${esc(str(a, 'official_name'))}</option>`;
+          }).join('');
       } catch {
         agent.innerHTML = '<option value="">تعذّر تحميل الوكلاء</option>';
       }

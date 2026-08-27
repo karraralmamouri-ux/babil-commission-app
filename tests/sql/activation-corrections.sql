@@ -66,9 +66,10 @@ insert into public.agent_aliases (agent_id, alias, resolution)
 values ('ac000000-0000-0000-0000-0000000000a4','ac.parent','mapped')
 on conflict (alias_key) do nothing;
 
--- كابينة في المنطقة الجديدة: نطاقها الكابينة نفسها.
+-- كابينة رقمية ضمن مدى 94-119: نطاقها الكابينة نفسها بعد LIVE-02 — الحسم
+-- بالرقم وحده، لا بتسجيلها هنا (fdts.zone بيانات تشغيلية فقط الآن).
 insert into public.fdts (code, label, zone, agent_id)
-values ('AC-115','FDT-AC-115','new','ac000000-0000-0000-0000-0000000000a4')
+values ('115','FDT-115','new','ac000000-0000-0000-0000-0000000000a4')
 on conflict (code) do nothing;
 
 -- ثلاثة أحداث داخل الدورة، وحدثان قبلها بشهر.
@@ -76,18 +77,18 @@ insert into public.saas_activation_events
   (import_batch_id, saas_event_id, username, profile_name, canceled, raw_parent,
    event_created_at, fdt_code)
 values
-  ('ac000000-0000-0000-0000-0000000000a3','AC-IN-1','ac-sub1','P-35000',false,'ac.parent','2027-05-05','AC-115'),
-  ('ac000000-0000-0000-0000-0000000000a3','AC-IN-2','ac-sub2','P-35000',false,'ac.parent','2027-05-06','AC-115'),
-  ('ac000000-0000-0000-0000-0000000000a3','AC-IN-3','ac-sub3','P-35000',false,'ac.parent','2027-05-07','AC-115'),
+  ('ac000000-0000-0000-0000-0000000000a3','AC-IN-1','ac-sub1','P-35000',false,'ac.parent','2027-05-05','115'),
+  ('ac000000-0000-0000-0000-0000000000a3','AC-IN-2','ac-sub2','P-35000',false,'ac.parent','2027-05-06','115'),
+  ('ac000000-0000-0000-0000-0000000000a3','AC-IN-3','ac-sub3','P-35000',false,'ac.parent','2027-05-07','115'),
   -- تاريخيّان: خارج نافذة الدورة تماماً
-  ('ac000000-0000-0000-0000-0000000000a3','AC-OLD-1','ac-sub9','P-35000',false,'ac.parent','2027-04-05','AC-115'),
-  ('ac000000-0000-0000-0000-0000000000a3','AC-OLD-2','ac-sub8','P-35000',false,'ac.parent','2027-04-06','AC-115'),
+  ('ac000000-0000-0000-0000-0000000000a3','AC-OLD-1','ac-sub9','P-35000',false,'ac.parent','2027-04-05','115'),
+  ('ac000000-0000-0000-0000-0000000000a3','AC-OLD-2','ac-sub8','P-35000',false,'ac.parent','2027-04-06','115'),
   -- مشترك مكرَّر: حدثان له داخل الدورة
-  ('ac000000-0000-0000-0000-0000000000a3','AC-DUP','ac-sub1','P-35000',false,'ac.parent','2027-05-20','AC-115'),
+  ('ac000000-0000-0000-0000-0000000000a3','AC-DUP','ac-sub1','P-35000',false,'ac.parent','2027-05-20','115'),
   -- خدمة دين: لا تُحتسب
-  ('ac000000-0000-0000-0000-0000000000a3','AC-DEBT','ac-sub4','Loan-3',false,'ac.parent','2027-05-08','AC-115'),
+  ('ac000000-0000-0000-0000-0000000000a3','AC-DEBT','ac-sub4','Loan-3',false,'ac.parent','2027-05-08','115'),
   -- تابع مباشر للشركة
-  ('ac000000-0000-0000-0000-0000000000a3','AC-DC','ac-dc1','P-35000',false,'ac.parent','2027-05-09','AC-115')
+  ('ac000000-0000-0000-0000-0000000000a3','AC-DC','ac-dc1','P-35000',false,'ac.parent','2027-05-09','115')
 on conflict do nothing;
 
 insert into public.subscriber_identities
@@ -115,33 +116,33 @@ select public.calculate_commission_cycle('ac000000-0000-0000-0000-0000000000a2',
 -- وواحد لتابعٍ مباشر. فالمؤهَّل أربعة: sub1 مرّتين، وsub2، وsub3.
 
 select pg_temp.ok(
-  (public.fdt_cycle_events('AC-115', 'ac000000-0000-0000-0000-0000000000a2')->>'lifetime_events')::int = 8,
+  (public.fdt_cycle_events('115', 'ac000000-0000-0000-0000-0000000000a2')->>'lifetime_events')::int = 8,
   'الإجمالي التاريخي ثمانية أحداث');
 
 select pg_temp.ok(
-  (public.fdt_cycle_events('AC-115', 'ac000000-0000-0000-0000-0000000000a2')->>'total')::int = 4,
+  (public.fdt_cycle_events('115', 'ac000000-0000-0000-0000-0000000000a2')->>'total')::int = 4,
   'تفعيلات الدورة أربعة — والتاريخي لا يُضخّمها');
 
 select pg_temp.ok(
-  (public.fdt_cycle_events('AC-115', 'ac000000-0000-0000-0000-0000000000a2')->>'unique_subscribers')::int = 3,
+  (public.fdt_cycle_events('115', 'ac000000-0000-0000-0000-0000000000a2')->>'unique_subscribers')::int = 3,
   'المشتركون الفريدون ثلاثة — المكرَّر يزيد الأحداث لا أساس الشريحة');
 
 select pg_temp.ok(
   (select unique_activated_subscribers from public.commission_cycle_snapshots
-   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='AC-115') = 3
+   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='115') = 3
   and (select qualifying_event_count from public.commission_cycle_snapshots
-   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='AC-115') = 4,
+   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='115') = 4,
   'اللقطة تطابق الشاشة: 3 مشتركين و4 أحداث');
 
 select pg_temp.ok(
   (select r->>'cycle_events' from jsonb_array_elements(
-     public.page_fdt_mapping('AC-115',null,null,null,50,0,
+     public.page_fdt_mapping('115',null,null,null,50,0,
        'ac000000-0000-0000-0000-0000000000a2')->'rows') r) = '4',
   'شاشة الربط تعرض تفعيلات الدورة لا مجموع التاريخ');
 
 select pg_temp.ok(
   (select r->>'lifetime_events' from jsonb_array_elements(
-     public.page_fdt_mapping('AC-115',null,null,null,50,0,
+     public.page_fdt_mapping('115',null,null,null,50,0,
        'ac000000-0000-0000-0000-0000000000a2')->'rows') r) = '8',
   'والتاريخي معروضٌ باسمه إلى جانبه');
 
@@ -149,15 +150,18 @@ select pg_temp.ok(
 -- ٢ · التابع المباشر لا يدخل شريحة الوكيل
 -- ------------------------------------------------------------------
 
+-- subscriber_key هو subscriber_identities.id (uuid) حين توجد هوية مطابقة، لا
+-- اسم المستخدم — فمطابقته حرفياً باسم مستخدم لا تُطابق شيئاً أبداً وتُخفي أي
+-- تسرّب عمولة حقيقي. activation_event_id هو الإثبات الصحيح لعدم الاستحقاق.
 select pg_temp.ok(
   not exists (select 1 from public.commission_event_entitlements
               where cycle_id='ac000000-0000-0000-0000-0000000000a2'
-                and subscriber_key = 'ac-dc1'),
+                and activation_event_id = 'AC-DC'),
   'التابع المباشر للشركة لا تنشأ عنه عمولة وكيل');
 
 select pg_temp.ok(
   (select scope_type from public.commission_cycle_snapshots
-   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='AC-115') = 'FDT',
+   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='115') = 'FDT',
   'نطاق المنطقة الجديدة يبقى الكابينة');
 
 -- ------------------------------------------------------------------
@@ -170,9 +174,9 @@ select public.calculate_commission_cycle('ac000000-0000-0000-0000-0000000000a2',
 
 select pg_temp.ok(
   (select qualifying_event_count from public.commission_cycle_snapshots
-   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='AC-115') = 3
+   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='115') = 3
   and (select unique_activated_subscribers from public.commission_cycle_snapshots
-   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='AC-115') = 2,
+   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='115') = 2,
   'الحدث المُستبعَد لم يعد يُحتسب بعد إعادة الحساب');
 
 select pg_temp.ok(
@@ -189,7 +193,7 @@ select pg_temp.ok(
   'الصفّ المستورَد باقٍ كما ورد');
 
 select pg_temp.ok(
-  (select count(*) from public.saas_activation_events where fdt_code='AC-115') = 8,
+  (select count(*) from public.saas_activation_events where fdt_code='115') = 8,
   'عدد صفوف المصدر لم يتغيّر');
 
 -- ------------------------------------------------------------------
@@ -197,15 +201,15 @@ select pg_temp.ok(
 -- ------------------------------------------------------------------
 
 select public.add_activation_correction('ac000000-0000-0000-0000-0000000000a2',
-  'ac-new1', 'P-35000', timestamptz '2027-05-15 12:00:00+03', 'AC-115',
+  'ac-new1', 'P-35000', timestamptz '2027-05-15 12:00:00+03', '115',
   'اختبار الإضافة', 'ac000000-0000-0000-0000-0000000000c2', 'ac.parent');
 select public.calculate_commission_cycle('ac000000-0000-0000-0000-0000000000a2', false);
 
 select pg_temp.ok(
   (select qualifying_event_count from public.commission_cycle_snapshots
-   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='AC-115') = 4
+   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='115') = 4
   and (select unique_activated_subscribers from public.commission_cycle_snapshots
-   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='AC-115') = 3,
+   where cycle_id='ac000000-0000-0000-0000-0000000000a2' and scope_id='115') = 3,
   'الحدث المُضاف يُحتسب مرّةً واحدة، ويرفع أساس الشريحة بمشتركه');
 
 select pg_temp.ok(
@@ -224,13 +228,13 @@ select pg_temp.ok(
 
 select pg_temp.must_fail(
   $q$ select public.add_activation_correction('ac000000-0000-0000-0000-0000000000a2',
-        '   ', 'P-35000', timestamptz '2027-05-15 12:00:00+03', 'AC-115',
+        '   ', 'P-35000', timestamptz '2027-05-15 12:00:00+03', '115',
         'سبب', gen_random_uuid()) $q$,
   'الإضافة المجهولة تُرفض — الشريحة تُحسب بالمشتركين الفريدين');
 
 select pg_temp.must_fail(
   $q$ select public.add_activation_correction('ac000000-0000-0000-0000-0000000000a2',
-        'ac-new2', 'P-35000', timestamptz '2027-08-15 12:00:00+03', 'AC-115',
+        'ac-new2', 'P-35000', timestamptz '2027-08-15 12:00:00+03', '115',
         'سبب', gen_random_uuid()) $q$,
   'حدثٌ خارج نافذة الدورة يُرفض');
 

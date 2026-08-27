@@ -6,6 +6,7 @@ const { TextEncoder } = require('node:util');
 const XLSX = require(path.join(__dirname, '..', 'assets', 'vendor', 'xlsx.full.min.js'));
 // index.html loads this as a separate <script src>; the sandbox needs it too.
 const InstallationFees = require(path.join(__dirname, '..', 'assets', 'js', 'installation-fees.js'));
+const Operations = require(path.join(__dirname, '..', 'assets', 'js', 'operations.js'));
 
 function createElement() {
   return {
@@ -57,6 +58,9 @@ function loadCurrentApp(options = {}) {
       }
       return elements.get(id);
     },
+    querySelector() {
+      return createElement();
+    },
     querySelectorAll() {
       return [];
     },
@@ -66,6 +70,10 @@ function loadCurrentApp(options = {}) {
   const context = vm.createContext({
     Blob,
     crypto: webcrypto,
+    CustomEvent: function CustomEvent(type, init) {
+      this.type = type;
+      this.detail = init && init.detail;
+    },
     Date,
     FileReader: function FileReader() {},
     Intl,
@@ -115,14 +123,17 @@ function loadCurrentApp(options = {}) {
     },
     window: {
       addEventListener() {},
+      dispatchEvent() {},
     },
     XLSX,
     InstallationFees,
+    Operations,
   });
 
   const exportsScript = `
     globalThis.__characterization = {
       calc,
+      centralPreview,
       calculateRawImport,
       syncTierGroupBasis,
       applyRawImportResult,
@@ -138,11 +149,13 @@ function loadCurrentApp(options = {}) {
       defaultTiers,
       getSbSession,
       getPreviousRow,
+      loadMyCapabilities,
       monthKey,
       monthOrder,
       renderAgentHierarchy,
       renderInstallation,
       renderZone,
+      setWorkspaceMode,
       showInstallationImportPreview,
       installationState,
       fetchInstallationSubscribers,
@@ -171,9 +184,12 @@ function loadCurrentApp(options = {}) {
       state,
       status,
       tierFor,
+      updateCentralPreviewUI,
       validatePeriodArchiveSnapshot,
       verifyBackupDocument,
-      verifyPeriodArchiveDocument
+      verifyPeriodArchiveDocument,
+      // Test-only: workspaceMode is a module-level binding, same reason as __setAuthProfile.
+      __getWorkspaceMode: () => workspaceMode,
     };
   `;
 

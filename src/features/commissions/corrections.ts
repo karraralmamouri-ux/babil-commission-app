@@ -16,7 +16,7 @@
 
 import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, pageRpc, select, can, ApiError } from '../../services/api';
+import { rpc, envelope, select, can, ApiError } from '../../services/api';
 import { count } from '../../domain/money';
 import { currentCycleId } from '../../domain/cycle';
 import {
@@ -64,12 +64,15 @@ export const corrections: Route = {
     if (m.query.get('scope_type')) args['p_scope_type'] = m.query.get('scope_type');
     if (m.query.get('scope_id')) args['p_scope_id'] = m.query.get('scope_id');
 
-    const page = await pageRpc<Row>('page_activation_corrections', args, view.signal);
+    if (view.signal.aborted) return;
+    const raw = await rpc<Row>('page_activation_corrections', args);
     if (!view.live) return;
+    const page = envelope<Row>(raw);
 
-    const active = page.rows.filter((r) => str(r, 'status') === 'ACTIVE');
-    const excluded = active.filter((r) => str(r, 'correction_type') === 'EXCLUDE').length;
-    const added = active.filter((r) => str(r, 'correction_type') === 'ADD').length;
+    // إجماليان خادميّان على كامل المجموعة المُرشَّحة، لا على صفحة الخمسين
+    // الحالية — وإلا اختلف الرقم المعروض بتغيّر حجم الصفحة أو الإزاحة.
+    const excluded = num(raw, 'active_exclusions');
+    const added = num(raw, 'active_additions');
     const locked = ['FINALIZED', 'PARTIALLY_PAID', 'PAID', 'CLOSED']
       .includes(str(cycle, 'status'));
 

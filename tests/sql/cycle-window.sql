@@ -251,7 +251,21 @@ values
    timestamptz '2026-06-30 20:30:00+00','CW-UNREG')
 on conflict do nothing;
 
--- تُعاد الحسبة بعد ظهور الكابينة المجهولة، وإلا فلا استثناء يُسعَّر.
+-- كابينة CW-UNREG غير مسجَّلة، لكنها بعد LIVE-02 نطاق وكيل محسوم فوراً —
+-- لا استثناء يُنشأ لها إطلاقاً، فلا تصلح مصدراً لاختبار
+-- report_commission_exception_impact (الذي ما زال يستقصي commission_exceptions
+-- كما هي دون تغيير). أبٌ لا يُحلّ إلى وكيل (UNKNOWN_AGENT) لم يمسّه LIVE-02
+-- هو ما يبقى حاجباً حقيقياً هنا — وبباقة معروفة مُسعَّرة (P-35000) كي يبقى
+-- المبلغ الاستدلالي رقماً حقيقياً لا صفراً ناتجاً عن باقة غير مسعَّرة.
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, canceled, raw_parent,
+   event_created_at)
+values
+  ('c0000000-0000-0000-0000-0000000000c3','CW-U-NOAGENT','cw-u-noagent','P-35000',false,
+   'cw.unmapped-parent', timestamptz '2026-07-15 12:00:00+00')
+on conflict do nothing;
+
+-- تُعاد الحسبة بعد ظهور الكابينة المجهولة والأب غير المحلول، وإلا فلا استثناء يُسعَّر.
 set local role authenticated;
 set local request.jwt.claim.sub = 'c0000000-0000-0000-0000-0000000000c1';
 select public.calculate_commission_cycle('c0000000-0000-0000-0000-0000000000c4') is not null as ran3;
@@ -290,12 +304,12 @@ set local request.jwt.claim.sub = 'c0000000-0000-0000-0000-0000000000c1';
 select pg_temp.ok(
   exists (select 1 from public.report_commission_exception_impact(
             'c0000000-0000-0000-0000-0000000000c4')
-          where reason_code = 'UNKNOWN_FDT' and indicative_amount > 0),
+          where reason_code = 'UNKNOWN_AGENT' and indicative_amount > 0),
   'أثر الاستثناء المالي رقم حقيقي لا صفر صامت');
 
 select pg_temp.ok(
   (select blocked_subscribers from public.report_commission_exception_impact(
-     'c0000000-0000-0000-0000-0000000000c4') where reason_code = 'UNKNOWN_FDT') >= 1,
+     'c0000000-0000-0000-0000-0000000000c4') where reason_code = 'UNKNOWN_AGENT') >= 1,
   'الأثر يعدّ المشتركين لا الأحداث وحدها');
 
 reset role;

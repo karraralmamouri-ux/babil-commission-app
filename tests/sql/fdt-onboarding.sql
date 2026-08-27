@@ -104,7 +104,17 @@ select pg_temp.ok(
   'الاكتشاف يعرض الآباء المرصودين دليلاً');
 
 -- ---------------------------------------------------------------------------
--- الحجب قبل التصنيف
+-- ما بعد LIVE-02: لا حجب على الإطلاق.
+--
+-- fdt_commission_scope لا تنظر إلى جدول fdts إطلاقاً — فقط إلى الرقم
+-- (94-119). ورموز هذا الملف كلّها نصّية غير رقمية (FO-NEW، FO-KNOWN)، فنطاقها
+-- وكيل محسوم فوراً، سواءٌ سُجِّلت في fdts أم لا. التسجيل أدناه يبقى ذا قيمة
+-- تشغيلية (تسمية، ربط بوكيل) لا يمسّ حساب العمولة إطلاقاً — وهذا يعني عملياً
+-- أن «الحجب حتى التصنيف» الذي صُمِّم له هذا الملف لم يعد له أثر مالي على أي
+-- رمز غير رقمي؛ يبقى أثره محصوراً بما لا يزال دون LIVE-02: رموز رقمية خارج
+-- 94-119 أو داخله، لا تحتاج تسجيلاً لتحديد نطاقها أصلاً. هذه فجوة عمل تستحق
+-- قراراً صريحاً: هل ما زالت شاشة «إدخال الكابينات» ذات غرض غير مالي (خرائط
+-- تشغيلية) يستحق الإبقاء عليها، أم أصبحت زائدة؟ BUSINESS DECISION REQUIRED.
 -- ---------------------------------------------------------------------------
 
 set local role authenticated;
@@ -113,27 +123,26 @@ select public.calculate_commission_cycle('f0000000-0000-0000-0000-0000000000a5')
 reset role;
 
 select pg_temp.ok(
-  (select zone from public.commission_qualifying_events where saas_event_id='FO-EV-1')
-    = 'unresolved',
-  'غير المسجَّلة لا تصير منطقة قديمة بصمت');
+  (select zone from public.commission_qualifying_events where saas_event_id='FO-EV-1') = 'old',
+  'رمزٌ غير رقمي نطاقه وكيل محسوم فوراً — لا حالة معلَّقة');
 
 select pg_temp.ok(
-  (select count(*) from public.commission_exceptions
-   where cycle_id='f0000000-0000-0000-0000-0000000000a5'
-     and reason_code='UNKNOWN_FDT' and status='OPEN' and blocks_finalization) = 2,
-  'كل حدث متأثر يُنتج استثناءً حاجباً قابلاً للتنفيذ');
+  not exists (select 1 from public.commission_exceptions
+              where cycle_id='f0000000-0000-0000-0000-0000000000a5'
+                and reason_code='UNKNOWN_FDT'),
+  'لا استثناء UNKNOWN_FDT بعد اليوم — لا حجب على الإطلاق');
 
 select pg_temp.ok(
   exists (select 1 from public.commission_event_entitlements
           where cycle_id='f0000000-0000-0000-0000-0000000000a5'
             and activation_event_id='FO-EV-3'),
-  'الكابينة المسجَّلة تبقى عاملة — الحجب موضعي لا شامل');
+  'الكابينة المسجَّلة مسبقاً تبقى عاملة');
 
 select pg_temp.ok(
-  not exists (select 1 from public.commission_event_entitlements
-              where cycle_id='f0000000-0000-0000-0000-0000000000a5'
-                and activation_event_id in ('FO-EV-1','FO-EV-2')),
-  'أحداث الكابينة غير المسجَّلة وحدها محجوبة');
+  exists (select 1 from public.commission_event_entitlements
+          where cycle_id='f0000000-0000-0000-0000-0000000000a5'
+            and activation_event_id in ('FO-EV-1','FO-EV-2')),
+  'غير المسجَّلة تُعمَّل فوراً أيضاً — لا حجب انتظاراً للتصنيف');
 
 -- ---------------------------------------------------------------------------
 -- الصلاحية
@@ -213,19 +222,22 @@ select pg_temp.ok(
   (select count(*) from public.commission_exceptions
    where cycle_id='f0000000-0000-0000-0000-0000000000a5'
      and reason_code='UNKNOWN_FDT' and status='OPEN') = 0,
-  'الاستثناء يزول بعد نجاح إعادة الحساب لا قبله');
+  'لا استثناء UNKNOWN_FDT قبل إعادة الحساب ولا بعدها');
 
 select pg_temp.ok(
   (select count(*) from public.commission_event_entitlements
    where cycle_id='f0000000-0000-0000-0000-0000000000a5'
      and activation_event_id in ('FO-EV-1','FO-EV-2')) = 2,
-  'المال المحجوب يُحرَّر بعد التصنيف');
+  'المال ظلّ عاملاً طوال الوقت — إعادة الحساب لا تُضاعفه ولا تُسقطه');
 
+-- 'FO-NEW' نصّ لا رقم: نطاقه وكيل قبل التصنيف وبعده سيّان. التصنيف هنا
+-- (register_fdt) لا يملك سلطة تغيير النطاق المالي بعد LIVE-02 — يُسجِّل
+-- تسميةً تشغيلية فقط في fdts.zone.
 select pg_temp.ok(
   (select scope_type from public.commission_event_entitlements
    where cycle_id='f0000000-0000-0000-0000-0000000000a5'
-     and activation_event_id='FO-EV-1') = 'FDT',
-  'المنطقة الجديدة تُسعَّر بنطاق الكابينة');
+     and activation_event_id='FO-EV-1') = 'AGENT',
+  'التصنيف لا يُغيّر نطاقاً مالياً لرمزٍ غير رقمي');
 
 select pg_temp.ok(
   exists (select 1 from public.audit_logs where action='commission.cycle.recalculated'),

@@ -82,12 +82,12 @@ export const auditLog: Route = {
       { key: 'before', label: 'قبل', cell: (r) => esc(str(r, 'old_value') || '—') },
       { key: 'after', label: 'بعد', cell: (r) => `<b>${esc(str(r, 'new_value') || '—')}</b>` },
       { key: 'why', label: 'لماذا؟', cell: (r) => {
-        const reason = str(r, 'reason') || str(r, 'note');
-        return `${esc(reason || '—')}<details class="technical-detail"><summary>تفاصيل تقنية</summary>
+        // لا عمود reason أو note في audit_logs؛ السبب الفعلي مكتوبٌ داخل extra.
+        const extra = str(r, 'extra');
+        return `${esc(extra || '—')}<details class="technical-detail"><summary>تفاصيل تقنية</summary>
           <code>${esc(str(r, 'action'))}</code>
           <span dir="ltr">Entity: ${esc(str(r, 'entity_id') || '—')}</span>
-          <span dir="ltr">Request: ${esc(str(r, 'request_id') || '—')}</span>
-          ${str(r, 'extra') ? `<pre>${esc(str(r, 'extra'))}</pre>` : ''}</details>`;
+          <span dir="ltr">Request: ${esc(str(r, 'request_id') || '—')}</span></details>`;
       } },
     ];
 
