@@ -108,11 +108,14 @@ rows120 as (
   limit 1
 )
 select pg_temp.ok((select (r->>'scope_type') = 'FDT' and (r->>'scope_id') = '94' from rows94),
-  'الحدّ الأدنى 94 — نطاق FDT، لا fdts.zone');
+  'الحدّ الأدنى 94 — نطاق FDT، لا fdts.zone')
+union all
 select pg_temp.ok((select (r->>'scope_type') = 'FDT' and (r->>'scope_id') = '119' from rows119),
-  'الحدّ الأعلى 119 — نطاق FDT');
+  'الحدّ الأعلى 119 — نطاق FDT')
+union all
 select pg_temp.ok((select (r->>'scope_type') = 'AGENT' and r->>'scope_id' is null from rows93),
-  'خارج المدى (93) — نطاق AGENT، لا رمز نطاق');
+  'خارج المدى (93) — نطاق AGENT، لا رمز نطاق')
+union all
 select pg_temp.ok((select (r->>'scope_type') = 'AGENT' and r->>'scope_id' is null from rows120),
   'خارج المدى (120) — نطاق AGENT');
 
@@ -126,18 +129,22 @@ tiny_page as (
 )
 select pg_temp.ok(
   (select (doc->>'active_additions')::int from full_page) = 4,
-  'أربع إضافات فعّالة فقط — الخامسة مُلغاة ولا تُحتسَب');
+  'أربع إضافات فعّالة فقط — الخامسة مُلغاة ولا تُحتسَب')
+union all
 select pg_temp.ok(
   (select (doc->>'active_exclusions')::int from full_page) = 1,
-  'استبعادٌ فعّالٌ واحد');
+  'استبعادٌ فعّالٌ واحد')
+union all
 select pg_temp.ok(
   (select (doc->>'active_additions')::int from tiny_page)
     = (select (doc->>'active_additions')::int from full_page),
-  'active_additions لا يتغيّر بتغيّر limit/offset');
+  'active_additions لا يتغيّر بتغيّر limit/offset')
+union all
 select pg_temp.ok(
   (select (doc->>'active_exclusions')::int from tiny_page)
     = (select (doc->>'active_exclusions')::int from full_page),
-  'active_exclusions لا يتغيّر بتغيّر limit/offset');
+  'active_exclusions لا يتغيّر بتغيّر limit/offset')
+union all
 select pg_temp.ok(
   (select jsonb_array_length(doc->'rows') from tiny_page) = 1,
   'الصفحة الصغيرة تُعيد صفّاً واحداً فقط رغم أن الإجمالي أكبر');
