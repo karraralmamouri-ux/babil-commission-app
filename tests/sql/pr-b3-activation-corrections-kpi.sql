@@ -58,11 +58,15 @@ values
   -- إضافة مُلغاة: لا تُحتسَب في active_additions
   ('66000000-0000-0000-0000-0000000000a2','ADD','b3ak-sub-revoked','B3AK-PKG','2027-06-09',
    '94','مُلغاة عمداً للاختبار','66000000-0000-0000-0000-000000000f05',
-   '66000000-0000-0000-0000-0000000000a1','REVOKED')
+   '66000000-0000-0000-0000-0000000000a1','ACTIVE')
 on conflict do nothing;
 
+-- انتقال ACTIVE -> REVOKED منسوب بالكامل دفعة واحدة، لا إدراج REVOKED مباشرة:
+-- activation_corrections_revoked_is_attributed يرفض أي صفّ REVOKED لا يحمل
+-- revoked_by/revoked_at/revoke_reason منذ لحظة كتابته.
 update public.activation_corrections
-set revoked_by = '66000000-0000-0000-0000-0000000000a1', revoked_at = now(),
+set status = 'REVOKED',
+    revoked_by = '66000000-0000-0000-0000-0000000000a1', revoked_at = now(),
     revoke_reason = 'اختبار'
 where request_id = '66000000-0000-0000-0000-000000000f05';
 
