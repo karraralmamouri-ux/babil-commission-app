@@ -198,19 +198,19 @@ values ('b3ak-sub-fallback','MATCHED','EXACT_USERNAME','RESELLER',
 
 insert into public.activation_corrections
   (cycle_id, correction_type, subscriber_username, package_code, event_at,
-   reason, request_id, created_by, status)
+   fdt_code, reason, request_id, created_by, status)
 values
   ('66000000-0000-0000-0000-0000000000a2','ADD','b3ak-sub-reseller','B3AK-PKG','2027-06-10',
-   'عائدية RESELLER صريحة','66000000-0000-0000-0000-000000000f07',
+   '93','عائدية RESELLER صريحة','66000000-0000-0000-0000-000000000f07',
    '66000000-0000-0000-0000-0000000000a1','ACTIVE'),
   ('66000000-0000-0000-0000-0000000000a2','ADD','b3ak-sub-direct','B3AK-PKG','2027-06-11',
-   'عائدية DIRECT_COMPANY صريحة','66000000-0000-0000-0000-000000000f08',
+   '93','عائدية DIRECT_COMPANY صريحة','66000000-0000-0000-0000-000000000f08',
    '66000000-0000-0000-0000-0000000000a1','ACTIVE'),
   ('66000000-0000-0000-0000-0000000000a2','ADD','b3ak-sub-review','B3AK-PKG','2027-06-12',
-   'عائدية NEEDS_REVIEW صريحة','66000000-0000-0000-0000-000000000f09',
+   '93','عائدية NEEDS_REVIEW صريحة','66000000-0000-0000-0000-000000000f09',
    '66000000-0000-0000-0000-0000000000a1','ACTIVE'),
   ('66000000-0000-0000-0000-0000000000a2','ADD','b3ak-sub-fallback','B3AK-PKG','2027-06-13',
-   'بلا فترة عائدية صريحة — احتياط الهوية','66000000-0000-0000-0000-000000000f10',
+   '93','بلا فترة عائدية صريحة — احتياط الهوية','66000000-0000-0000-0000-000000000f10',
    '66000000-0000-0000-0000-0000000000a1','ACTIVE')
 on conflict do nothing;
 
