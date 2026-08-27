@@ -145,7 +145,7 @@ select pg_temp.ok(
 reset role;
 
 insert into public.commission_cycles (id, name, period_start, period_end, engine_version, created_by)
-values ('64000000-0000-0000-0000-0000000000d5','B3L إضافة يدوية', date '2026-12-01', date '2026-12-31',
+values ('64000000-0000-0000-0000-0000000000d5','B3L إضافة يدوية', date '2027-01-01', date '2027-01-31',
         'VNEXT','64000000-0000-0000-0000-0000000000d1')
 on conflict do nothing;
 
@@ -154,7 +154,7 @@ insert into public.activation_corrections
    fdt_code, raw_parent, reason, request_id, created_by, status)
 values
   ('64000000-0000-0000-0000-0000000000d5','ADD','b3l-manual-sub','P-35000',
-   timestamptz '2026-12-10 10:00+03','93','B3L.ManualAdd.Parent','اختبار إضافة يدوية',
+   timestamptz '2027-01-10 10:00+03','93','B3L.ManualAdd.Parent','اختبار إضافة يدوية',
    '64000000-0000-0000-0000-000000000e01','64000000-0000-0000-0000-0000000000d1','ACTIVE')
 on conflict do nothing;
 
@@ -206,7 +206,7 @@ select pg_temp.ok(
 
 -- إضافة يدوية مُلغاة وحدها في دورةٍ مستقلّة: تصنيف نفس الأب يجب ألّا يَسِمها.
 insert into public.commission_cycles (id, name, period_start, period_end, engine_version, created_by)
-values ('64000000-0000-0000-0000-0000000000d6','B3L إضافة ملغاة', date '2026-12-01', date '2026-12-31',
+values ('64000000-0000-0000-0000-0000000000d6','B3L إضافة ملغاة', date '2027-02-01', date '2027-02-28',
         'VNEXT','64000000-0000-0000-0000-0000000000d1')
 on conflict do nothing;
 
@@ -215,7 +215,7 @@ insert into public.activation_corrections
    fdt_code, raw_parent, reason, request_id, created_by, status)
 values
   ('64000000-0000-0000-0000-0000000000d6','ADD','b3l-manual-sub-revoked','P-35000',
-   timestamptz '2026-12-12 10:00+03','93','B3L.ManualAdd.Revoked','مُلغاة عمداً للاختبار',
+   timestamptz '2027-02-12 10:00+03','93','B3L.ManualAdd.Revoked','مُلغاة عمداً للاختبار',
    '64000000-0000-0000-0000-000000000e02','64000000-0000-0000-0000-0000000000d1','ACTIVE')
 on conflict do nothing;
 
