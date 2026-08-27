@@ -50,9 +50,12 @@ set local role authenticated;
 set local request.jwt.claim.sub = '64000000-0000-0000-0000-0000000000d1';
 select public.calculate_commission_cycle('64000000-0000-0000-0000-0000000000d4') is not null as ran;
 
+-- المُصادَق عليه لا يقرأ commission_cycles مباشرة؛ عقده العام الوحيد هو
+-- commission_cycle_result. كل تحقق عن needs_recalculation/recalculation_reason
+-- أدناه يمرّ من خلاله، لا من الجدول.
 select pg_temp.ok(
-  not (select needs_recalculation from public.commission_cycles
-       where id = '64000000-0000-0000-0000-0000000000d4'),
+  ((public.commission_cycle_result('64000000-0000-0000-0000-0000000000d4')
+    -> 'cycle') ->> 'needs_recalculation')::boolean = false,
   'الدورة قبل أي قرار لا تحمل علم إعادة حساب');
 
 -- ---------------------------------------------------------------------------
@@ -63,16 +66,19 @@ select (public.classify_parent('B3L.Parent.X', 'RESELLER', '64000000-0000-0000-0
    'اختبار', gen_random_uuid()) ->> 'cycles_flagged_for_recalculation')::int as flagged;
 
 select pg_temp.ok(
-  (select needs_recalculation from public.commission_cycles
-   where id = '64000000-0000-0000-0000-0000000000d4') = true,
+  ((public.commission_cycle_result('64000000-0000-0000-0000-0000000000d4')
+    -> 'cycle') ->> 'needs_recalculation')::boolean = true,
   'تصنيف الأب يَسِم الدورة المتأثّرة بحاجتها لإعادة الحساب');
 
 select pg_temp.ok(
-  (select recalculation_reason from public.commission_cycles
-   where id = '64000000-0000-0000-0000-0000000000d4') is not null,
+  (public.commission_cycle_result('64000000-0000-0000-0000-0000000000d4')
+    -> 'cycle') ->> 'recalculation_reason' is not null,
   'سبب الوسم مسجَّل');
 
--- والمال لم يتغيّر بعد — القرار لم يحسب شيئاً.
+-- والمال لم يتغيّر بعد — القرار لم يحسب شيئاً. هذا فحص داخلي لا يعرضه عقد
+-- commission_cycle_result (لا يفحص استحقاق حدثٍ بعينه)، فيُنفَّذ بصلاحية
+-- المالك بعد إعادة الدور — لا يجوز لـ authenticated قراءة الجدول مباشرة.
+reset role;
 select pg_temp.ok(
   not exists (select 1 from public.commission_event_entitlements
               where activation_event_id = 'B3L-EV-1'),
@@ -82,39 +88,49 @@ select pg_temp.ok(
 -- إعادة الحساب المُخوَّلة تُطفئ العلم وتُحدِّث المال.
 -- ---------------------------------------------------------------------------
 
+set local role authenticated;
+set local request.jwt.claim.sub = '64000000-0000-0000-0000-0000000000d1';
+
 select public.recalculate_cycle_after_master_change(
   '64000000-0000-0000-0000-0000000000d4', gen_random_uuid(), 'اختبار تصنيف') is not null as recalculated;
 
 select pg_temp.ok(
-  (select needs_recalculation from public.commission_cycles
-   where id = '64000000-0000-0000-0000-0000000000d4') = false,
+  ((public.commission_cycle_result('64000000-0000-0000-0000-0000000000d4')
+    -> 'cycle') ->> 'needs_recalculation')::boolean = false,
   'إعادة الحساب المُخوَّلة تُطفئ العلم');
-
-select pg_temp.ok(
-  exists (select 1 from public.commission_event_entitlements
-          where activation_event_id = 'B3L-EV-1'
-            and effective_agent_id = '64000000-0000-0000-0000-0000000000d2'),
-  'وتُنتج الآن استحقاقاً للوكيل المُصنَّف');
 
 select pg_temp.ok(
   ((public.commission_cycle_result('64000000-0000-0000-0000-0000000000d4')
     -> 'cycle') ->> 'needs_recalculation')::boolean = false,
   'الشاشة تقرأ العلم من commission_cycle_result');
 
+-- فحص داخلي آخر — نفس السبب أعلاه: الاستحقاق نُسِب فعلاً للوكيل المُصنَّف.
+reset role;
+select pg_temp.ok(
+  exists (select 1 from public.commission_event_entitlements
+          where activation_event_id = 'B3L-EV-1'
+            and effective_agent_id = '64000000-0000-0000-0000-0000000000d2'),
+  'وتُنتج الآن استحقاقاً للوكيل المُصنَّف');
+
 -- ---------------------------------------------------------------------------
 -- الدورة المنتهية لا تُوسَم إطلاقاً.
 -- ---------------------------------------------------------------------------
 
+-- تجهيز فرضية الاختبار (اعتماد الدورة)، لا فعل تطبيق — يُنفَّذ بصلاحية
+-- المالك. authenticated لا يملك ولا يجوز أن يملك كتابة مباشرة على الجدول.
 update public.commission_cycles set status = 'FINALIZED', finalized_at = now()
 where id = '64000000-0000-0000-0000-0000000000d4';
+
+set local role authenticated;
+set local request.jwt.claim.sub = '64000000-0000-0000-0000-0000000000d1';
 
 select (public.classify_parent('B3L.Parent.X', 'DIRECT_COMPANY', null,
    'إعادة تصنيف بعد الاعتماد', gen_random_uuid()) ->> 'cycles_flagged_for_recalculation')::int
   as flagged_after_finalize;
 
 select pg_temp.ok(
-  (select needs_recalculation from public.commission_cycles
-   where id = '64000000-0000-0000-0000-0000000000d4') = false,
+  ((public.commission_cycle_result('64000000-0000-0000-0000-0000000000d4')
+    -> 'cycle') ->> 'needs_recalculation')::boolean = false,
   'الدورة المعتمدة لا تُوسَم — تصحيحها أداةٌ أخرى');
 
 reset role;
