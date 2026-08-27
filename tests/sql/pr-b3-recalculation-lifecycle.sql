@@ -118,7 +118,10 @@ select pg_temp.ok(
 
 -- تجهيز فرضية الاختبار (اعتماد الدورة)، لا فعل تطبيق — يُنفَّذ بصلاحية
 -- المالك. authenticated لا يملك ولا يجوز أن يملك كتابة مباشرة على الجدول.
-update public.commission_cycles set status = 'FINALIZED', finalized_at = now()
+update public.commission_cycles
+set status = 'FINALIZED',
+    finalized_by = '64000000-0000-0000-0000-0000000000d1',
+    finalized_at = now()
 where id = '64000000-0000-0000-0000-0000000000d4';
 
 set local role authenticated;
