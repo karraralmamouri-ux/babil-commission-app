@@ -3,3 +3,10 @@ assets/vendor/xlsx.full.min.js -text
 
 # Shell scripts must keep LF endings or bash refuses to run them.
 *.sh text eol=lf
+
+# Force LF on every other tracked text file regardless of the checking-out
+# machine's core.autocrlf. Without this, a Windows checkout (autocrlf=true,
+# the Git-for-Windows default) silently rewrites source files to CRLF, which
+# breaks any test doing literal "\n"-based string slicing (see
+# financial-corrections-ui.test.js) without there being an actual code bug.
+* text=auto eol=lf
