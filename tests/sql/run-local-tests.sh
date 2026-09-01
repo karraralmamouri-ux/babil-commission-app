@@ -363,6 +363,15 @@ fi
 echo "$out39" | grep -E "^ {18,19}(ok|==) " || true
 passed=$((passed + $(echo "$out39" | grep -c "                   ok ")))
 
+echo "== live-04 / arc-001: payment history domain parity =="
+out40=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/live04-payment-history-domain-parity.sql 2>&1) || true
+if echo "$out40" | grep -qE "FAILED|ERROR"; then
+  echo "$out40" | grep -E "FAILED|ERROR" || true
+  echo "LIVE-04 PAYMENT HISTORY DOMAIN PARITY TESTS FAILED" >&2; exit 1
+fi
+echo "$out40" | grep -E "^ {3,5}(ok|==) " || true
+passed=$((passed + $(echo "$out40" | grep -c "    ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
