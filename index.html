@@ -370,6 +370,7 @@
    <button class="tab" data-cx="exceptions" onclick="switchCxTab('exceptions')">⚠️ الاستثناءات</button>
    <button class="tab" data-cx="config" onclick="switchCxTab('config')">⚙️ التهيئة</button>
    <button class="tab" data-cx="agent" onclick="switchCxTab('agent')">👤 الملف المالي للوكيل</button>
+   <button class="tab" data-cx="freep1" onclick="switchCxTab('freep1')">🎁 Free P1</button>
   </div>
 
   <div id="cx-cycle" class="cx-panel active">
@@ -402,6 +403,11 @@
     <select id="cxAgentSelect" class="select" onchange="loadAgentProfile()"></select>
    </div>
    <div id="cxAgentProfile"></div>
+  </div>
+
+  <div id="cx-freep1" class="cx-panel">
+   <p class="muted" style="font-size:11px">عرض/تدقيق فقط — Free P1 أهلية وعرض دائماً، بلا صرف أو تسوية مالية أو قيد دفتر أستاذ (ADR-031). NEW ZONE: أهلية لكل كابينة (FDT) مستقلة. OLD ZONE: أهلية بإجمالي مشتركي الموزّع.</p>
+   <div id="cxFreeP1Table" style="overflow:auto"></div>
   </div>
  </div>
 </section>
@@ -2075,8 +2081,28 @@ async function loadCommissionCycle(){
   const meta=document.getElementById("cxCycleMeta");
   if(meta)meta.innerHTML=sum.byZone.map(z=>`${esc(z.label)}: ${fmt(z.scopes)} نطاق · ${fmt(z.subscribers)} مشترك · ${fmt(z.events)} حدث · ${fmt(z.gross)} د.ع`).join("<br>")
    +`<br>المحرّك: ${esc(cxCurrentCycle?.engine_version||"—")} · الحالة: ${esc(cxCurrentCycle?.status||"—")}`;
-  renderCommissionScopes();loadCommissionExceptions();
+  renderCommissionScopes();loadCommissionExceptions();loadCommissionFreeP1();
  }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+/* Free P1: عرض/تدقيق فقط. لا حساب هنا — الأهلية تُحسب على الخادم بمعيار
+   واحد (>) يتطابق حرفياً مع grant_free_p1()، تثبته tests/sql/free-p1.sql.
+   لا صرف، لا رصيد، لا قيد مالي (ADR-031). */
+async function loadCommissionFreeP1(){
+ const host=document.getElementById("cxFreeP1Table");if(!host||!cxCurrentCycle)return;
+ host.innerHTML="<div class='muted'>جارٍ التحميل…</div>";
+ try{
+  const rows=await sbRequest("/rest/v1/rpc/free_bonus_eligibility",{method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({p_cycle_id:cxCurrentCycle.id})});
+  renderCommissionFreeP1(rows||[]);
+ }catch(error){host.innerHTML=`<div class="muted">تعذر التحميل: ${esc(error?.message||"خطأ")}</div>`}}
+
+function renderCommissionFreeP1(rows){
+ const host=document.getElementById("cxFreeP1Table");if(!host)return;
+ if(!rows.length){host.innerHTML="<div class='muted'>لا نطاقات مؤهَّلة لـFree P1 في هذه الدورة حتى الآن.</div>";return}
+ host.innerHTML=`<div class="muted" style="font-size:11px;margin-bottom:6px">${fmt(rows.length)} نطاق مؤهَّل — عرض فقط.</div>`+
+  `<table class="raw-config-table"><thead><tr><th>الموزّع/الكابينة</th><th>المنطقة</th><th>المشتركون الفعّالون المؤهِّلون</th><th>العتبة</th><th>Free P1</th></tr></thead><tbody>`+
+  rows.map(r=>`<tr><td>${esc(r.scope_label||r.scope_id)}</td><td>${esc(CommissionVNext.describeScope({zone:r.zone,scopeType:r.scope_type}))}</td><td>${fmt(r.unique_activated_subscribers)}</td><td>${fmt(r.threshold)}</td><td>مؤهَّل × ${fmt(r.free_p1_count)}</td></tr>`).join("")+"</tbody></table>"}
 
 function renderCommissionScopes(){
  const host=document.getElementById("cxScopeTable");if(!host)return;

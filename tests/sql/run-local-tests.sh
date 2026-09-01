@@ -363,9 +363,82 @@ fi
 echo "$out39" | grep -E "^ {18,19}(ok|==) " || true
 passed=$((passed + $(echo "$out39" | grep -c "                   ok ")))
 
+echo "== live-04 / arc-001: payment history domain parity =="
+out40=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/live04-payment-history-domain-parity.sql 2>&1) || true
+if echo "$out40" | grep -qE "FAILED|ERROR"; then
+  echo "$out40" | grep -E "FAILED|ERROR" || true
+  echo "LIVE-04 PAYMENT HISTORY DOMAIN PARITY TESTS FAILED" >&2; exit 1
+fi
+echo "$out40" | grep -E "^ {3,5}(ok|==) " || true
+passed=$((passed + $(echo "$out40" | grep -c "    ok ")))
+
+echo "== bulk invoice audit engine =="
+out41=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/bulk-invoice-audit.sql 2>&1) || true
+if echo "$out41" | grep -qE "FAILED|ERROR"; then
+  echo "$out41" | grep -E "FAILED|ERROR" || true
+  echo "BULK INVOICE AUDIT TESTS FAILED" >&2; exit 1
+fi
+echo "$out41" | grep -E "^ {3,5}(ok|==) " || true
+passed=$((passed + $(echo "$out41" | grep -c "    ok ")))
+
+echo "== free p1 bonus =="
+out42=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/free-p1.sql 2>&1) || true
+if echo "$out42" | grep -qE "FAILED|ERROR"; then
+  echo "$out42" | grep -E "FAILED|ERROR" || true
+  echo "FREE P1 BONUS TESTS FAILED" >&2; exit 1
+fi
+echo "$out42" | grep -E "^ {14,16}(ok|==) " || true
+passed=$((passed + $(echo "$out42" | grep -c "ok ")))
+
+echo "== void import batch =="
+out43=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/void-import-batch.sql 2>&1) || true
+if echo "$out43" | grep -qE "FAILED|ERROR"; then
+  echo "$out43" | grep -E "FAILED|ERROR" || true
+  echo "VOID IMPORT BATCH TESTS FAILED" >&2; exit 1
+fi
+echo "$out43" | grep -E "^ {14,16}(ok|==) " || true
+passed=$((passed + $(echo "$out43" | grep -c "ok ")))
+
+echo "== zone consistency (ZON-005) =="
+out44=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/zone-consistency.sql 2>&1) || true
+if echo "$out44" | grep -qE "FAILED|ERROR"; then
+  echo "$out44" | grep -E "FAILED|ERROR" || true
+  echo "ZONE CONSISTENCY TESTS FAILED" >&2; exit 1
+fi
+echo "$out44" | grep -E "^ {14,16}(ok|==) " || true
+passed=$((passed + $(echo "$out44" | grep -c "ok ")))
+
+echo "== permission primitive hardening (SEC-004) =="
+out45=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/permission-primitive-hardening.sql 2>&1) || true
+if echo "$out45" | grep -qE "FAILED|ERROR"; then
+  echo "$out45" | grep -E "FAILED|ERROR" || true
+  echo "PERMISSION PRIMITIVE HARDENING TESTS FAILED" >&2; exit 1
+fi
+echo "$out45" | grep -E "^ {8,10}(ok|==) " || true
+passed=$((passed + $(echo "$out45" | grep -c "ok ")))
+
+echo "== invoice identity dedup (IMP-001) =="
+out46=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/invoice-identity-dedup.sql 2>&1) || true
+if echo "$out46" | grep -qE "FAILED|ERROR"; then
+  echo "$out46" | grep -E "FAILED|ERROR" || true
+  echo "INVOICE IDENTITY DEDUP TESTS FAILED" >&2; exit 1
+fi
+echo "$out46" | grep -E "^ {2,7}(ok|==) " || true
+passed=$((passed + $(echo "$out46" | grep -c "ok ")))
+
+echo "== installation kpi reconciliation (INS-009) =="
+out47=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-kpi-reconciliation.sql 2>&1) || true
+if echo "$out47" | grep -qE "FAILED|ERROR"; then
+  echo "$out47" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION KPI RECONCILIATION TESTS FAILED" >&2; exit 1
+fi
+echo "$out47" | grep -E "^ {2,7}(ok|==) " || true
+passed=$((passed + $(echo "$out47" | grep -c "ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
+bash tests/sql/invoice-dedup-concurrency.sh
 
 echo
 echo "local database assertions passed: $((passed + 1))"

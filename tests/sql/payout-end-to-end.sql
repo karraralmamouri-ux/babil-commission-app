@@ -130,6 +130,15 @@ select pg_temp.ok(
   (select status from public.installation_payment_batches where name = 'E2E-BATCH') = 'DRAFT',
   '  · وتولد مسوّدةً — الإنشاء ليس دفعاً');
 
+-- السطر يحمل الفاتورة التي أهّلته: سلسلة فاتورة→استحقاق→دفعة كاملة، لا مقطوعة.
+select pg_temp.ok(
+  (select i.invoice_id from public.installation_payment_batch_items i
+   join public.installation_payment_batches b on b.id = i.batch_id
+   where b.name = 'E2E-BATCH' and i.subscriber_id = 'e2e-pass') =
+  (select id from public.installation_invoices
+   where subscriber_id = 'e2e-pass' and stage_code = 'P1'),
+  '  · وبند الدفعة يحمل معرّف الفاتورة المدقَّقة التي أهّلته');
+
 -- ٦. التحقّق: تصير جاهزة.
 select pg_temp.ok(
   (public.revalidate_installation_batch(

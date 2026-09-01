@@ -17,6 +17,8 @@
     "guard:project-ref": "node scripts/assert-project-ref.mjs",
     "guard:staging-ref": "node scripts/assert-staging-project-ref.mjs",
     "migrate:staging": "npm run guard:staging-ref && npx supabase db push",
+    "dump:staging": "npm run guard:staging-ref && node scripts/dump-database.mjs --target staging",
+    "dump:production": "npm run guard:project-ref && node scripts/dump-database.mjs --target production",
     "build": "vite build",
     "dev": "vite",
     "typecheck": "tsc --noEmit"

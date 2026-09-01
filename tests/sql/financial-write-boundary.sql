@@ -226,6 +226,17 @@ select pg_temp.assert_that(
                        'audit_installation_invoice', 'record_installation_payment')
      and coalesce(pg_get_userbyid(x.grantee), 'PUBLIC') in ('anon', 'PUBLIC')));
 
+-- ---------------------------------------------------------------------------
+-- 5. المسار القديم المُتقاعد: لا صلاحية تنفيذ لأحد على publish_commission_month.
+-- ---------------------------------------------------------------------------
+
+select pg_temp.assert_that(
+  'legacy publish_commission_month has no execute grant for anyone',
+  (select count(*) = 0 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   cross join lateral aclexplode(p.proacl) x
+   where n.nspname = 'public' and p.proname = 'publish_commission_month'
+     and coalesce(pg_get_userbyid(x.grantee), 'PUBLIC') in ('authenticated', 'anon', 'PUBLIC')));
+
 select check_name, result from public.boundary_results order by check_name;
 drop table public.boundary_results;
 
