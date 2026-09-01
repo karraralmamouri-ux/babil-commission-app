@@ -369,14 +369,18 @@ $$;
 --    مدفوعة، لا يُعيد كتابة مالاً ولا يخالف حظر «لا تعديل مبالغ الإنتاج».
 -- ---------------------------------------------------------------------------
 
-update public.installation_enrollments
-set zone = case when public.fdt_commission_scope(fdt_code) = 'FDT' then 'new' else 'old' end
-where zone is distinct from
-      (case when public.fdt_commission_scope(fdt_code) = 'FDT' then 'new' else 'old' end);
+do $$
+begin
+  update public.installation_enrollments
+  set zone = case when public.fdt_commission_scope(fdt_code) = 'FDT' then 'new' else 'old' end
+  where zone is distinct from
+        (case when public.fdt_commission_scope(fdt_code) = 'FDT' then 'new' else 'old' end);
 
-update public.installation_entitlements
-set zone = case when public.fdt_commission_scope(fdt) = 'FDT' then 'new' else 'old' end
-where zone is distinct from
-      (case when public.fdt_commission_scope(fdt) = 'FDT' then 'new' else 'old' end);
+  update public.installation_entitlements
+  set zone = case when public.fdt_commission_scope(fdt) = 'FDT' then 'new' else 'old' end
+  where zone is distinct from
+        (case when public.fdt_commission_scope(fdt) = 'FDT' then 'new' else 'old' end);
+end;
+$$;
 
 commit;
