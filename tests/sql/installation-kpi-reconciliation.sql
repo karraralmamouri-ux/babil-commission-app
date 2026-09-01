@@ -240,6 +240,67 @@ select pg_temp.ok(
 
 reset role;
 
+-- ===========================================================================
+-- 4. تقرير أجور التنصيب (/reports/installation) مقابل خطوة «تثبيت الاستحقاق»
+--    في دورة التنصيب (/installation/cycle) — تدقيق QA ما بعد الإطلاق
+--    (2026-09-01، طلب #6): الشاشتان تُبلَّغان بأن أرقامهما «تتضارب».
+--
+--    الحقيقة: كلتاهما تقرآن installation_entitlements بمعيار الفترة نفسه
+--    حرفاً بحرف (period = p_period). فحين تُمرَّر نفس الفترة صراحةً لكلتيهما
+--    يجب أن يتطابق العدد والمبلغ تماماً — وهذا ما يُثبته القسم الأول أدناه.
+--    التضارب الحقيقي المُبلَّغ ليس خطأ حسابٍ بل اختلاف افتراضٍ: التقرير بلا
+--    فلترة فترة يجمع كل الفترات المستوردة، بينما لوحة الدورة بلا فترة تفترض
+--    الشهر الحالي (business_timezone) — القسم الثاني يُثبت هذا الفارق صراحةً
+--    حتى لا يُقرأ ثانيةً كخطأ حساب. المعالجة على الواجهة توضيحية (راجع
+--    src/features/reports/index.ts) لا تُغيّر افتراض أيّ دالّةٍ من الاثنتين.
+-- ===========================================================================
+
+-- صفٌّ إضافي في فترةٍ مختلفة (٢٠٢٦-٠٨) كي يكون الفارق بين «فترة واحدة» و
+-- «كل الفترات» فارقاً حقيقياً قابلاً للقياس، لا فارقاً صفرياً بالمصادفة.
+insert into public.installation_entitlements
+  (batch_id, period, subscriber_id, subscriber_name, reseller, zone, remaining,
+   stage, amount, payment_status, created_by)
+select null, '2026-08', 'kpi-other-period', 'اختبار فترة أخرى', 'وكيل KPI', 'old',
+       13000, 'P1', 3000, 'awaiting_invoice', 'ae000000-0000-0000-0000-0000000000a1'
+where not exists (
+  select 1 from public.installation_entitlements
+  where period = '2026-08' and subscriber_id = 'kpi-other-period');
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'ae000000-0000-0000-0000-0000000000a1';
+
+select public.report_installation_fees('2026-09', null, null, 1, 0) as rep0906 \gset
+select public.installation_cycle_pipeline('2026-09') as pipe0906 \gset
+
+select pg_temp.ok(
+  ((:'rep0906'::jsonb -> 'summary' ->> 'entitlements')::int
+    = (select (elem ->> 'count')::int from jsonb_array_elements(:'pipe0906'::jsonb -> 'steps') elem
+       where elem ->> 'key' = 'ENTITLEMENT')),
+  'مطابقة #6: عدد استحقاقات ٢٠٢٦-٠٩ في التقرير = عدّاد خطوة تثبيت الاستحقاق في الدورة، لنفس الفترة الصريحة');
+select pg_temp.ok(
+  ((:'rep0906'::jsonb -> 'summary' ->> 'total_amount')::bigint
+    = (select (elem ->> 'amount')::bigint from jsonb_array_elements(:'pipe0906'::jsonb -> 'steps') elem
+       where elem ->> 'key' = 'ENTITLEMENT')),
+  'مطابقة #6: مبلغ استحقاقات ٢٠٢٦-٠٩ في التقرير = مبلغ خطوة تثبيت الاستحقاق في الدورة، لنفس الفترة الصريحة');
+select pg_temp.ok(
+  (:'pipe0906'::jsonb ->> 'period') = '2026-09',
+  'مطابقة #6: تمرير p_period صراحةً للدورة يُلزمها تلك الفترة، لا الشهر الحالي');
+
+-- جذر التضارب المُبلَّغ: التقرير بلا فلترة فترة يجمع كل الفترات — لا يقتصر
+-- على فترةٍ واحدة كما تفعل لوحة الدورة حين تفترض الشهر الحالي بلا تمرير فترة.
+select public.report_installation_fees(null, null, null, 1, 0) as repall \gset
+
+select pg_temp.ok(
+  (:'repall'::jsonb -> 'summary' ->> 'entitlements')::int
+    = (:'rep0906'::jsonb -> 'summary' ->> 'entitlements')::int + 1,
+  'جذر التضارب #6: بلا فلترة فترة، التقرير يضمّ صفّ فترة٢٠٢٦-٠٨ الإضافي أيضاً — يجمع كل الفترات لا فترة الدورة الحالية وحدها');
+select pg_temp.ok(
+  (:'repall'::jsonb -> 'summary' ->> 'total_amount')::bigint
+    = (:'rep0906'::jsonb -> 'summary' ->> 'total_amount')::bigint + 3000,
+  'جذر التضارب #6: مبلغ التقرير بلا فلترة يشمل مبلغ الفترة الأخرى أيضاً — 3000 زيادة');
+
+reset role;
+
 select ' == installation kpi reconciliation: done ==';
 
 rollback;

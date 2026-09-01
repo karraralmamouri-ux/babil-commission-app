@@ -120,6 +120,65 @@ select pg_temp.ok(
   and not has_function_privilege('anon', 'public.protect_voided_import_batch()', 'EXECUTE'),
   'protect_voided_import_batch: مُغلَقة صراحة الآن لـanon وauthenticated');
 
+-- ===========================================================================
+-- 4. مساحة العمل الكاملة (تدقيق QA 2026-09-01، طلب #7): legacy.workspace
+--    مقصورةٌ على admin وحده — لا accountant ولا monitor ولا viewer يرثها
+--    (لم تُدرَج في القائمة المشتركة لهم في 20260820090000)، والمدير يرثها
+--    ضمناً من قالب admin (الذي يملك كل قدرة) بلا صفٍّ إضافي.
+-- ===========================================================================
+
+insert into auth.users (id, email) values
+  ('ac000000-0000-0000-0000-00000000ea03', 'pph-admin@fixture.invalid'),
+  ('ac000000-0000-0000-0000-00000000ea04', 'pph-accountant@fixture.invalid'),
+  ('ac000000-0000-0000-0000-00000000ea05', 'pph-monitor@fixture.invalid')
+on conflict do nothing;
+insert into public.profiles (id, full_name, email, role, is_active) values
+  ('ac000000-0000-0000-0000-00000000ea03', 'PPH-AD', 'pph-admin@fixture.invalid', 'admin', true),
+  ('ac000000-0000-0000-0000-00000000ea04', 'PPH-AC', 'pph-accountant@fixture.invalid', 'accountant', true),
+  ('ac000000-0000-0000-0000-00000000ea05', 'PPH-MO', 'pph-monitor@fixture.invalid', 'monitor', true)
+on conflict (id) do update set role = excluded.role, is_active = true;
+
+select pg_temp.ok(
+  exists (select 1 from public.permission_capabilities where key = 'legacy.workspace'),
+  'مساحة العمل: قدرة legacy.workspace مُعرَّفة في الكتالوج');
+select pg_temp.ok(
+  exists (select 1 from public.role_template_capabilities
+          where role_key = 'admin' and capability_key = 'legacy.workspace'),
+  'مساحة العمل: قالب admin يملكها');
+select pg_temp.ok(
+  not exists (select 1 from public.role_template_capabilities
+              where role_key in ('accountant', 'monitor', 'viewer')
+                and capability_key = 'legacy.workspace'),
+  'مساحة العمل: لا accountant ولا monitor ولا viewer يملكها');
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'ac000000-0000-0000-0000-00000000ea03';
+select pg_temp.ok(
+  public.has_capability('legacy.workspace'),
+  'مساحة العمل: admin مخوَّل فعلياً عبر has_capability');
+reset role;
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'ac000000-0000-0000-0000-00000000ea04';
+select pg_temp.ok(
+  not public.has_capability('legacy.workspace'),
+  'مساحة العمل: accountant غير مخوَّل فعلياً عبر has_capability');
+reset role;
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'ac000000-0000-0000-0000-00000000ea05';
+select pg_temp.ok(
+  not public.has_capability('legacy.workspace'),
+  'مساحة العمل: monitor غير مخوَّل فعلياً عبر has_capability');
+reset role;
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'ac000000-0000-0000-0000-00000000ea01';
+select pg_temp.ok(
+  not public.has_capability('legacy.workspace'),
+  'مساحة العمل: viewer غير مخوَّل فعلياً عبر has_capability');
+reset role;
+
 select '       == permission primitive hardening: done ==';
 
 rollback;

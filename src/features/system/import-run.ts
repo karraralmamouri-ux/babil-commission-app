@@ -27,7 +27,7 @@ declare global {
   interface Window {
     XLSX?: {
       read: (data: ArrayBuffer, opts: { type: string }) => XlsxBook;
-      utils: { sheet_to_json: (sheet: unknown, opts: { defval: string }) => Row[] };
+      utils: { sheet_to_json: (sheet: unknown, opts: { defval: string; header?: number; raw?: boolean }) => Row[] };
     };
     InstallationFees?: {
       buildImportPreview: (rows: Row[], options: Record<string, unknown>) => Row;
@@ -290,19 +290,22 @@ function wireImport(view: View): void {
             p_rows: fees ? fees.buildHistoricalImportRows(preview) : [],
             p_request_id: crypto.randomUUID(),
           })
-        : await rpc<Row>('import_installation_entitlements', {
-            p_period: period?.value.trim(),
-            p_file_name: parsed.fileName,
-            p_file_checksum: parsed.checksum,
-            p_rows: entitlementRows(preview),
-            p_request_id: crypto.randomUUID(),
-          });
+        : await importEntitlementsChunked(
+            period?.value.trim() || '', parsed.fileName, parsed.checksum, entitlementRows(preview),
+            (done, total) => {
+              if (!view.live) return;
+              out.innerHTML = loading(total > ENTITLEMENTS_CHUNK_SIZE
+                ? `جارٍ الاعتماد على الخادم… (${count(done)} من ${count(total)})`
+                : 'جارٍ الاعتماد على الخادم…');
+            });
       if (!view.live) return;
 
       const batch = (result?.['batch'] || result || {}) as Row;
+      // batch_totals إجماليّ الدفعة كلّها عبر كلّ أجزائها، لا الجزء الأخير وحده.
+      const totals = (batch['batch_totals'] as Row) || batch;
       out.innerHTML = insight('good', 'اعتُمد الاستيراد',
-        `مقبول ${count(num(batch, 'accepted'))} · مكرّر ${count(num(batch, 'duplicates'))}`
-        + ` · مرفوض ${count(num(batch, 'rejected'))} من ${count(num(batch, 'source_rows'))} صفّاً`)
+        `مقبول ${count(num(totals, 'accepted'))} · مكرّر ${count(num(totals, 'duplicates'))}`
+        + ` · مرفوض ${count(num(totals, 'rejected'))} من ${count(num(totals, 'source_rows'))} صفّاً`)
         + `<div class="actions" style="margin-top:10px">
             <a class="btn" href="${esc(href('/system/imports'))}">افتح مركز الاستيراد</a></div>`;
       parsed = null;
@@ -315,6 +318,37 @@ function wireImport(view: View): void {
       confirm.disabled = false;
     }
   });
+}
+
+/** حدّ النداء الواحد في import_installation_entitlements — صار حجم دفعةٍ داخلية
+ *  لا سقف ملفٍّ (20261027090000). ملفّات الاستحقاقات الحقيقية قد تتجاوزه. */
+const ENTITLEMENTS_CHUNK_SIZE = 20000;
+
+/** يُقسّم صفوف استحقاقات الشهر إلى نداءاتٍ ≤20000 ضمن دفعةٍ منطقيةٍ واحدة:
+ *  النداء الأول بلا p_batch_id ينشئ الدفعة، وكلّ نداءٍ لاحقٍ يُلحِق بها عبر
+ *  batch_id الذي أعاده النداء السابق. يعيد استجابة آخر نداءٍ — تحمل
+ *  batch_totals لإجماليّ الدفعة كلّها، لا الجزء الأخير وحده. */
+async function importEntitlementsChunked(
+  period: string, fileName: string, fileChecksum: string, rows: Row[],
+  onProgress: (done: number, total: number) => void,
+): Promise<Row> {
+  let batchId: string | null = null;
+  let last: Row = {};
+  for (let i = 0; i < rows.length; i += ENTITLEMENTS_CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + ENTITLEMENTS_CHUNK_SIZE);
+    const params: Row = {
+      p_period: period,
+      p_file_name: fileName,
+      p_file_checksum: fileChecksum,
+      p_rows: chunk,
+      p_request_id: crypto.randomUUID(),
+    };
+    if (batchId) params['p_batch_id'] = batchId;
+    last = await rpc<Row>('import_installation_entitlements', params);
+    batchId = str((last['batch'] || {}) as Row, 'batch_id') || batchId;
+    onProgress(Math.min(i + chunk.length, rows.length), rows.length);
+  }
+  return last;
 }
 
 /** صفوف الاستحقاق بالشكل الذي تنتظره دالة الخادم. */

@@ -1,11 +1,12 @@
 /**
- * الكابينات — الطابور والسجلّ والتصنيف.
+ * الكابينات — الطابور والسجلّ والعائديّة.
  *
- * أكبر حاجبٍ في النظام: 119 كابينة مجهولة تحجب 22,724 صفَّ استثناء. وحدة
- * القرار الكابينة لا الصفّ، فحسمُ واحدةٍ يُطلق مئاتٍ دفعةً واحدة.
- *
- * والمنطقة تُذكر صراحةً ولا تُشتقّ من رقم الكابينة. الترقيم لا يحمل معنى
- * المنطقة، واشتقاقه منه يخترع تصنيفاً مالياً من محارف — والخادم يرفضه.
+ * تدقيق QA ما بعد الإطلاق (2026-09-01): المنطقة (قديمة/جديدة) محسومةٌ دوماً
+ * برقم الكابينة وحده عبر fdt_commission_scope() — كابينة ٩٥ مثلاً جديدةٌ
+ * بيقين سواء سُجِّلت في fdts أم لا. «غير مسجَّلة في fdts» إشارة عائديّة (لا
+ * وكيل مسنَد بعد) لا إشارة منطقة، تماماً كما تنصّ شاشة ربط الوكلاء
+ * (`master/mapping.ts`) صراحةً: «غير مسجَّلة» ليست «غير مربوطة». هذه الشاشة
+ * كانت الاستثناء الوحيد الذي خلط بينهما — راجع 20261026090000.
  */
 
 import type { Route, View } from '../../app/router';
@@ -30,11 +31,11 @@ export const ZONE_AR: Record<string, string> = { old: 'قديمة', new: 'جدي
 export const unknownFdts: Route = {
   pattern: '/master/fdts/unknown',
   capability: 'commission.view',
-  title: 'كابينات بلا تصنيف',
+  title: 'كابينات بلا وكيل مسجَّل',
   breadcrumb: () => [
     { label: 'الرئيسية', href: href('/') },
     { label: 'الكابينات', href: href('/master/fdts') },
-    { label: 'بلا تصنيف' },
+    { label: 'بلا وكيل مسجَّل' },
   ],
   async render(view, m) {
     const limit = 50;
@@ -55,6 +56,10 @@ export const unknownFdts: Route = {
       { key: 'code', label: 'الكابينة', cell: (r) =>
         `<a dir="ltr" href="${esc(href(`/master/fdts/${encodeURIComponent(str(r, 'fdt_code'))}`))}">
            <b>${esc(str(r, 'fdt_code'))}</b></a>` },
+      { key: 'zone', label: 'المنطقة', cell: (r) => {
+        const z = str(r, 'zone');
+        return chip(ZONE_AR[z] || z || '—', z === 'new' ? 'success' : 'info');
+      } },
       { key: 'subs', label: 'المشتركون', cell: (r) => count(num(r, 'subscribers')), numeric: true },
       { key: 'ev', label: 'الأحداث', cell: (r) => count(num(r, 'events')), numeric: true },
       // الأب الأكثر وروداً: شاهد نسبة، لا حكم.
@@ -67,18 +72,18 @@ export const unknownFdts: Route = {
       { key: 'seen', label: 'آخر ظهور', cell: (r) =>
         `<span dir="ltr">${esc(String(r['last_seen'] ?? '').slice(0, 10) || '—')}</span>` },
       { key: 'go', label: '', cell: (r) =>
-        `<a class="smallbtn" href="${esc(href(`/master/fdts/${encodeURIComponent(str(r, 'fdt_code'))}`))}">صنّف</a>` },
+        `<a class="smallbtn" href="${esc(href(`/master/fdts/${encodeURIComponent(str(r, 'fdt_code'))}`))}">أسنِد وكيلاً</a>` },
     ];
 
-    view.innerHTML = pageHeader('كابينات بلا تصنيف',
-      'وحدة القرار الكابينة لا الصفّ — وحسمُ واحدةٍ يُطلق مئات الأحداث')
+    view.innerHTML = pageHeader('كابينات بلا وكيل مسجَّل',
+      'المنطقة محسومةٌ برقم الكابينة دوماً — الناقص هنا العائديّة (الوكيل) لا التصنيف')
 
       + kpiRow([
-        { label: 'كابينات مجهولة', value: count(num(summary || {}, 'cabinets')), tone: 'red',
-          sub: 'قرارٌ لكلٍّ منها' },
-        { label: 'أحداث محجوبة', value: count(num(summary || {}, 'events')), tone: 'primary',
+        { label: 'بلا وكيل مسجَّل', value: count(num(summary || {}, 'cabinets')), tone: 'red',
+          sub: `${count(num(summary || {}, 'unknown_old'))} قديمة · ${count(num(summary || {}, 'unknown_new'))} جديدة` },
+        { label: 'أحداث بانتظار العائديّة', value: count(num(summary || {}, 'events')), tone: 'primary',
           sub: `${count(num(summary || {}, 'subscribers'))} مشتركاً` },
-        { label: 'مبلغ مؤشِّر محجوب', value: money(num(summary || {}, 'indicative_amount')), tone: 'gold',
+        { label: 'مبلغ مؤشِّر بانتظار العائديّة', value: money(num(summary || {}, 'indicative_amount')), tone: 'gold',
           sub: 'داخل نافذة الدورة الجارية' },
         { label: 'مُعرَّفة في السجلّ', value: count(num(summary || {}, 'registered')), tone: 'green',
           sub: `${count(num(summary || {}, 'registered_old'))} قديمة · ${count(num(summary || {}, 'registered_new'))} جديدة`,
@@ -86,9 +91,10 @@ export const unknownFdts: Route = {
       ])
 
       + `<div class="insight warn" style="margin-top:12px"><span class="insight-dot"></span><span>
-          <b>المنطقة تُذكر ولا تُشتقّ</b>
-          <small>رقم الكابينة لا يحمل معنى المنطقة. التصنيف قرارٌ صريح
-          يُسجَّل باسم صاحبه، ويرفض الخادم أيّ تسجيل بلا منطقة معلنة.</small>
+          <b>المنطقة محسومة، والعائديّة تحتاج قراراً</b>
+          <small>المنطقة (قديمة/جديدة) تُحسم برقم الكابينة وحده ولا تحتاج
+          تسجيلاً. الناقص فعلاً هو الوكيل: قرارٌ صريح يُسجَّل باسم صاحبه، ولا
+          يُخمَّن من رقم الكابينة أو أبيها الوارد.</small>
         </span></div>`
 
       + filterBar([{ key: 'search', label: 'بحث برمز الكابينة', type: 'search' }],
@@ -157,8 +163,8 @@ export const fdtRegistry: Route = {
 
       + (unknown
         ? `<div class="insight danger" style="margin-bottom:12px"><span class="insight-dot"></span><span>
-            <b>${count(unknown)} كابينة بلا تصنيف</b>
-            <small>تحجب ${count(num(summary || {}, 'events'))} حدثاً
+            <b>${count(unknown)} كابينة بلا وكيل مسجَّل</b>
+            <small>${count(num(summary || {}, 'events'))} حدثاً بانتظار العائديّة
             بمبلغ مؤشِّر ${money(num(summary || {}, 'indicative_amount'))}.</small></span>
             <a class="btn gold" href="${esc(href('/master/fdts/unknown'))}">افتح الطابور</a></div>`
         : '')
@@ -207,22 +213,24 @@ export const fdtDetail: Route = {
     const parents = (doc['parents'] || []) as Row[];
     const samples = (doc['samples'] || []) as Row[];
     const audit = (doc['audit'] || []) as Row[];
-    const zone = rec ? str(rec, 'zone') : '';
+    // المنطقة محسومة برقم الكابينة دوماً، بصرف النظر عن التسجيل — راجع
+    // fdt_detail (20261026090000). recordZone بيانات تشغيلية منفصلة من
+    // fdts.zone نفسها، تُعرض للشفافية فقط ولا تُستخدم للحساب.
+    const zone = str(doc, 'zone');
+    const recordZone = rec ? str(rec, 'zone') : '';
 
     view.innerHTML = pageHeader(`كابينة ${code}`,
-      registered ? 'مُعرَّفة في السجلّ' : 'غير معرَّفة — تحجب أحداثها',
-      registered
-        ? chip(ZONE_AR[zone] || zone || '—', zone === 'new' ? 'success' : 'info')
-        : chip('بلا تصنيف', 'critical'))
+      registered ? 'مُعرَّفة في السجلّ' : 'بلا وكيل مسجَّل — العائديّة تحتاج قراراً',
+      chip(ZONE_AR[zone] || zone || '—', zone === 'new' ? 'success' : 'info'))
 
       + kpiRow([
         { label: 'المشتركون', value: count(num(vol, 'subscribers')), tone: 'primary',
           sub: `${count(num(vol, 'events'))} حدثاً` },
         { label: 'أول ظهور', value: String(vol['first_seen'] ?? '').slice(0, 10) || '—', tone: 'blue' },
         { label: 'آخر ظهور', value: String(vol['last_seen'] ?? '').slice(0, 10) || '—', tone: 'blue' },
-        { label: 'الحالة', value: registered ? (ZONE_AR[zone] || zone) : 'بلا تصنيف',
-          tone: registered ? 'green' : 'red',
-          sub: registered ? esc(str(rec || {}, 'agent_name') || 'بلا وكيل') : 'أحداثها محجوبة' },
+        { label: 'الوكيل المسجَّل', value: registered ? (str(rec || {}, 'agent_name') || 'بلا وكيل') : 'بلا تسجيل',
+          tone: registered && str(rec || {}, 'agent_id') ? 'green' : 'red',
+          sub: registered ? 'مسجَّلة في السجلّ' : 'العائديّة بانتظار قرار' },
       ])
 
       // الآباء شاهدُ نسبةٍ لا حكم: يساعدون على معرفة صاحبها، ولا يصنّفون المنطقة.
@@ -241,14 +249,14 @@ export const fdtDetail: Route = {
           <h3>البيانات المسجَّلة</h3>
           ${registered && rec ? `
             <div class="minirow"><span class="muted">التسمية</span><b>${esc(str(rec, 'label') || '—')}</b></div>
-            <div class="minirow"><span class="muted">المنطقة</span>
-              <b>${esc(ZONE_AR[zone] || zone || '—')}</b></div>
+            <div class="minirow"><span class="muted">المنطقة المسجَّلة</span>
+              <b>${esc(ZONE_AR[recordZone] || recordZone || '—')}</b></div>
             <div class="minirow"><span class="muted">الوكيل</span>
               ${str(rec,'agent_id') ? `<a href="${esc(href(`/commissions/agents/${str(rec,'agent_id')}`))}"><b>${esc(str(rec,'agent_name')||'—')}</b></a>` : '<b>—</b>'}</div>
             <div class="minirow"><span class="muted">آخر تعديل</span>
               <b dir="ltr">${esc(when(rec['updated_at']))}</b></div>
             ${str(rec, 'notes') ? `<p class="muted">${esc(str(rec, 'notes'))}</p>` : ''}`
-          : '<p class="muted">لا صفّ لها في السجلّ. أحداثها تُحجب حتى تُصنَّف.</p>'}
+          : '<p class="muted">لا صفّ لها في السجلّ — بلا وكيل مسجَّل بعد. المنطقة أعلاه محسومة بالرقم ولا علاقة لهذا بها.</p>'}
         </div>
       </div>`
 
@@ -282,13 +290,14 @@ export const fdtDetail: Route = {
 function classifyPanel(code: string, rec: Row | null): string {
   if (!can('fdt.manage')) {
     return `<div class="box" style="margin-top:12px">
-      <p class="muted">تحتاج صلاحية <code>fdt.manage</code> لتصنيف الكابينات.</p></div>`;
+      <p class="muted">تحتاج صلاحية <code>fdt.manage</code> لتسجيل الكابينات.</p></div>`;
   }
   const zone = rec ? str(rec, 'zone') : '';
   return `<div class="box" style="margin-top:12px" id="fdtBox" data-code="${esc(code)}">
-    <h3>${rec ? 'تعديل التصنيف' : 'تصنيف الكابينة'}</h3>
+    <h3>${rec ? 'تعديل التسجيل' : 'تسجيل الكابينة'}</h3>
     <p class="muted" style="font-size:11px;margin:0 0 10px">
-      المنطقة تُذكر صراحةً. لا يُشتقّ شيء من رقم الكابينة.</p>
+      المنطقة أعلاه محسومة بالرقم بالفعل — الحقل هنا وسمٌ تشغيليٌّ منفصل لا
+      يُستخدم للحساب. الأهم فعلاً هو الوكيل: يُذكر صراحةً ولا يُخمَّن.</p>
     <div class="toolbar">
       <select class="select" id="fdZone" aria-label="المنطقة">
         <option value="">— المنطقة —</option>
@@ -302,7 +311,7 @@ function classifyPanel(code: string, rec: Row | null): string {
         value="${esc(rec ? str(rec, 'label') : '')}">
       <input class="search" id="fdNotes" placeholder="سبب القرار" aria-label="سبب القرار">
       <button class="btn gold" id="fdApply" data-current-agent="${esc(rec ? str(rec, 'agent_id') : '')}">
-        ${rec ? 'احفظ التعديل' : 'صنّف'}</button>
+        ${rec ? 'احفظ التعديل' : 'سجِّل'}</button>
     </div>
     <div id="fdResult"></div>
   </div>`;
@@ -341,7 +350,7 @@ function wireClassify(view: View, code: string): void {
       return;
     }
     apply.disabled = true;
-    out.innerHTML = loading('جارٍ حفظ التصنيف…');
+    out.innerHTML = loading('جارٍ حفظ التسجيل…');
     try {
       await rpc<Row>('register_fdt', {
         p_code: code,
@@ -353,12 +362,12 @@ function wireClassify(view: View, code: string): void {
         p_request_id: crypto.randomUUID(),
       });
       if (!view.live) return;
-      out.innerHTML = insight('good', `صُنِّفت ${ZONE_AR[zone.value] || zone.value}`,
+      out.innerHTML = insight('good', 'سُجِّلت الكابينة',
         'تُعاد الأحداث المرتبطة بها إلى الحساب في إعادة التقييم.');
       window.setTimeout(() => { if (view.live) window.dispatchEvent(new CustomEvent('babil:refresh')); }, 1300);
     } catch (error) {
       if (!view.live) return;
-      out.innerHTML = insight('danger', 'لم يُحفظ التصنيف',
+      out.innerHTML = insight('danger', 'لم يُحفظ التسجيل',
         error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
     } finally {
       apply.disabled = false;

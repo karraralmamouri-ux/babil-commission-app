@@ -11,7 +11,7 @@
 
 import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
-import { rpc, select, envelope } from '../../services/api';
+import { rpc, select, envelope, can } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { dateTime } from '../../domain/time';
 import { readCycleResult, knownAgentTotal, cycleStatusAr, currentCycleId } from '../../domain/cycle';
@@ -164,8 +164,23 @@ export const installationReport: Route = {
       if (v) args[p] = v;
     }
 
-    const doc = await rpc<Row>('report_installation_fees', args);
+    // بلا فلترة فترة، هذا التقرير يجمع كل الفترات المستوردة — بخلاف لوحة
+    // «دورة التنصيب» التي تفترض الشهر الحالي حين لا تُمرَّر فترة. الفارق
+    // حقيقيٌّ لا خطأ حساب (راجع تدقيق installation-kpi-reconciliation.sql،
+    // القسم ٤) — فيُوضَّح هنا بدل أن يُقرأ ثانيةً كتضاربٍ في الأرقام.
+    // installation_cycle_pipeline يحتاج صلاحية installation.view — مختلفة عن
+    // report.view لهذه الشاشة، فقد لا تُتاح لمن يفتحها. الفحص هنا قبل
+    // النداء، لا بعده: غياب الصلاحية يُسقِط التوضيح وحده بصمت (متوقَّع)، أمّا
+    // فشلٌ حقيقيٌّ للنداء نفسه (حين تتوفّر الصلاحية) فيبقى ظاهراً كسائر
+    // أخطاء الشاشة — لا يُبتلع.
+    const periodFilter = m.query.get('period');
+    const wantPipeline = !periodFilter && can('installation.view');
+    const [doc, pipeline] = await Promise.all([
+      rpc<Row>('report_installation_fees', args),
+      wantPipeline ? rpc<Row>('installation_cycle_pipeline', {}) : Promise.resolve(null),
+    ]);
     if (!view.live) return;
+    const currentPeriod = pipeline ? str(pipeline, 'period') : '';
 
     const summary = (doc?.['summary'] || {}) as Row;
     const page = envelope<Row>(doc?.['page']);
@@ -205,6 +220,18 @@ export const installationReport: Route = {
         { key: 'stage', label: 'المرحلة', type: 'select',
           options: ['P1', 'P2', 'P3', 'P4'].map((s) => ({ value: s, label: s })) },
       ], '/reports/installation', m.query)
+
+      + (!periodFilter
+        ? `<div class="insight warn" style="margin-top:10px"><span class="insight-dot"></span><span>
+            <b>المجموع أعلاه يشمل كل الفترات المستوردة</b>
+            <small>بلا فلترة فترة، هذا التقرير يجمع كل ما استُورد منذ البداية —
+              بخلاف لوحة «دورة التنصيب» التي تعرض فترةً واحدة${currentPeriod
+                ? ` (تفترض الشهر الحالي، ${esc(currentPeriod)}، حين لا تُختار فترة)`
+                : ''}. فرقٌ في نطاق العرض لا في الحساب.
+              ${currentPeriod
+                ? `<a href="${esc(href('/reports/installation', { period: currentPeriod }))}">اعرض ${esc(currentPeriod)} وحدها للمقارنة</a>`
+                : ''}</small></span></div>`
+        : '')
 
       + (Object.keys(byStage).length || byReseller.length
         ? `<div class="grid2" style="margin-top:12px">

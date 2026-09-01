@@ -237,4 +237,48 @@ select pg_temp.ok(
 
 reset role;
 
+-- ------------------------------------------------------------------
+-- ٧ · ملغاةٌ متعدّدة أحدث فترةً لا تُغيّر الحكم
+-- ------------------------------------------------------------------
+--
+-- تدقيق QA ما بعد الإطلاق (2026-09-01): الشاشة الرئيسية لعمولات الوكلاء
+-- (`src/features/commissions/index.ts`) كانت لا تزال تختار `list[0]` —
+-- أحدث period_start بلا شرط — رغم أن `current_commission_cycle_id()` نفسها
+-- صحيحة منذ هذه الهجرة. هذا القسم يثبت أن الدالّة تصمد أمام عدّة دورات
+-- ملغاة متتالية أحدث من الدورة العاملة، لا ملغاةً واحدة فقط.
+
+update public.commission_cycles set status = 'UNDER_REVIEW', calculated_at = now()
+where id = 'cc000000-0000-0000-0000-0000000000b1';
+
+insert into public.commission_cycles
+  (id, name, period_start, period_end, status, engine_version, created_by)
+values
+  ('cc000000-0000-0000-0000-0000000000b4','CC أيلول ملغاة',
+   date '2027-09-01', date '2027-09-30','CANCELLED','VNEXT',
+   'cc000000-0000-0000-0000-0000000000a1'),
+  ('cc000000-0000-0000-0000-0000000000b5','CC تشرين الأول ملغاة',
+   date '2027-10-01', date '2027-10-31','CANCELLED','VNEXT',
+   'cc000000-0000-0000-0000-0000000000a1')
+on conflict do nothing;
+update public.commission_cycles set status = 'CANCELLED'
+where id = 'cc000000-0000-0000-0000-0000000000b3';
+
+select pg_temp.ok(
+  public.current_commission_cycle_id() = 'cc000000-0000-0000-0000-0000000000b1',
+  'ثلاث دورات ملغاة أحدث فترةً (آب، أيلول، تشرين الأول) لا تُغيّر الافتراضي عن تموز');
+
+select pg_temp.ok(
+  (select count(*) from public.commission_cycles
+   where status = 'CANCELLED'
+     and period_start > date '2027-07-31') >= 3,
+  'تثبيت الوصف: عدّة دورات ملغاة فعلاً أحدث من الدورة العاملة (آب معاد فتحها ثم أُلغيت أيضاً — راجع القسم ٦)');
+
+-- والوصول الصريح لكلٍّ منها ما زال ممكناً — لا حذف ولا حجب.
+set local role authenticated;
+set local request.jwt.claim.sub = 'cc000000-0000-0000-0000-0000000000a1';
+select pg_temp.ok(
+  (public.commission_cycle_result('cc000000-0000-0000-0000-0000000000b5')->>'found') = 'true',
+  'وأحدث ملغاة (تشرين الأول) تُفتح صراحةً رغم أنها ليست الافتراضي');
+reset role;
+
 rollback;

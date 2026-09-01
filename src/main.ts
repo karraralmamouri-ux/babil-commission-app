@@ -34,6 +34,8 @@ import { routes as reportRoutes } from './features/reports';
 
 const legacyRoute: Route = {
   pattern: '/legacy',
+  // مقصورة على المدير — راجع src/app/shell.ts وتدقيق QA (طلب #7، 20261028090000).
+  capability: 'legacy.workspace',
   title: 'مساحة العمل السابقة',
   breadcrumb: () => [{ label: 'الرئيسية', href: '#/' }, { label: 'مساحة العمل السابقة' }],
   render(view) {

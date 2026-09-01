@@ -82,8 +82,11 @@ export const NAV: NavGroup[] = [
   },
   {
     // تبقى مرئيّةً ومُعلَّمةً بأنها سابقة، وللقراءة التاريخية وحدها.
+    // مقصورة على المدير: أدوات تشخيصٍ وإدارةٍ لم تُصمَّم لغير هذا الدور
+    // (تدقيق QA 2026-09-01، طلب #7 — راجع 20261028090000).
     key: 'legacy', label: 'الشاشات السابقة', items: [
-      { label: 'مساحة العمل الكاملة', path: '/legacy', icon: '▥', legacy: true },
+      { label: 'مساحة العمل الكاملة', path: '/legacy', icon: '▥', legacy: true,
+        capability: 'legacy.workspace' },
     ],
   },
 ];

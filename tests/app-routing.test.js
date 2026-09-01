@@ -135,6 +135,21 @@ test('كل عنصر ملاحة يحمل قدرته أو يكون قديماً م
   });
 });
 
+test('مساحة العمل الكاملة مقصورة على قدرة legacy.workspace (تدقيق QA #7)', () => {
+  // كانت بلا capability إطلاقاً — كل مستخدمٍ مسجَّلٍ دخوله يراها ويفتحها،
+  // أياً كان دوره. راجع 20261028090000_gate_legacy_workspace_capability.sql.
+  const navItem = shellSrc.match(/\{ label: 'مساحة العمل الكاملة'[^}]*\}/);
+  assert.ok(navItem, 'عنصر «مساحة العمل الكاملة» غير موجود في الشريط');
+  assert.match(navItem[0], /capability:\s*'legacy\.workspace'/,
+    'عنصر «مساحة العمل الكاملة» ما زال بلا قدرة صريحة');
+
+  const mainSrc = read('src/main.ts');
+  const legacyRoute = mainSrc.match(/pattern:\s*'\/legacy'[\s\S]{0,200}/);
+  assert.ok(legacyRoute, 'تعريف مسار /legacy غير موجود');
+  assert.match(legacyRoute[0], /capability:\s*'legacy\.workspace'/,
+    'مسار /legacy نفسه ما زال بلا قدرة صريحة — الموجِّه يصرّح له بلا فحص');
+});
+
 /* ---------------------------------------------------------------------------
    الحالات
    ------------------------------------------------------------------------ */
