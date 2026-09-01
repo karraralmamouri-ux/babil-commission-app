@@ -448,3 +448,65 @@ Reordered from the register's own Execution Order (§ Execution order, A–G) wi
 10. **Backup/recovery**: evaluate a Supabase plan upgrade for PITR, or formalize the existing manual export process as the accepted interim strategy (SEC-007).
 11. **Close the remaining VERIFY items** (INS-009, ZON-005, OWN-003/004, IMP-001, ARC-005, SEC-001/005, UX-006, USR-007, INV-019) with targeted, narrow follow-up checks — none of these block the larger items above, but all are needed before a genuine V1 Stable declaration.
 12. **Only then**: run the register's own Mandatory acceptance cases (all 24) end-to-end and declare V1 Stable — never from a repo-only audit, per the register's own closing line.
+
+---
+
+## 11. 2026-09-01 Reconciliation Addendum
+
+**Type:** Dated delta, not a fresh four-pass audit. Branch `feat/v1-go-live-closure`, reconciled against the same baseline as §1–§10 above (commit `65a90f4` / `2be654e`). This section documents what changed since that baseline and gives fresh evidence only for the specific IDs actually re-checked this pass — everything else in §1–§10 stands unless contradicted here, per the register's own rule that findings are never silently deleted.
+
+**Method:** two kinds of evidence. (a) Commits already built, tested (local Postgres SQL suite + `npm test` + `tsc --noEmit`), and merged onto this branch during this closure engagement — cited by commit hash and description, not re-derived here. (b) A targeted VERIFY-resolution pass this session, re-checking each of the 11 IDs §10 step 11 named, with file:line evidence, matching the original audit's own evidentiary standard. No file was edited to make a requirement pass; no migration ran against Staging/Production; the zone/FDT regression (headline blocker #1) was deliberately **not touched** — a prior investigation in this engagement concluded the 94–119 reinstatement was a deliberate business choice, not an accidental regression, so reversing it is not this engagement's call to make. Free P1 (headline blocker #3) likewise remains untouched — still zero implementation, still blocked on FREE-004.
+
+### 11.1 Shipped this engagement (evidence: commit + prior verification run, not re-derived here)
+
+| Commits | Requirement IDs affected | What shipped |
+|---|---|---|
+| `ad1f5d3` | INV-001..004, INV-007..009, INV-013, INV-014 | Bulk Invoice Audit engine — upload → parse → preview (matched/unknown/duplicate/already-used/invalid/conflict) → bulk apply, replacing the single-row manual gate headline blocker #2 described. |
+| `d7ab452` | ARC-001 | LIVE-04 fix — archive KPI and detail now reconcile from the same server dataset; closes the stale-filename trap. |
+| (pre-dates this window, per standing engagement record) | PAY-010, UX-004 | Commission correction/reversal UI wired to the existing server RPCs — closes the "DB console required" gap. |
+| (pre-dates this window) | COM-002, PAY-012 | Legacy `publish_commission_month` grant revoked — closes the direct-API exposure §8 flagged as a concrete financial risk. |
+| `0d9d9eb`, `20038ad`, `ac1feaa` | SEC-001, SEC-004 | Full `has_function_privilege`-based grant audit (not text-matching) — confirmed 54/54 `public` tables RLS-enabled with zero anon/PUBLIC table grants; closed two genuinely accidental EXECUTE-to-anon/public function grants and completed a missing `revoke ... from public, anon` half on four functions. `docs/SECURITY.md` rewritten to match (including a self-caught correction of an initially over-generalized "no financial data in localStorage" claim — the legacy `index.html` layer still uses `localStorage`, only `src/` is clean). |
+| `5592a53` | SEC-007 | Scripted, guarded, on-demand `pg_dump` (`scripts/dump-database.mjs`, `npm run dump:staging`/`dump:production`) replacing what had only ever been a one-time manual Staging test. Still **not** scheduled backups or PITR — that remains a Supabase billing/plan decision, now tracked explicitly in `docs/BUSINESS_DECISIONS_REQUIRED.md` rather than left as a bare mention in R-015. |
+| `5592a53` | (governance, no single ID) | `docs/BUSINESS_DECISIONS_REQUIRED.md` — consolidates DEC-001..006, FREE-004, and the PITR/billing decision into one closure-facing document with current evidence cited per item, satisfying the register's own rule 11 ("never invent a money rule") by recording rather than resolving. |
+
+SEC-003 (Security Advisor findings closed/accepted) and SEC-005 (full least-privilege/auth review) are **not** claimed closed by the grant audit above — see §11.3.
+
+### 11.2 VERIFY resolution pass (the 11 IDs named in §10 step 11)
+
+| ID | Outcome | Evidence |
+|---|---|---|
+| USR-007 | **PASS** | `tests/session-persistence.test.js` — 4 tests: reload-persistence, expired-token-refresh, near-expiration-only-refresh, refresh-token survives a temporary network failure. Directly covers the requirement text. |
+| OWN-003 | **PASS** | `tests/sql/subscriber-transfer.sql:238-241` — `sum(installation_payment_history.amount)` for the transferred subscriber is asserted unchanged after `transfer_subscriber()` runs ("وما دُفع لا يُعاد حسابه"). Ownership change does not rewrite old money. |
+| OWN-004 | **PASS** | `tests/sql/subscriber-transfer.sql:200-236` — `effective_agent_id`, `agent_name_at_enrollment`, and `current_stage_code` on `installation_enrollments` all assert unchanged after transfer; a stage genuinely in progress at another agent raises an explicit `NEEDS_BUSINESS_DECISION` with `paid_so_far`, rather than silently moving history. |
+| ARC-005 | **PASS** | `tests/sql/commission-payout.sql:221-222` — `sum(gross)` from `report_commission_cycle_detail()` is asserted equal to `commission_cycle_financials()`'s independently-computed `totals.gross`, a genuine cross-function reconciliation (not just an assertion against a fixture constant). Reinforced by `commission_scope_payable()` matching the same source-snapshot value (line 57, `gross=12000`) both before and after a reversal (lines 67-69, 184-197), and `report_agent_statement()`'s `gross`/timeline agreeing too (lines 236-242). |
+| INV-019 | **PASS** | `grep -rn "storage\.objects\|createBucket\|storage\.from"` across `supabase/migrations/*.sql` and `src/` returns zero hits — no evidence-attachment mechanism exists at all (matches DEC-004 still being fully open in `docs/BUSINESS_DECISIONS_REQUIRED.md`), so the Bulk Invoice Audit engine (`supabase/migrations/20261019090000_bulk_invoice_audit.sql`, `src/features/installation/invoices.ts`) cannot have entangled with it. The "evidence" panel in `invoices.ts` is a text/data review summary, not a file attachment. Distinction holds. |
+| SEC-001 | **PASS** | Confirms the register's own draft status. This session's `has_function_privilege`-based sweep (§11.1) is exactly the "hardening" half the register flagged as open; RLS coverage itself (54/54 tables, zero anon/PUBLIC grants) was independently re-confirmed, not assumed from the register. |
+| INS-009 | **stays VERIFY** | `tests/installation-dashboard-source.test.js` (9 tests) proves the *frontend* merge of baseline+entitlement never drops/duplicates rows. `grep -rln "installation_financials\|dashboard" tests/sql/*.sql` finds zero SQL-level tests reconciling the aggregate KPI against a fresh count from underlying tables — the audit's specific concern is unaddressed. |
+| IMP-001 | **stays VERIFY** | Per-domain checksum/dedup mechanisms exist (`source_checksum` in SaaS activation intake, `file_checksum` in installation-fee import, duplicate detection in bulk holds preview) but no test proves re-importing the same file/event produces zero financial delta end-to-end across all three import domains together — matches the original audit's own characterization. |
+| ZON-005 | **stays VERIFY — structurally blocked** | Directly entangled with the paused zone/FDT scope question (§1 headline blocker #1 / DEC-002 in `docs/BUSINESS_DECISIONS_REQUIRED.md`). Cannot be honestly resolved without first resolving which scope definition import/calculation/dashboard/payment should consistently use — which this engagement is deliberately not deciding. |
+| SEC-005 | **stays VERIFY, narrowed** | Checked the `search_path`-hijack half specifically: across every migration file declaring `SECURITY DEFINER` functions, `SET search_path` count is ≥ the `SECURITY DEFINER` count in every case (`grep -c` cross-check, 20+ files) — no function found missing a pinned search_path. The other half of SEC-005 — per-function least-privilege/internal-authorization review across all 81 `SECURITY DEFINER` declarations — was not attempted; that is a full audit pass, not a targeted check, and stays open. |
+| UX-006 | **stays VERIFY** | Final mobile touch-target sizing is a device/manual-QA question, not something a code read or grep resolves honestly. Left open pending actual device review. |
+
+Net: **6 of 11 VERIFY items resolved to PASS** (USR-007, OWN-003, OWN-004, ARC-005, INV-019, SEC-001) with fresh, cited evidence; **5 remain VERIFY** (INS-009, IMP-001, ZON-005, SEC-005, UX-006), each for a stated, specific, still-open reason rather than a blanket "not verified."
+
+### 11.3 Recomputed blocker count
+
+The baseline count (§9) was **63 of 156 in-scope IDs not yet PASS** (16 PARTIAL + 29 MISSING + 11 VERIFY + 7 DECISION REQUIRED). This addendum does not re-run the full four-pass per-ID audit that produced that table — doing so would be a disproportionate re-audit rather than a reconciliation, and is explicitly not what this pass did. What can be stated with the evidence actually gathered:
+
+- **At least 6 IDs move from the VERIFY bucket to PASS** (§11.2): 11 → 5 VERIFY remaining.
+- **At least 4 more IDs move out of the MISSING/OPEN bucket** on direct evidence already cited in §11.1: ARC-001 (LIVE-04 fix), COM-002, PAY-012 (grant revoked), PAY-010 (correction UI shipped).
+- **A cluster of 9 IDs** (INV-001..004, INV-007..009, INV-013, INV-014) has a real, tested implementation where §1's headline blocker #2 previously found none — this addendum does not individually re-tag each one to PASS, since the Bulk Invoice Audit engine's edge cases (e.g. INV-013's dedup guarantee, INV-014's full lineage chain) deserve the same file:line scrutiny the original audit applied elsewhere, not an inherited pass from the commit message alone.
+- The 7 DECISION REQUIRED items are **unchanged in count** — `docs/BUSINESS_DECISIONS_REQUIRED.md` records and cross-references all of them (plus FREE-004 and the PITR/billing question) but ratifying any of them is explicitly outside what an engineering session may do.
+
+**Honest recomputed ceiling: no more than 63 − 6 (§11.2) − 4 (§11.1 direct) = 53 of 156 in-scope IDs remain not-PASS**, and the true number is very likely lower once the INV cluster above and SEC-003/SEC-004/SEC-006 (Security Advisor dashboard items, not re-checked from Supabase itself this session — no Supabase project was touched) get the same targeted re-check. **Recommend a follow-up pass specifically over the INV-001..004/007..009/013/014 cluster and the Security Advisor-dependent SEC IDs before formally declaring any of them PASS** — this addendum intentionally stops short of that to avoid claiming precision it doesn't have.
+
+### 11.4 What remains genuinely, deliberately unresolved
+
+- **Zone/FDT scope (headline blocker #1, DEC-002)** — paused, not touched. A prior investigation in this engagement found the 94–119 reinstatement was a deliberate choice, not an accident; this closure neither reverts nor ratifies it. A formal ADR is still owed either direction.
+- **IMP-003 (bad-import cancellation)** — blocked by DEC-005 (cancellation semantics never decided). Not built; building it would mean inventing a money rule.
+- **Free P1 (FREE-001..006)** — still zero implementation. Blocked on FREE-004 (active-customer definition) and, per §10 step 8, on COM-009 being ratified first (same active-user definition dependency).
+- **5 remaining VERIFY items** — INS-009, IMP-001, ZON-005, SEC-005, UX-006 (§11.2).
+- **7 DECISION REQUIRED items** — now consolidated with current evidence in `docs/BUSINESS_DECISIONS_REQUIRED.md`, none ratified.
+- **Scheduled backups / PITR** — genuinely improved (guarded on-demand dump script) but not equivalent to the register's SEC-007 requirement; still a billing/plan decision.
+
+See `docs/BUSINESS_DECISIONS_REQUIRED.md` for the consolidated decision list and `docs/GO_LIVE_READINESS.md` (this engagement's final closure synthesis) for the overall recommendation.
