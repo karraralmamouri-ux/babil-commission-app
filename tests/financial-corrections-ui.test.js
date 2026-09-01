@@ -17,6 +17,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const corrSrc = read('src/features/finance/paymentCorrections.ts');
 const idSrc = read('src/features/system/identities.ts');
 const classSrc = read('src/features/installation/classification.ts');
+const financeSrc = read('src/features/finance/index.ts');
 
 function slice(src, from, to) {
   const a = src.indexOf(from);
@@ -194,4 +195,41 @@ test('زرّ تشغيل التصنيف يُعطَّل أثناء التنفيذ 
 
 test('لا إشارة لإنشاء مشترك أو استحقاق أو دفعة في لوحة تشغيل التصنيف — الكتابة تصل التصنيف فقط', () => {
   assert.doesNotMatch(classSrc, /installation_entitlements|installation_payment|create_subscriber/);
+});
+
+/* ---------------------------------------------------------------------------
+   PAY-010 — تصحيح/عكس دفعة عمولة من دفعة الصرف vNext
+   ------------------------------------------------------------------------ */
+
+test('شاشة دفعة الصرف تستورد لوحة التصحيح العامة', () => {
+  assert.match(financeSrc,
+    /import \{ correctionActionsCell, correctionBox, wireCorrectionActions \} from '\.\/paymentCorrections'/);
+});
+
+test('خلية الإجراءات على سطر دفعة العمولة تُستدعى بنطاق commission، لا installation', () => {
+  const cell = slice(financeSrc, "{ key: 'act'", '},');
+  assert.match(cell, /correctionActionsCell\('commission'/);
+});
+
+test('معرّف المصدر هو snapshot_id لا id السطر — هو ما يقرأه الدفتر فعلاً', () => {
+  // post_commission_batch يكتب source_id = snapshot_id (20260822090000)، وensure_financial_origin
+  // يطابق عليه؛ id سطر الدفعة (commission_payment_batch_items.id) لا معنى مالياً له هنا.
+  const cell = slice(financeSrc, "{ key: 'act'", '},');
+  assert.match(cell, /str\(r, 'snapshot_id'\)/);
+  assert.doesNotMatch(cell, /str\(r, 'id'\)/);
+});
+
+test('حالة الدفع للتفعيل هي PAID — لا POSTED ولا حالة الدفعة الأمّ', () => {
+  const cell = slice(financeSrc, "{ key: 'act'", '},');
+  assert.match(cell, /str\(r, 'status'\) === 'PAID'/);
+});
+
+test('المبلغ المصحَّح/المعكوس هو amount المدفوع فعلياً لهذا السطر لا gross_amount', () => {
+  const cell = slice(financeSrc, "{ key: 'act'", '},');
+  assert.match(cell, /num\(r, 'amount'\)/);
+});
+
+test('لوحة التصحيح وسلكها مرسومان في شاشة الدفعة لا مرة واحدة فقط بلا سلك', () => {
+  assert.match(financeSrc, /correctionBox\(\)/);
+  assert.match(financeSrc, /wireCorrectionActions\(view\)/);
 });

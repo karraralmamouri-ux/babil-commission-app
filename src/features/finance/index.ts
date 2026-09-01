@@ -14,6 +14,7 @@ import {
   esc, loading, empty, pageHeader, table, pager, chip, kpiRow, type Column,
 } from '../../components/ui';
 import { routes as installationBatchRoutes } from './installation-batches';
+import { correctionActionsCell, correctionBox, wireCorrectionActions } from './paymentCorrections';
 
 type Row = Record<string, unknown>;
 const num = (r: Row, k: string) => Number(r[k] || 0);
@@ -90,6 +91,11 @@ export const batchDetail: Route = {
         ? chip('مرفوض', 'critical') : chip(str(r, 'status') || '—', 'info') },
       // سبب الرفض يأتي من الخادم بنصّه: الواجهة لا تُعيد صياغته ولا تُخمّنه.
       { key: 'reason', label: 'سبب الرفض', cell: (r) => esc(str(r, 'blocked_reason') || '—') },
+      // معرّف الدفع هو snapshot_id لا id السطر: هو ما يقرأه الدفتر
+      // (post_commission_batch يكتب source_id = snapshot_id)، فتصحيح أو عكس
+      // سطرٍ مدفوع يجب أن يشير إلى القيد نفسه لا إلى سطر الدفعة الوسيط.
+      { key: 'act', label: '', cell: (r) =>
+        correctionActionsCell('commission', str(r, 'snapshot_id'), str(r, 'status') === 'PAID', num(r, 'amount')) },
     ];
 
     view.write(pageHeader(str(batch, 'name') || 'دفعة',
@@ -107,9 +113,11 @@ export const batchDetail: Route = {
             <small>الخادم رفضها عند التحقّق. لا يُرحَّل سطر مرفوض مهما ظهر في الشاشة.</small></span></div>`
         : '')
       + postPanel(batch, blocked.length)
-      + (lines.length ? table(columns, lines) : empty('لا سطور في هذه الدفعة')));
+      + (lines.length ? table(columns, lines) : empty('لا سطور في هذه الدفعة'))
+      + correctionBox());
 
     wirePost(view, id, str(batch, 'name') || 'الدفعة');
+    wireCorrectionActions(view);
   },
 };
 
