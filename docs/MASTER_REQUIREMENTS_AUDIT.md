@@ -729,3 +729,29 @@ Free P1 settlement and Staging absence were never counted among the 156 in-scope
 - **Free P1 settlement and Staging absence are no longer on this list** — both are permanently resolved by owner ruling as of this addendum (§14.1, §14.2).
 
 See `docs/GO_LIVE_READINESS.md` for the updated overall recommendation and verdict.
+
+## 15. 2026-09-01 Independent QA Addendum — Free P1 threshold fix, eligibility display, CI baseline correction
+
+**Type:** Fifth same-day delta. An independent QA pass (Codex) verified the branch after §14's addendum and reported two real defects plus one CI-only issue. All three are fixed in this addendum; nothing else from §1–§14 was touched or re-litigated.
+
+### 15.1 Threshold operator bug — `>=` corrected to `>`
+
+§14.1 restated the owner's rule as "`>350` qualifying active subscribers," but the actual implementation used `>=` in three places: the `free_p1_grants_meets_threshold` CHECK constraint and both SELECT predicates inside `grant_free_p1()` (the eligibility-count query and the insert query). This meant exactly 350 was incorrectly granted a Free P1. Fixed to `>` in all three locations, in `supabase/migrations/20261021090000_free_p1_bonus.sql`, applied identically to both NEW ZONE (per-FDT) and OLD ZONE (reseller-total) paths — the bug and the fix affected both symmetrically since they share the same comparison logic.
+
+New explicit boundary regression tests added to `tests/sql/free-p1.sql` for both zones: 349 (not eligible), 350 (not eligible — this is the corrected boundary), 351 (eligible, first qualifying value). Test count for that file: 41 assertions (was 30 as of §12.4/14.1).
+
+### 15.2 Free P1 was computed but never displayed
+
+Free P1 eligibility existed only as rows `grant_free_p1()` could write (admin-only, capability-gated) — no read surface existed for an ordinary viewer to see who was eligible before or without a grant being run. A new read-only function `public.free_bonus_eligibility(p_cycle_id uuid)` was added (`security definer`, self-gated via `perform public.require_capability('commission.view')` — the broad view capability, not the admin-only `commission.grant_free_bonus`), mirroring `grant_free_p1()`'s exact eligibility predicate with zero writes. Wired into `index.html`'s commission-cycle screen as a new "🎁 Free P1" tab (`#cx-freep1` panel, `#cxFreeP1Table` host, `loadCommissionFreeP1()`/`renderCommissionFreeP1()`), showing per eligible scope: reseller/scope label, zone type, FDT where applicable, qualifying active subscriber count, and eligibility status. Display-only — no payment amount, batch, ledger entry, or paid/remaining state is created or shown, consistent with ADR-031. A reconciliation test in `tests/sql/free-p1.sql` proves `free_bonus_eligibility()`'s output set is identical to `free_p1_grants` after an actual grant, guarding the two predicates against future drift.
+
+### 15.3 CI `db-regression` job had stale numeric guards
+
+`.github/workflows/ci.yml`'s `db-regression` job hard-coded migration count (81) and SQL assertion count (1012) from an earlier point in this branch's history, unrelated to and unchanged by §15.1/§15.2's fixes. Corrected to the actual current baseline: **91 migrations, 1154 SQL assertions** (1143 per §13.6/§14.2, +11 from the new boundary tests in §15.1). No check was weakened — the same exact-match assertions remain, only the expected numbers were corrected to match reality.
+
+### 15.4 Re-verification after all three fixes
+
+Full sequence re-run after 15.1–15.3: `tests/sql/rebuild-local.sh` — 91/91 migrations, clean. `tests/sql/run-local-tests.sh` — **1154 assertions passing**, zero failures. `npm test` — **701/701 passing** (one test, `tests/babil-flow-ui.test.js`'s read/write RPC-naming scan, initially failed because the first draft function name `free_p1_eligible_scopes` was truncated by that test's digit-excluding regex; renamed to `free_bonus_eligibility` — no digits, ends in the whitelisted `_eligibility` suffix — same digit-avoidance precedent already established by the `commission.grant_free_bonus` capability name in this same migration). `npx tsc --noEmit` — clean. `npm run build` — succeeds. CI-equivalent migration-manifest/extension check (replicating `ci.yml`'s `db-regression` job logic locally) — passes against the corrected 91/1154 baseline.
+
+### 15.5 Scope discipline
+
+No merge, no deploy, no Production financial data touched, no payment executed, no July recalculation performed. `free_p1_grants` remains structurally payment-incapable (§14.1, unchanged) — this addendum fixed a comparison operator and added a read surface, neither of which required or involved any payment-authority schema change. Free P1 remains, and remains provably, informational-only.

@@ -106,8 +106,9 @@ from public.commission_scheme_versions v,
        ('fb100000-0000-0000-0000-00000000f100','100', 420),  -- فوق العتبة بوضوح
        ('fb100000-0000-0000-0000-00000000f101','101', 370),  -- فوق العتبة، كابينة ثانية مستقلة
        ('fb100000-0000-0000-0000-00000000f102','102', 300),  -- دون العتبة
-       ('fb100000-0000-0000-0000-00000000f103','103', 349),  -- حدّياً تحت العتبة بواحد
-       ('fb100000-0000-0000-0000-00000000f104','104', 350)   -- حدّياً عند العتبة تماماً
+       ('fb100000-0000-0000-0000-00000000f103','103', 349),  -- حدّياً تحت العتبة بواحد: غير مؤهِّلة
+       ('fb100000-0000-0000-0000-00000000f104','104', 350),  -- حدّياً عند العتبة تماماً: غير مؤهِّلة — القاعدة "أكبر من" لا "أكبر من أو يساوي"
+       ('fb100000-0000-0000-0000-00000000f105','105', 351)   -- حدّياً فوق العتبة بواحد: أول قيمة مؤهِّلة
      ) as x(id, scope_id, n)
 where v.version = 1
 on conflict do nothing;
@@ -126,7 +127,10 @@ from public.commission_scheme_versions v,
      (values
        -- مثال صاحب القرار حرفياً: FDT A=200 + FDT B=180 = 380، منح واحد لا اثنين.
        ('fb100000-0000-0000-0000-00000000a200','reseller-1', 380),
-       ('fb100000-0000-0000-0000-00000000a201','reseller-2', 300)  -- دون العتبة إجمالاً
+       ('fb100000-0000-0000-0000-00000000a201','reseller-2', 300),  -- دون العتبة إجمالاً
+       ('fb100000-0000-0000-0000-00000000a202','reseller-3', 349),  -- حدّياً تحت العتبة بواحد: غير مؤهَّل
+       ('fb100000-0000-0000-0000-00000000a203','reseller-4', 350),  -- حدّياً عند العتبة تماماً: غير مؤهَّل — نفس قاعدة NEW ZONE
+       ('fb100000-0000-0000-0000-00000000a204','reseller-5', 351)   -- حدّياً فوق العتبة بواحد: أول قيمة مؤهَّلة
      ) as x(id, scope_id, n)
 where v.version = 1
 on conflict do nothing;
@@ -161,6 +165,46 @@ select pg_temp.must_fail(
   'قيد free_p1_grants_meets_threshold يرفض منحاً دون العتبة مباشرة حتى بتجاوز الدالة');
 
 -- ===========================================================================
+-- 1ب. العرض للقراءة فقط — قبل أي منح، وبصلاحية العرض العادية فقط (لا صلاحية
+--     منح). يثبت أن "النظام يحسب ويعرض من هو مؤهَّل" لا يعتمد على أن يشغّل
+--     أحدٌ يملك commission.grant_free_bonus أولاً — وأن العتبة "أكبر من 350"
+--     صارمة: 349 وحتى 350 نفسها غير مؤهَّلتين، 351 أول قيمة مؤهَّلة.
+-- ===========================================================================
+
+reset role;
+set local role authenticated;
+set local request.jwt.claim.sub = 'fb100000-0000-0000-0000-0000000000a2';
+
+select pg_temp.ok(
+  (select count(*) from public.free_p1_grants
+   where cycle_id='fb100000-0000-0000-0000-0000000000c1') = 0,
+  'قبل أي استدعاء لـgrant_free_p1: لا صفوف في free_p1_grants بعد');
+
+select pg_temp.ok(
+  (select count(*) from public.free_bonus_eligibility('fb100000-0000-0000-0000-0000000000c1')) = 5,
+  'viewer بصلاحية commission.view فقط (بلا commission.grant_free_bonus) يرى خمسة نطاقات مؤهَّلة قبل أي منح — العرض لا يعتمد على تشغيل المنح أولاً');
+select pg_temp.ok(
+  exists(select 1 from public.free_bonus_eligibility('fb100000-0000-0000-0000-0000000000c1')
+         where scope_type='FDT' and scope_id='100'),
+  'العرض المسبق يشمل FDT 100 (420، فوق العتبة)');
+select pg_temp.ok(
+  not exists(select 1 from public.free_bonus_eligibility('fb100000-0000-0000-0000-0000000000c1')
+             where scope_type='FDT' and scope_id='103'),
+  'العرض المسبق لا يشمل FDT 103 (349 — تحت العتبة بواحد)');
+select pg_temp.ok(
+  not exists(select 1 from public.free_bonus_eligibility('fb100000-0000-0000-0000-0000000000c1')
+             where scope_type='FDT' and scope_id='104'),
+  'العرض المسبق لا يشمل FDT 104 (350 بالضبط — العتبة نفسها غير مؤهِّلة، القاعدة > لا >=)');
+select pg_temp.ok(
+  exists(select 1 from public.free_bonus_eligibility('fb100000-0000-0000-0000-0000000000c1')
+         where scope_type='FDT' and scope_id='105'),
+  'العرض المسبق يشمل FDT 105 (351 — أول قيمة فوق العتبة تماماً: مؤهَّلة)');
+
+reset role;
+set local role authenticated;
+set local request.jwt.claim.sub = 'fb100000-0000-0000-0000-0000000000a1';
+
+-- ===========================================================================
 -- 2. المنح الفعلي — أول استدعاء.
 -- ===========================================================================
 
@@ -170,10 +214,10 @@ select public.grant_free_p1('fb100000-0000-0000-0000-0000000000c1',
 select pg_temp.ok((:'g1' is not null), 'أول استدعاء يعيد نتيجة');
 
 select pg_temp.ok(
-  ((:'g1')::jsonb ->> 'eligible_scopes')::int = 4,
-  'أربعة نطاقات مؤهَّلة: FDT 100/101/104 وreseller-1');
+  ((:'g1')::jsonb ->> 'eligible_scopes')::int = 5,
+  'خمسة نطاقات مؤهَّلة: FDT 100/101/105 وreseller-1/reseller-5');
 select pg_temp.ok(
-  ((:'g1')::jsonb ->> 'newly_granted')::int = 4,
+  ((:'g1')::jsonb ->> 'newly_granted')::int = 5,
   'كلها مُنحت حديثاً في الاستدعاء الأول');
 select pg_temp.ok(
   ((:'g1')::jsonb ->> 'already_granted')::int = 0,
@@ -202,10 +246,15 @@ select pg_temp.ok(
                and scope_type='FDT' and scope_id='103'),
   'FDT 103 (349) حدّياً دون العتبة بواحد: لا منح');
 select pg_temp.ok(
+  not exists(select 1 from public.free_p1_grants
+             where cycle_id='fb100000-0000-0000-0000-0000000000c1'
+               and scope_type='FDT' and scope_id='104'),
+  'FDT 104 (350) عند العتبة تماماً: لا منح — القاعدة "أكبر من" لا "أكبر من أو يساوي"، العتبة نفسها غير مؤهِّلة');
+select pg_temp.ok(
   exists(select 1 from public.free_p1_grants
          where cycle_id='fb100000-0000-0000-0000-0000000000c1'
-           and scope_type='FDT' and scope_id='104'),
-  'FDT 104 (350) عند العتبة تماماً: يُمنح — الحد الأدنى شامل');
+           and scope_type='FDT' and scope_id='105'),
+  'FDT 105 (351) أول قيمة فوق العتبة بالضبط: يُمنح');
 
 -- --- OLD ZONE: إجمالي الموزّع، لا ضرب بعدد الكابينات ------------------------
 
@@ -222,13 +271,46 @@ select pg_temp.ok(
 select pg_temp.ok(
   not exists(select 1 from public.free_p1_grants
              where cycle_id='fb100000-0000-0000-0000-0000000000c1'
+               and zone='old' and scope_id='reseller-3'),
+  'reseller-3 (349 إجمالاً) حدّياً دون العتبة بواحد: لا منح');
+select pg_temp.ok(
+  not exists(select 1 from public.free_p1_grants
+             where cycle_id='fb100000-0000-0000-0000-0000000000c1'
+               and zone='old' and scope_id='reseller-4'),
+  'reseller-4 (350 إجمالاً) عند العتبة تماماً: لا منح — نفس قاعدة NEW ZONE، > لا >=');
+select pg_temp.ok(
+  exists(select 1 from public.free_p1_grants
+         where cycle_id='fb100000-0000-0000-0000-0000000000c1'
+           and zone='old' and scope_id='reseller-5'),
+  'reseller-5 (351 إجمالاً) أول قيمة فوق العتبة بالضبط: يُمنح');
+select pg_temp.ok(
+  not exists(select 1 from public.free_p1_grants
+             where cycle_id='fb100000-0000-0000-0000-0000000000c1'
                and zone='old' and scope_type='FDT'),
   'لا صفّ OLD ZONE بمستوى الكابينة إطلاقاً — القيد نفسه يمنعه بنيوياً');
 
 select pg_temp.ok(
   (select count(*) from public.free_p1_grants
-   where cycle_id='fb100000-0000-0000-0000-0000000000c1') = 4,
-  'إجمالي المنح بعد الاستدعاء الأول أربعة بالضبط');
+   where cycle_id='fb100000-0000-0000-0000-0000000000c1') = 5,
+  'إجمالي المنح بعد الاستدعاء الأول خمسة بالضبط');
+
+-- ===========================================================================
+-- 3ب. تطابق العرض مع المنح الفعلي — إثبات حيّ بتشغيل الدالتين معاً، لا
+--     افتراضاً بمقارنة نصّ الكود.
+-- ===========================================================================
+
+select pg_temp.ok(
+  not exists(
+    select scope_type, scope_id from public.free_bonus_eligibility('fb100000-0000-0000-0000-0000000000c1')
+    except
+    select scope_type, scope_id from public.free_p1_grants
+    where cycle_id='fb100000-0000-0000-0000-0000000000c1')
+  and not exists(
+    select scope_type, scope_id from public.free_p1_grants
+    where cycle_id='fb100000-0000-0000-0000-0000000000c1'
+    except
+    select scope_type, scope_id from public.free_bonus_eligibility('fb100000-0000-0000-0000-0000000000c1')),
+  'free_bonus_eligibility() وfree_p1_grants يتطابقان تماماً بعد المنح — نفس النطاقات بالضبط، بلا فرق واحد');
 
 -- ===========================================================================
 -- 3. التكرار — لا ازدواج، لا بإعادة الحساب ولا بإعادة الإرسال.
@@ -249,13 +331,13 @@ select pg_temp.ok(
   ((:'g3')::jsonb ->> 'newly_granted')::int = 0,
   'استدعاء ثانٍ بـrequest_id مختلف: صفر منح جديد');
 select pg_temp.ok(
-  ((:'g3')::jsonb ->> 'already_granted')::int = 4,
-  'كل الأربعة تظهر ممنوحة سلفاً، لا مُعاد إنشاؤها');
+  ((:'g3')::jsonb ->> 'already_granted')::int = 5,
+  'كل الخمسة تظهر ممنوحة سلفاً، لا مُعاد إنشاؤها');
 
 select pg_temp.ok(
   (select count(*) from public.free_p1_grants
-   where cycle_id='fb100000-0000-0000-0000-0000000000c1') = 4,
-  'الإجمالي يبقى أربعة تماماً بعد ثلاثة استدعاءات — إعادة الحساب/الإرسال لا تضاعف الاستحقاق');
+   where cycle_id='fb100000-0000-0000-0000-0000000000c1') = 5,
+  'الإجمالي يبقى خمسة تماماً بعد ثلاثة استدعاءات — إعادة الحساب/الإرسال لا تضاعف الاستحقاق');
 
 -- ===========================================================================
 -- 4. القدرة مفروضة فعلاً، لا معلَنة فقط.

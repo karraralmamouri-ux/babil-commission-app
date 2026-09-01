@@ -155,8 +155,10 @@ create table if not exists public.free_p1_grants (
   constraint free_p1_grants_zone_scope_match check (
     (zone = 'new' and scope_type = 'FDT') or (zone = 'old' and scope_type = 'AGENT')),
   constraint free_p1_grants_threshold_check check (rule_threshold > 0),
-  -- حتى لو أخطأت الدالة، لا يمكن لصفٍّ تحت العتبة أن يُكتب أصلاً.
-  constraint free_p1_grants_meets_threshold check (unique_activated_subscribers >= rule_threshold)
+  -- حتى لو أخطأت الدالة، لا يمكن لصفٍّ عند العتبة أو تحتها أن يُكتب أصلاً.
+  -- القاعدة المعتمدة حرفياً من صاحب المنتج: "greater than 350" — 350 نفسها
+  -- غير مؤهِّلة، 351 هي أول قيمة مؤهِّلة. عامل المقارنة > صريح، لا >=.
+  constraint free_p1_grants_meets_threshold check (unique_activated_subscribers > rule_threshold)
 );
 
 create index if not exists free_p1_grants_cycle_idx on public.free_p1_grants (cycle_id);
@@ -211,11 +213,15 @@ begin
       using errcode = 'P0002';
   end if;
 
+  -- عتبة صاحب القرار حرفية: "greater than 350" — 350 نفسها غير مؤهِّلة، 351
+  -- أول قيمة مؤهِّلة. عامل > صريح هنا، لا >=؛ ويطابقه free_bonus_eligibility()
+  -- أدناه حرفياً — كلاهما يجب أن يتغيّر معاً، وتثبت ذلك
+  -- tests/sql/free-p1.sql عبر مقارنة حيّة بين الدالتين، لا افتراضاً.
   select count(*) into v_eligible
   from public.commission_cycle_snapshots s
   where s.cycle_id = p_cycle_id
     and s.finalized_at is not null
-    and s.unique_activated_subscribers >= v_threshold
+    and s.unique_activated_subscribers > v_threshold
     and ((s.zone = 'new' and s.scope_type = 'FDT') or (s.zone = 'old' and s.scope_type = 'AGENT'));
 
   insert into public.free_p1_grants (
@@ -226,7 +232,7 @@ begin
   from public.commission_cycle_snapshots s
   where s.cycle_id = p_cycle_id
     and s.finalized_at is not null
-    and s.unique_activated_subscribers >= v_threshold
+    and s.unique_activated_subscribers > v_threshold
     and ((s.zone = 'new' and s.scope_type = 'FDT') or (s.zone = 'old' and s.scope_type = 'AGENT'))
   on conflict (cycle_id, scope_type, scope_id) do nothing;
   get diagnostics v_granted = row_count;
@@ -248,6 +254,55 @@ begin
     'already_granted', v_eligible - v_granted);
 end;
 $fn$;
+
+-- ---------------------------------------------------------------------------
+-- 3ب. عرض الأهلية للقراءة فقط — بلا كتابة، بلا سلطة دفع (ADR-031، FREE-004).
+--
+-- النظام "يحسب ويعرض من هو مؤهَّل" بحسب صاحب القرار — لا يجوز أن يبقى هذا
+-- مرهوناً بأن يشغّل أحدٌ يملك صلاحية المنح grant_free_p1() أولاً؛ لذا هذه
+-- دالة مستقلة للقراءة فقط، بصلاحية العرض العادية (commission.view) لا صلاحية
+-- المنح، تُعيد نفس الصفوف التي كانت grant_free_p1() ستمنحها، دون أن تكتب
+-- أي شيء. المعيار (>) يجب أن يبقى مطابقاً حرفياً لمعيار grant_free_p1() —
+-- tests/sql/free-p1.sql يثبت التطابق بتشغيل حيّ للدالتين معاً على نفس البيانات،
+-- لا بمقارنة نص الكود.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.free_bonus_eligibility(p_cycle_id uuid)
+returns table (
+  scope_type text,
+  scope_id text,
+  scope_label text,
+  zone text,
+  unique_activated_subscribers integer,
+  threshold integer,
+  free_p1_count integer
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $fn$
+begin
+  perform public.require_capability('commission.view');
+
+  return query
+  select s.scope_type, s.scope_id, s.scope_label, s.zone,
+         s.unique_activated_subscribers, r.threshold,
+         1 as free_p1_count
+  from public.commission_cycle_snapshots s
+  join public.commission_cycles c on c.id = s.cycle_id
+  join public.commission_free_p1_rules r on r.scheme_version_id = c.scheme_version_id
+  where s.cycle_id = p_cycle_id
+    and c.finalized_at is not null
+    and s.finalized_at is not null
+    and s.unique_activated_subscribers > r.threshold
+    and ((s.zone = 'new' and s.scope_type = 'FDT') or (s.zone = 'old' and s.scope_type = 'AGENT'))
+  order by s.zone, s.scope_label;
+end;
+$fn$;
+
+comment on function public.free_bonus_eligibility(uuid) is
+  'Read-only Free P1 eligibility display for a cycle. No write, no payment authority — informational only (ADR-031). Mirrors grant_free_p1()''s eligibility predicate exactly; keep both in sync.';
 
 -- ---------------------------------------------------------------------------
 -- 4. بذر عتبة V1 المعتمدة (350) لإصدار المخطط المنشور اليوم.
@@ -301,5 +356,7 @@ revoke execute on function public.set_free_p1_threshold(uuid, integer, uuid) fro
 grant execute on function public.set_free_p1_threshold(uuid, integer, uuid) to authenticated;
 revoke execute on function public.grant_free_p1(uuid, uuid) from public, anon;
 grant execute on function public.grant_free_p1(uuid, uuid) to authenticated;
+revoke execute on function public.free_bonus_eligibility(uuid) from public, anon;
+grant execute on function public.free_bonus_eligibility(uuid) to authenticated;
 
 commit;
