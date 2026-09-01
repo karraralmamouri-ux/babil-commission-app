@@ -510,3 +510,75 @@ The baseline count (§9) was **63 of 156 in-scope IDs not yet PASS** (16 PARTIAL
 - **Scheduled backups / PITR** — genuinely improved (guarded on-demand dump script) but not equivalent to the register's SEC-007 requirement; still a billing/plan decision.
 
 See `docs/BUSINESS_DECISIONS_REQUIRED.md` for the consolidated decision list and `docs/GO_LIVE_READINESS.md` (this engagement's final closure synthesis) for the overall recommendation.
+
+---
+
+## 12. 2026-09-01 Owner-Decision Ratification Addendum
+
+**Type:** Second same-day delta, superseding specific stale claims in §11 above (not a fresh audit pass). The owner supplied explicit written rulings on all 7 DECISION REQUIRED items plus FREE-004 and the PITR question — reproduced in full in `docs/BUSINESS_DECISIONS_REQUIRED.md` ("القرار المعتمد") and formalized as `docs/DECISIONS.md` ADR-023 through ADR-030. Per the owner's explicit instruction, this pass did not stop at recording the decisions — wherever a decision unblocked a missing implementation, it was built and tested against local Postgres, never Staging/Production. §11's text below is superseded where noted; everything else in §1–§11 stands.
+
+### 12.1 Decisions ratified with no code change (behavior already matched)
+
+| Decision | ADR | Disposition |
+|---|---|---|
+| DEC-001 (UNIQUE ACTIVATED SUBSCRIBERS basis) | ADR-023 | Existing implementation already matched; ratified as-is. |
+| DEC-003 (invoice identity = SOURCE + REFERENCE) | ADR-025 | Existing implementation already matched; ratified as-is. |
+| DEC-004 (no attachment storage in V1) | ADR-026 | Confirms INV-019's §11.2 finding (zero attachment mechanism) as the *correct*, now-ratified state, not an open gap. |
+| DEC-006 (no auto-merge) | ADR-028 | Existing NEEDS_REVIEW/CONFLICT behavior already matched; ratified as-is. |
+
+### 12.2 DEC-002 (zone/FDT scope) — ratified, §11.4's "ADR still owed" is now stale
+
+ADR-024 records the owner's ruling: the 94–119 NEW ZONE routing stays exactly as implemented, documented as a **deliberate V1 business choice**, not an accidental regression pending reversal. §11.4's line *"A formal ADR is still owed either direction"* is now false — the ADR exists and the direction is "keep as-is."
+
+This resolves the decision question itself, but **not** the broader per-ID audit. §11.2's ZON-005 entry ("stays VERIFY — structurally blocked... which this engagement is deliberately not deciding") is **reclassified**, not flipped to PASS:
+
+| ID | Prior (§11.2) | Now | Why not PASS outright |
+|---|---|---|---|
+| ZON-005 | VERIFY — structurally blocked on an undecided question | **VERIFY — unblocked, not yet re-verified** | The scope-definition question that blocked honest evaluation is answered (per-FDT for NEW ZONE, no aggregation). What has NOT happened this pass is re-reading ZON-005's exact requirement text against import/calculation/dashboard/payment code to confirm every one of those four surfaces consistently applies the now-ratified rule. Flipping to PASS without that file:line check would be exactly the kind of unearned precision §11.3 warned against. |
+
+The wider `ZON-001..004/006/007` and `CFG-001..005`/`COM-012/013` cluster referenced in `docs/BUSINESS_DECISIONS_REQUIRED.md`'s "ما بقي مفتوحاً" for DEC-002 has the same status: the *decision* is no longer the blocker, but a fresh per-ID pass has not been run in this engagement. That per-ID pass is the correct next step, tracked in Pending Task 4 below — not claimed done here.
+
+### 12.3 DEC-005 (IMP-003, bad-import VOID) — moved from blocked to built and tested
+
+§11.4's line *"blocked by DEC-005 (cancellation semantics never decided). Not built; building it would mean inventing a money rule"* is now stale. ADR-027 records the ratified logical-VOID semantics; they were implemented and tested this session, never against Staging/Production:
+
+- Migration: `supabase/migrations/20261022090000_void_saas_import_batch.sql` (commit `cf9b1e5`) — new `saas.void_import` capability; `voided`/`voided_by`/`voided_at`/`void_reason` columns with a mandatory-attribution CHECK; an immutability trigger blocking any further mutation of a voided batch; `commission_qualifying_events` and `evaluate_enrollment_gate()` both re-defined (via `create or replace`, no applied migration edited) to exclude/flag voided-batch data; `void_saas_import_batch()` RPC — SECURITY DEFINER, capability-gated, request_id-replay-idempotent, and fails closed (rejects with the exact posted/paid row count) if the batch has already touched a `FINALIZED/PARTIALLY_PAID/PAID/CLOSED` cycle — using the same mutability boundary as `calculate_commission_cycle`/`recalculate_cycle_after_master_change`/`assert_cycle_correctable`.
+- Test: `tests/sql/void-import-batch.sql`, wired into `tests/sql/run-local-tests.sh` as block `out43` — **20/20 assertions passing** against local Postgres, covering rejection paths (empty reason, missing request_id, missing capability, draft-status batch, FINALIZED/PAID impact, installation-enrollment impact), the success path with full attribution verification, request_id replay, a direct-superuser-bypass attempt proving the immutability trigger itself (not just the RPC's guard) blocks mutation, and confirmed exclusion from `commission_qualifying_events` plus a `BATCH_VOIDED` blocker surfacing from `evaluate_enrollment_gate`.
+- **Deliberate residual scope, not a gap**: no confirmed FK linkage exists from `installation_enrollments` to `saas_import_batches`, so the RPC conservatively **refuses VOID outright** whenever the batch produced any installation enrollment at all — wider than may be strictly necessary, but fail-closed rather than silently unsafe. Documented in the migration's own comments and in `docs/BUSINESS_DECISIONS_REQUIRED.md`'s DEC-005 "ما بقي مفتوحاً".
+
+**IMP-003: MISSING → PASS.**
+
+### 12.4 FREE-001..006 (Free P1) — moved from blocked to built and tested
+
+§11.4's line *"still zero implementation. Blocked on FREE-004... and on COM-009 being ratified first"* is now stale. ADR-029 records the owner's final ruling (threshold = 350 UNIQUE ACTIVATED SUBSCRIBERS per DEC-001's definition; NEW ZONE eligibility strictly per-FDT, one Free P1 per qualifying FDT; OLD ZONE eligibility on the reseller's *total* qualifying subscribers across the OLD ZONE, never per-FDT). Implemented and tested this session, never against Staging/Production:
+
+- Migration: `supabase/migrations/20261021090000_free_p1_bonus.sql` (commit `0c28c56`) — `commission.grant_free_bonus`/`commission.configure_free_bonus` capabilities; `commission_free_p1_rules` (one configurable threshold row per scheme version, seeded at 350 for the production `COMMISSION_STANDARD` v1 scheme version only); `set_free_p1_threshold()` RPC (capability-gated, replay-idempotent); `free_p1_grants` table with three defense-in-depth CHECK constraints (identity-unique per cycle+scope, zone/scope-type match, threshold-met); `grant_free_p1()` RPC — SECURITY DEFINER, capability-gated, requires a *finalized* cycle, fails closed with no invented default if no threshold rule exists for the scheme version, reads eligibility purely from finalized `commission_cycle_snapshots`, `on conflict do nothing` idempotency plus request_id replay, full audit-log write.
+- Test: `tests/sql/free-p1.sql`, wired into `run-local-tests.sh` as block `out42` — **30/30 assertions passing**, covering NEW ZONE per-FDT independence (two FDTs on the same reseller each judged separately, no aggregation), OLD ZONE reseller-total aggregation (two FDTs summed, exactly one grant, not two), the 349/350 threshold boundary, fail-closed paths (not-finalized cycle, no threshold configured, direct CHECK-constraint violation attempts), capability enforcement, and `set_free_p1_threshold` RPC behavior including replay.
+- **Interpretive note carried forward, not re-litigated**: "≥350" was read as inclusive (350 itself qualifies) — stated explicitly in `docs/BUSINESS_DECISIONS_REQUIRED.md` and ADR-029 as an interpretation of the owner's wording, not an invented rule.
+- **Out of scope, explicitly**: how a granted Free P1 is actually settled/paid out (voucher, credit, cash-equivalent) was never specified by the owner and was not invented — `grant_free_p1()` only records entitlement; no payment/settlement code was written.
+
+**FREE-001..006: MISSING → PASS** (entitlement generation and eligibility logic). Settlement/payout mechanics remain explicitly unspecified and out of this engagement's scope.
+
+### 12.5 SEC-007 / R-015 (backups, PITR) — closes as mitigated by decision
+
+ADR-030 records the owner's ruling: a paid Supabase PITR upgrade is **not** a V1 go-live requirement; the existing guarded on-demand `pg_dump` tooling (`scripts/dump-database.mjs`, commit `5592a53`, §11.1) is accepted as the V1 backup/recovery posture, with paid PITR tracked as a documented future infrastructure enhancement rather than an open risk. §11.4's line calling this "still a billing/plan decision" is now stale — the decision has been made.
+
+### 12.6 Recomputed blocker ceiling
+
+§11.3's honest ceiling was **"no more than 53 of 156."** This addendum moves the following out of not-PASS:
+
+- **IMP-003**: MISSING → PASS (§12.3).
+- **FREE-001..006** (6 IDs): MISSING → PASS (§12.4).
+- **7 DECISION REQUIRED items**: all 7 (plus FREE-004, already counted in the FREE cluster) are now ratified — §11.3's "7 DECISION REQUIRED, unchanged in count" no longer holds; all 7 close as *decided*, though 4 of them (DEC-001/003/004/006) close with zero code change since behavior already matched, and DEC-002's decision closing does not itself flip ZON-005 or its cluster to PASS (§12.2).
+
+**Revised honest ceiling: no more than 53 − 1 (IMP-003) − 6 (FREE-001..006) − 7 (DECISION REQUIRED, now decided) = 39 of 156 in-scope IDs remain not-PASS**, with the same caveat §11.3 already stated: the true number is very likely lower once the INV cluster, the Security Advisor-dependent SEC IDs, and now also the ZON-002/006/007/CFG-001..005/COM-012/013 cluster (§12.2) get their own targeted file:line re-check — none of which this addendum claims to have done. This ceiling intentionally still counts ZON-005 and its cluster as not-PASS, ISN-009/IMP-001/SEC-005/UX-006 as unchanged VERIFY (§11.2), and does not touch the INV-cluster caveat from §11.3.
+
+### 12.7 What remains genuinely, deliberately unresolved (supersedes §11.4)
+
+- **ZON-001..002/004/006/007, CFG-001..005, COM-012/013** — the decision blocking them is resolved (§12.2), but no fresh per-ID file:line audit has been run this engagement. Needs a dedicated follow-up pass, not a blanket flip.
+- **5 VERIFY items unchanged**: INS-009, IMP-001, SEC-005, UX-006 (§11.2), plus ZON-005 reclassified as "unblocked, not yet re-verified" (§12.2) rather than "structurally blocked."
+- **Free P1 settlement/payout mechanics** — explicitly out of scope; not specified by the owner, not invented (§12.4).
+- **DEC-005's installation-enrollment FK-linkage gap** — the VOID RPC's conservative whole-batch refusal is a safe stand-in, not a resolution of whether a real FK exists; documented as a residual in `docs/BUSINESS_DECISIONS_REQUIRED.md`.
+- **INV cluster and Security-Advisor-dependent SEC-003/004/006** — unchanged from §11.3, still owed their own targeted re-check.
+
+See `docs/BUSINESS_DECISIONS_REQUIRED.md` (now the ratified decision record, not an open-blockers list) and `docs/DECISIONS.md` ADR-023..030 for the full decision text, and `docs/GO_LIVE_READINESS.md` for the updated overall recommendation.
