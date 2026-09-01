@@ -390,6 +390,15 @@ fi
 echo "$out42" | grep -E "^ {14,16}(ok|==) " || true
 passed=$((passed + $(echo "$out42" | grep -c "ok ")))
 
+echo "== void import batch =="
+out43=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/void-import-batch.sql 2>&1) || true
+if echo "$out43" | grep -qE "FAILED|ERROR"; then
+  echo "$out43" | grep -E "FAILED|ERROR" || true
+  echo "VOID IMPORT BATCH TESTS FAILED" >&2; exit 1
+fi
+echo "$out43" | grep -E "^ {14,16}(ok|==) " || true
+passed=$((passed + $(echo "$out43" | grep -c "ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
