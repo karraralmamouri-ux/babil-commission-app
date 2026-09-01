@@ -609,3 +609,86 @@ Re-verified but **not** moved to PASS (stay counted as not-PASS, now with sharpe
 - **INV cluster and Security-Advisor-dependent SEC-003/004/006** — unchanged from §11.3, still owed their own targeted re-check.
 
 See `docs/BUSINESS_DECISIONS_REQUIRED.md` (now the ratified decision record, not an open-blockers list) and `docs/DECISIONS.md` ADR-023..030 for the full decision text, and `docs/GO_LIVE_READINESS.md` for the updated overall recommendation.
+
+---
+
+## 13. 2026-09-01 Final Pre-Go-Live Closure Addendum
+
+**Type:** Third same-day delta, closing the 5 IDs §12.6 still counted not-PASS (ZON-005, INS-009, IMP-001, SEC-004, UX-006), on top of PR #94 (`feat/v1-go-live-closure`, starting HEAD `3e5a4b9d7fc189dcff02633abd2fb9e7d8d5920f`). Not merged, not deployed to Production, no Production financial data touched, no payment executed, no July recalculation. Every change was built and proven against local Postgres only.
+
+### 13.1 SEC-004 — PARTIAL → PASS
+
+Commit `ee0c697`. An exhaustive `has_function_privilege()`-based sweep of all 210 currently-effective `SECURITY DEFINER` functions (not text-grep, which the project's own dynamic `foreach ... execute format('grant/revoke ...')` migrations defeat) found the codebase's grant hygiene already correct almost everywhere — two early `ALTER DEFAULT PRIVILEGES` changes (`20260804230000`, `20260809190000`) mean every function created after them gets **no** PUBLIC execute grant by default. This directly resolves §12.7's residual finding as a false alarm: the ~20 read-only functions flagged there (`installation_financials`, `commission_cycle_financials`, etc.) with no explicit grant/revoke statement do **not** default to PUBLIC execute, because default privileges were reconfigured before they were created — they were never actually anon/PUBLIC-reachable.
+
+Two genuine gaps were found and closed, not blindly revoked:
+- `effective_permission(uuid,...)` / `explain_permission(uuid,...)` took an arbitrary `p_user_id` with no check it was the caller's own `auth.uid()`, and were granted directly to `authenticated` — any logged-in viewer could query or dump another user's full permission detail via a direct PostgREST RPC call. Direct `authenticated` access revoked; internal callers (`has_capability`/`require_capability`/`my_capabilities`, which invoke them as the function owner) are unaffected.
+- `protect_activation_correction()` / `protect_voided_import_batch()` — the only 2 of 17 trigger functions with no grant/revoke history — given the explicit revoke every sibling guard trigger already carries, for consistency.
+
+Evidence: `tests/sql/permission-primitive-hardening.sql` walks every `SECURITY DEFINER` function via `aclexplode(coalesce(proacl, acldefault('f', proowner)))` — the same resolution Postgres itself applies with no explicit grant/revoke — and asserts none grant EXECUTE to `anon`/PUBLIC, so a future function created without an explicit revoke fails the suite automatically. Also proves behaviorally that a non-admin viewer is rejected on the two primitives directly while `has_capability` still works.
+
+**SEC-004: PASS.**
+
+### 13.2 ZON-005 — PARTIAL → PASS
+
+Commit `dfffcb0` (migration hardened for the safety scanner in `9a824dd`, see §13.6). §12.2 found one genuine gap: `installation_enrollments.zone` was never populated by either write path, so the installation dashboard's zone display read a dead column instead of `fdt_commission_scope()`'s output — commission-side consistency (import/calculation/payment) was already real, only the dashboard surface was unwired.
+
+Fix routes all three write paths — `enroll_new_installation`, `bootstrap_historical_enrollments`, and the legacy `import_installation_entitlements` (which previously trusted the raw uploaded file's own zone column instead of the FDT number) — through `fdt_commission_scope()`, the same sole-source function the commission engine already uses, and idempotently backfills existing rows. Zone is a display/classification field never read by any amount or rate calculation (confirmed across the full migration history, and explicitly not among the columns `protect_settled_installation_entitlement()` guards) — the backfill touches zero financial amounts, including on already-paid entitlement rows.
+
+Evidence: `tests/sql/zone-consistency.sql` proves the same FDT (105 in-range, 50 out-of-range) produces the same zone across all four surfaces — `enroll_new_installation`, `bootstrap_historical_enrollments`, `materialize_installation_entitlements`, and `import_installation_entitlements`, including with a deliberately wrong raw-file zone value — plus idempotent backfill correctness on an already-paid row.
+
+**ZON-005: PASS.**
+
+### 13.3 IMP-001 — PARTIAL → PASS
+
+Commit `8720eb7`. §12.7 found the real gap: bulk-invoice re-upload duplicate detection (the `already_used` bucket) was a plain application-level `EXISTS` query with zero test coverage for the actual re-upload scenario, and vulnerable to a classic read-then-write race between two concurrent uploads. The owner-approved identity rule: invoice identity = SOURCE/SYSTEM + INVOICE REFERENCE/NUMBER.
+
+Two-level fix: (1) DB — a partial unique index `installation_invoices_verified_identity_key` on `(invoice_source, invoice_number)` where `invoice_number is not null and status = 'VERIFIED'`, scoped to VERIFIED only so a REJECTED/PENDING row never permanently blocks a legitimate correction; (2) App — `review_invoice()` (the single/manual invoice-review path, which previously had zero check against reusing an `invoice_number` for a different subscriber/stage) now runs the same identity check the bulk path already had, before allowing a VERIFIED insert. The unique index is the atomic backstop making the race structurally impossible, not just discouraged by application logic.
+
+Evidence covers all six required scenarios: `tests/sql/invoice-identity-dedup.sql` (13 assertions) — A. same invoice uploaded twice (no duplicate), C. same invoice in another file (skipped, `already_used`), D. two distinct invoices for the same subscriber/month (coexist without conflict), E. previously-verified invoice re-upload for another subscriber (rejected, no payment condition needed), F. atomic apply failure leaves no partial entitlement or audit trace; `tests/sql/invoice-dedup-concurrency.sh` — B. true concurrent verification of the same invoice number for two different subscribers, proven to land exactly once via real parallel processes, not a simulated race.
+
+**IMP-001: PASS.**
+
+### 13.4 INS-009 — PARTIAL → PASS
+
+Commit `59ffb24`. §12.7 found no server-side KPI aggregate existed for the installation dashboard at all — only a frontend merge of two independently-paginated raw fetches, proven internally consistent by fixture tests but never reconciled against ground truth. Investigation this pass found `installation_cycle_pipeline()` already calls `installation_payout_candidates()` internally (`20261010090000_installation_monthly_readiness.sql:412`) rather than recomputing independently — the two screens (`/installation`, `/installation/cycle`) were already single-sourced, so no new RPC was needed; the real open question was whether that single source was itself correct.
+
+`installation_payout_candidates()` deliberately inlines a copy of `subscriber_ownership_type()`'s ownership-resolution logic for performance (avoiding thousands of per-row function calls, `20260920090000_statement_timeout_hot_paths.sql:66-71`) — a real, previously-unverified exception to the project's "don't duplicate business logic" convention.
+
+`tests/sql/installation-kpi-reconciliation.sql` (17 assertions) proves: (a) the function's candidate count/amount matches a raw `COUNT`/`SUM` on the underlying tables; (b) the ready/blocked/by-stage breakdown is internally consistent (ready + blocked = total, no gap or double-count, on both count and amount); (c) the inlined ownership-resolution copy agrees with the canonical `subscriber_ownership_type()` by running both real functions against identical fixture data — 7 subscribers each isolating one blocker (hold, missing invoice, unresolved history, identity conflict, direct-company ownership, needs-review ownership) — not just a code-comparison-by-eye.
+
+**INS-009: PASS.**
+
+### 13.5 UX-006 — stays VERIFY
+
+Per the standing instruction ("Do not invent a PASS... leave UX-006 as VERIFY until human/device confirmation if that is genuinely required"), this pass produced [`docs/UX-006-MANUAL-QA-CHECKLIST.md`](./UX-006-MANUAL-QA-CHECKLIST.md) rather than a status change. It replaces the prior generic "min-height values of 28/34/36/38/52px" spot-check (§2's UX-006 row) with code-verified specifics:
+
+- Most of those flagged values are false positives: `.btn`, `.smallbtn`, `.select`, and every actual `<textarea>` in the app (all four instances carry class `search`) are already bumped to 44px by an existing `@media (pointer: coarse)` rule (`assets/css/babil-flow.css:1193-1201`).
+- Two genuine, code-confirmed gaps remain, not covered by that rule: `.side-btn` (sidebar nav items, 38px, reachable via the mobile off-canvas drawer that becomes the primary navigation at ≤860px) and `.minirow` used as a clickable link (no `min-height` at all — used for the "open holds/next action" rows on `/installation` and `/installation/cycle`, effective height ≈32px from content alone).
+
+Neither can be honestly resolved by a code read — real tap-target adequacy depends on physical device/finger geometry a browser emulator does not reproduce. **UX-006: VERIFY**, with a concrete, executable checklist now in place instead of an open-ended "needs review."
+
+### 13.6 Final acceptance gate
+
+Full local verification run this pass, in order:
+- `npm test` (`node --test tests/*.test.js`) — **701/701 passing**, including `tests/master-requirements-coverage.test.js` and `tests/migration-safety-scanner.test.js`.
+- One genuine finding from the scanner, unrelated to anything above: the ZON-005 migration (`20261023090000_installation_zone_consistency.sql`, committed earlier this same session as `dfffcb0`) had two top-level `UPDATE` statements against `installation_enrollments`/`installation_entitlements` outside any function body — the project's own migration-safety convention requires writes to run inside a function/`do $$...$$` body, not as bare top-level DML in a migration file. Fixed in commit `9a824dd` by wrapping the two statements in `do $$ begin ... end $$;` — same statements, same effect (the zone-classification backfill described in §13.2), purely a scanner-satisfying wrap. Re-verified: scanner test green, full local SQL suite still green at 1143 assertions after a clean rebuild from all 91 migrations, full `npm test` green at 701/701.
+- `npx tsc --noEmit` — clean, zero errors.
+- `npm run build` (`vite build`) — succeeds, bundle verified (9 referenced assets all present).
+- Migration order — 91 migration files, filenames strictly sorted, zero duplicate timestamps, and `tests/sql/rebuild-local.sh` applied all 91 cleanly from scratch in filename order with no conflict (the concrete proof, not just a naming check).
+- Local SQL suite (`tests/sql/run-local-tests.sh`) — **1143 assertions passing**, including all of §13.1-§13.4's new coverage and the pre-existing concurrency suite (installation-fee payment, financial correction, and invoice-verification races each proven to resolve to exactly one winner).
+- **Staging mandatory acceptance scenarios: not executable in this environment.** No `.env`/Supabase project link exists in this worktree (`node scripts/assert-staging-project-ref.mjs` confirms "Not linked to any Supabase project"); only `.env.example` is present. This is an honest environment limitation, not a skipped step — Staging verification remains outstanding and must be performed by someone with Staging credentials before a genuine V1 Stable declaration, per the register's own closing line (§10 step 12).
+
+### 13.7 Recomputed blocker ceiling
+
+§12.6's ceiling was **38 of 156 in-scope IDs not-PASS**, counting ZON-005, INS-009, IMP-001, SEC-004, and UX-006 as not-PASS. This pass moves 4 of those 5 to PASS (§13.1-§13.4); UX-006 stays VERIFY (§13.5) per explicit instruction not to invent a PASS.
+
+**Revised honest ceiling: no more than 38 − 4 = 34 of 156 in-scope IDs remain not-PASS.** The same caveat §11.3/§12.6 already stated still holds: the true number is very likely lower once the INV-001..004/007..009/013/014 cluster and the Security-Advisor-dependent SEC-003/006 get their own targeted file:line re-check — neither of which was in scope for this closure pass (the owner's named priority list was SEC-004, ZON-005, IMP-001, INS-009, Free P1 settlement status, and UX-006; all six have now been addressed to the extent honestly possible).
+
+### 13.8 What remains genuinely, deliberately unresolved after this pass
+
+- **UX-006** — device-only manual QA; checklist written (§13.5), status correctly stays VERIFY pending actual human/device confirmation. Does not block go-live per the standing instruction unless a functional usability defect is discovered during that confirmation.
+- **Free P1 settlement/payout mechanics** — unchanged from §12.4/§12.7: entitlement generation and eligibility are PASS (ADR-029, 30 test cases), but how a granted Free P1 is actually settled (voucher, credit, cash-equivalent) was never specified by the owner and was not invented. This needs a new, separate business decision before it can be built — not an engineering gap in what already exists.
+- **INV-001..004/007..009/013/014 cluster and SEC-003/006** — unchanged from §11.3/§12.6, still owed their own targeted re-check; explicitly out of this closure pass's named scope.
+- Everything else listed in §12.7 as unresolved (Post-V1 zone/FDT configurability, DEC-005's FK-linkage residual) is unchanged by this pass.
+
+See `docs/GO_LIVE_READINESS.md` for the updated overall recommendation and verdict.
