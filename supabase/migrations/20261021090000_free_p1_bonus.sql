@@ -24,11 +24,12 @@
 -- العمولة (UNIQUE_ACTIVATED_SUBSCRIBERS) — commission_cycle_snapshots.unique_activated_subscribers
 -- هو نفسه العدد المستعمل، لا تعريف مواز.
 --
--- خارج نطاق هذه المهاجرة عمداً: كيف يتحول منح Free P1 إلى قيد مالي فعلي (دفعة/رصيد/
--- إعفاء مرحلة تنصيب) — صاحب القرار لم يحدد آلية التسوية المالية بعد، فقط قاعدة
--- الاستحقاق والعتبة والتجميع. بناء مسار دفع الآن يعني اختراع قاعدة مالية غير محسومة؛
--- هذه المهاجرة تبني طبقة الاستحقاق فقط: حتمية، مدقَّقة، ومحمية من الازدواج على
--- مستوى القيد نفسه (constraint، لا فحص تطبيقي وحده).
+-- Free P1 أهلية/عرض فقط، دائماً — قرار نهائي (ADR-031)، لا تأجيل بانتظار حسم
+-- مالي لاحق. لا يُبنى هنا، ولن يُبنى لاحقاً ضمن هذا القرار، أي مسار يحوّل منح
+-- Free P1 إلى قيد مالي فعلي: لا دفعة، لا رصيد، لا إعفاء مرحلة تنصيب، لا دخول
+-- دفعات سداد، لا قيد دفتر أستاذ، لا وسم "مدفوع"، ولا تصحيح/عكس. هذه المهاجرة
+-- تبني طبقة الاستحقاق فقط، بصلاحية دفع صفرية بنيوياً: حتمية، مدقَّقة، ومحمية
+-- من الازدواج على مستوى القيد نفسه (constraint، لا فحص تطبيقي وحده).
 --
 -- forward-only. لا صف مالي قائم يُمَس، ولا دورة عمولة تُعاد حسابها.
 
@@ -161,7 +162,7 @@ create table if not exists public.free_p1_grants (
 create index if not exists free_p1_grants_cycle_idx on public.free_p1_grants (cycle_id);
 
 comment on table public.free_p1_grants is
-  'Free P1 eligibility grants only — not a payment/credit record. How a grant settles financially (payout, waived installation stage, etc.) is not yet decided; see docs/BUSINESS_DECISIONS_REQUIRED.md.';
+  'Free P1 eligibility/display record only — permanently, by owner decision (ADR-031). Never a payment/credit record: no payable amount, no payment batch, no ledger entry, no correction/reversal mechanics. See docs/BUSINESS_DECISIONS_REQUIRED.md § FREE-004.';
 
 create or replace function public.grant_free_p1(
   p_cycle_id uuid,

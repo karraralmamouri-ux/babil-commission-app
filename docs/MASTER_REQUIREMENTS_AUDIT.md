@@ -692,3 +692,40 @@ Full local verification run this pass, in order:
 - Everything else listed in §12.7 as unresolved (Post-V1 zone/FDT configurability, DEC-005's FK-linkage residual) is unchanged by this pass.
 
 See `docs/GO_LIVE_READINESS.md` for the updated overall recommendation and verdict.
+
+## 14. 2026-09-01 Owner Final Clarification Addendum
+
+**Type:** Fourth same-day delta. Following §13's closure pass, the product owner sent a second message this same day ("FINAL OWNER CLARIFICATION") resolving two of §13.8's open items by explicit, permanent ruling — not new engineering work, not a re-scan of code. No commit in this addendum touches business logic; only documentation and two migration comments (see below) changed.
+
+### 14.1 Free P1 settlement — Prior → Now
+
+**Prior (§13.8):** "how a granted Free P1 is actually settled (voucher, credit, cash-equivalent) was never specified by the owner... This needs a new, separate business decision before it can be built."
+
+**Now:** The owner has ruled Free P1 will **never** be a payable/settleable item — not deferred, struck permanently. Required behavior, restated as a permanent constraint: NEW ZONE eligibility is per-FDT (>350 qualifying active subscribers ⇒ that FDT eligible for 1 Free P1); OLD ZONE eligibility is per reseller-total (>350 qualifying active subscribers ⇒ that reseller eligible for 1 Free P1). Free P1 is informational only — it must never create a payable amount, enter an installation payment batch, create a ledger entry, affect paid/remaining balances, be marked paid, or trigger correction/reversal mechanics. It may keep its own eligibility/status record for display/audit, with zero payment authority.
+
+This required **no code change**: `free_p1_grants` (`supabase/migrations/20261021090000_free_p1_bonus.sql`) already has no amount column and no FK to any financial/ledger/payment table — the table was already structurally payment-incapable before this ruling. Two comment-only edits (table comment, header block) were made in that migration to state the permanence explicitly instead of describing it as pending. Formalized as ADR-031 in `docs/DECISIONS.md`; see `docs/BUSINESS_DECISIONS_REQUIRED.md` § FREE-004 for the full ruling text.
+
+**FREE-001/002/005/006 remain PASS, unchanged.** This addendum removes Free P1 settlement from the "decision required" list entirely — it is no longer an open item of any kind, resolved or not: it is closed by permanent non-existence of the thing that was being asked about.
+
+### 14.2 Staging acceptance — Prior → Now
+
+**Prior (§13.6):** "Staging mandatory acceptance scenarios: not executable in this environment... Staging verification remains outstanding and must be performed by someone with Staging credentials before a genuine V1 Stable declaration."
+
+**Now:** The owner has clarified there is no separate Staging Supabase project available as a matter of permanent project structure — confirmed independently this pass via `npx supabase projects list`, which shows `babil-commission-staging` (ref `unohqhxubraelqgjhxgh`) exists but is **INACTIVE** (paused), while `babil-commission-production` (ref `fbgffpxpskjzgheheikd`) is ACTIVE_HEALTHY. This is not a missing-credentials gap to chase down; it is a structural fact about the environment. §13.6's framing — that Staging verification is "outstanding" pending someone with credentials — is superseded.
+
+**Substitute acceptance methodology (ADR-032), already satisfied by §13.6's own results plus this pass:** full clean local DB rebuild (`tests/sql/rebuild-local.sh`, 91/91 migrations applied cleanly), full SQL regression (`tests/sql/run-local-tests.sh`, 1143 assertions), full JS/TS suite (`npm test`, 701/701), typecheck (`npx tsc --noEmit`, clean), production build (`npm run build`, succeeds), migration safety/order checks (scanner green, filenames strictly ordered, no duplicate timestamps), and the Master Requirements coverage test (part of the 701). All of these were already green in §13.6 before this addendum, under a different justification ("this is what we can do given no Staging access"); the owner's ruling reclassifies them from a stopgap into the actual, permanent, sufficient acceptance bar.
+
+**Read-only Production verification — investigated, not performed.** The instruction requires this "where safe and available." In this execution environment it is not safely available: no `.env` and no linked project ref exist in the worktree (`supabase/.temp/project-ref` absent), and no lightweight read-only verification script exists in `scripts/` — only three Staging-scoped verify scripts and `scripts/dump-database.mjs`, a full `pg_dump` that is both heavier than a verification step and would pull real financial/personal data to a local machine, which is not an appropriate substitute for a narrow read-only check. Actually linking the CLI to Production (`npx supabase link --project-ref fbgffpxpskjzgheheikd`) would require a database password not present in this environment and not to be sourced or entered ad hoc. Per ADR-032's own fallback clause, this is documented honestly as a local-environment limitation, not fabricated or skipped silently, and does not by itself block go-live given the local regression suite above is fully green.
+
+### 14.3 Ceiling — unchanged
+
+Free P1 settlement and Staging absence were never counted among the 156 in-scope requirement IDs (they are business-decision/acceptance-methodology items tracked outside the ID register). Removing them as blockers does not move the §13.7 ceiling: it remains **34 of 156 in-scope IDs not-PASS**, unaffected by this addendum.
+
+### 14.4 What remains genuinely, deliberately unresolved after this addendum
+
+- **UX-006** — unchanged from §13.5/§13.8: device-only manual QA, checklist in place, does not block go-live unless the manual check surfaces an actual functional usability defect.
+- **INV-001..004/007..009/013/014 cluster and SEC-003/006** — unchanged from §11.3/§13.8, still owed their own targeted re-check; explicitly out of scope for both this addendum and §13's closure pass.
+- Everything else listed in §12.7/§13.8 as unresolved (Post-V1 zone/FDT configurability, DEC-005's FK-linkage residual) is unchanged.
+- **Free P1 settlement and Staging absence are no longer on this list** — both are permanently resolved by owner ruling as of this addendum (§14.1, §14.2).
+
+See `docs/GO_LIVE_READINESS.md` for the updated overall recommendation and verdict.
