@@ -381,6 +381,15 @@ fi
 echo "$out41" | grep -E "^ {3,5}(ok|==) " || true
 passed=$((passed + $(echo "$out41" | grep -c "    ok ")))
 
+echo "== free p1 bonus =="
+out42=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/free-p1.sql 2>&1) || true
+if echo "$out42" | grep -qE "FAILED|ERROR"; then
+  echo "$out42" | grep -E "FAILED|ERROR" || true
+  echo "FREE P1 BONUS TESTS FAILED" >&2; exit 1
+fi
+echo "$out42" | grep -E "^ {14,16}(ok|==) " || true
+passed=$((passed + $(echo "$out42" | grep -c "ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
