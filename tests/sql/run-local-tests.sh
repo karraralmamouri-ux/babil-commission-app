@@ -408,6 +408,15 @@ fi
 echo "$out44" | grep -E "^ {14,16}(ok|==) " || true
 passed=$((passed + $(echo "$out44" | grep -c "ok ")))
 
+echo "== permission primitive hardening (SEC-004) =="
+out45=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/permission-primitive-hardening.sql 2>&1) || true
+if echo "$out45" | grep -qE "FAILED|ERROR"; then
+  echo "$out45" | grep -E "FAILED|ERROR" || true
+  echo "PERMISSION PRIMITIVE HARDENING TESTS FAILED" >&2; exit 1
+fi
+echo "$out45" | grep -E "^ {8,10}(ok|==) " || true
+passed=$((passed + $(echo "$out45" | grep -c "ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
