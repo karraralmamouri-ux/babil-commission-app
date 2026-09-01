@@ -372,6 +372,15 @@ fi
 echo "$out40" | grep -E "^ {3,5}(ok|==) " || true
 passed=$((passed + $(echo "$out40" | grep -c "    ok ")))
 
+echo "== bulk invoice audit engine =="
+out41=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/bulk-invoice-audit.sql 2>&1) || true
+if echo "$out41" | grep -qE "FAILED|ERROR"; then
+  echo "$out41" | grep -E "FAILED|ERROR" || true
+  echo "BULK INVOICE AUDIT TESTS FAILED" >&2; exit 1
+fi
+echo "$out41" | grep -E "^ {3,5}(ok|==) " || true
+passed=$((passed + $(echo "$out41" | grep -c "    ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh

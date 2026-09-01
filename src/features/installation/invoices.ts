@@ -118,6 +118,10 @@ export const invoiceReview: Route = {
           sub: 'ما رُفع عنه حاجب الفاتورة', link: href('/installation/ready') },
       ])
 
+      + `<div class="actions" style="margin-bottom:12px">
+          <a class="btn gold" href="${esc(href('/installation/invoices/bulk'))}">تدقيق فواتير بالجملة من ملف</a>
+        </div>`
+
       + filterBar([
         { key: 'search', label: 'بحث بالمشترك أو الرقم', type: 'search' },
         { key: 'status', label: 'حالة الفاتورة', type: 'select',
@@ -292,4 +296,221 @@ function insight(tone: 'good' | 'warn' | 'danger', title: string, detail = ''): 
     <b>${esc(title)}</b>${detail ? `<small>${esc(detail)}</small>` : ''}</span></div>`;
 }
 
-export const routes: Route[] = [invoiceReview];
+/* ---- تدقيق الفواتير بالجملة ------------------------------------------------
+ *
+ * نفس بنية تعليق الجملة تماماً (holds.ts): ملفٌ يُقرأ → معاينة مبوَّبة قبل أي
+ * تطبيق → تطبيق دفعة واحدة. المطابقة والتطبيق يستدعيان review_invoice نفسها
+ * على الخادم، فأثر «مدقَّقة» هنا مطابقٌ حرفياً لأثر المراجعة اليدوية.
+ */
+
+const INVOICE_BUCKET_AR: Record<string, string> = {
+  matched: 'ستُدقَّق',
+  unknown: 'معرّف غير معروف',
+  conflict: 'تعارض — أكثر من فاتورة لنفس المشترك في الرفعة',
+  duplicate: 'رقم فاتورة مكرَّر في الرفعة',
+  already_used: 'لا مرحلة مفتوحة أو مدقَّقة سلفاً',
+  invalid: 'صفّ ناقص',
+};
+
+const INVOICE_BUCKET_TONE: Record<string, 'success' | 'critical' | 'warning' | 'neutral'> = {
+  matched: 'success',
+  unknown: 'critical',
+  conflict: 'critical',
+  duplicate: 'warning',
+  already_used: 'neutral',
+  invalid: 'critical',
+};
+
+export const bulkInvoiceAudit: Route = {
+  pattern: '/installation/invoices/bulk',
+  capability: 'invoice.verify',
+  title: 'تدقيق فواتير بالجملة',
+  breadcrumb: () => [
+    { label: 'الرئيسية', href: href('/') },
+    { label: 'أجور التنصيب', href: href('/installation') },
+    { label: 'مراجعة الفواتير', href: href('/installation/invoices') },
+    { label: 'تدقيق بالجملة' },
+  ],
+  render(view) {
+    view.innerHTML = pageHeader('تدقيق فواتير بالجملة',
+      'ارفع ملفاً فيه معرّف المشترك ورقم الفاتورة وتاريخها — يُعايَن قبل أن يُطبَّق شيء')
+
+      + `<div class="box">
+        <h3>١ · الملف</h3>
+        <p class="muted" style="font-size:11px;margin:0 0 8px">
+          ثلاثة أعمدة بهذا الترتيب: معرّف المشترك، رقم الفاتورة، تاريخها
+          (YYYY-MM-DD). الصيغ المقبولة: CSV أو نصّ بسطرٍ لكل فاتورة.
+          مشتركٌ له أكثر من فاتورة في الملف نفسه يُرفض تعارضاً — لا تخمين
+          لأيّ مرحلة تليها.</p>
+        <div class="toolbar">
+          <input type="file" id="biFile" accept=".csv,.txt" class="search"
+            aria-label="ملف الفواتير">
+          <button class="btn" id="biParse">اقرأ الملف</button>
+        </div>
+        <textarea id="biRows" class="search" rows="6" dir="ltr"
+          style="width:100%;margin-top:10px;font-family:ui-monospace,Consolas,monospace"
+          placeholder="أو الصق الصفوف هنا: subscriber_id,invoice_number,invoice_date"
+          aria-label="صفوف الفواتير"></textarea>
+        <div id="biFileInfo" class="muted" style="font-size:11px;margin-top:6px"></div>
+      </div>
+
+      <div class="box" style="margin-top:12px">
+        <h3>٢ · سبب التدقيق</h3>
+        <input class="search" id="biReason" placeholder="سبب القرار (إلزامي — يُحفظ في التدقيق)"
+          aria-label="سبب القرار" style="width:100%">
+      </div>
+
+      <div class="actions" style="margin-top:12px">
+        <button class="btn" id="biPreview">٣ · عايِن</button>
+        <button class="btn gold" id="biApply" disabled>٤ · طبّق التدقيق</button>
+      </div>
+
+      <div id="biResult" style="margin-top:12px"></div>`;
+
+    wireBulkInvoiceAudit(view);
+  },
+};
+
+function parseInvoiceRows(text: string): Array<Record<string, string>> {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const rows = lines.map((line) => {
+    const cols = line.split(/[,;\t]/).map((c) => c.trim());
+    return {
+      subscriber_id: cols[0] || '',
+      invoice_number: cols[1] || '',
+      invoice_date: cols[2] || '',
+    };
+  }).filter((r) => r.subscriber_id);
+  if (rows.length && /^(subscriber[\s_-]?id|id|المشترك|معرّف)$/i.test(rows[0]?.subscriber_id || '')) {
+    rows.shift();
+  }
+  return rows;
+}
+
+function wireBulkInvoiceAudit(view: View): void {
+  const root = view.el;
+  const file = root.querySelector<HTMLInputElement>('#biFile');
+  const parse = root.querySelector<HTMLButtonElement>('#biParse');
+  const rowsBox = root.querySelector<HTMLTextAreaElement>('#biRows');
+  const info = root.querySelector<HTMLElement>('#biFileInfo');
+  const reason = root.querySelector<HTMLInputElement>('#biReason');
+  const preview = root.querySelector<HTMLButtonElement>('#biPreview');
+  const apply = root.querySelector<HTMLButtonElement>('#biApply');
+  const out = root.querySelector<HTMLElement>('#biResult');
+  if (!rowsBox || !preview || !apply || !out) return;
+
+  let filename = '';
+  let previewed: Array<Record<string, string>> = [];
+
+  parse?.addEventListener('click', () => {
+    const f = file?.files?.[0];
+    if (!f) { if (info) info.textContent = 'اختر ملفاً أولاً'; return; }
+    filename = f.name;
+    const reader = new FileReader();
+    reader.onload = () => {
+      rowsBox.value = String(reader.result || '');
+      const n = parseInvoiceRows(rowsBox.value).length;
+      if (info) info.textContent = `${f.name} — ${n.toLocaleString('en-US')} صفّاً`;
+    };
+    reader.readAsText(f, 'utf-8');
+  });
+
+  preview.addEventListener('click', async () => {
+    const list = parseInvoiceRows(rowsBox.value);
+    if (!list.length) {
+      out.innerHTML = insight('warn', 'لا صفوف', 'ارفع ملفاً أو الصق الصفوف');
+      return;
+    }
+    preview.disabled = true;
+    out.innerHTML = loading('جارٍ المعاينة…');
+    try {
+      const doc = await rpc<Row>('preview_bulk_invoice_upload', { p_rows: list });
+      if (!view.live) return;
+      previewed = list;
+      out.innerHTML = renderInvoicePreview(doc);
+      const counts = (doc?.['counts'] || {}) as Record<string, number>;
+      apply.disabled = Number(counts['matched'] || 0) === 0;
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'تعذّرت المعاينة',
+        error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      preview.disabled = false;
+    }
+  });
+
+  apply.addEventListener('click', async () => {
+    if (!can('invoice.verify')) {
+      out.innerHTML = insight('warn', 'لا صلاحية', 'التدقيق بالجملة يحتاج invoice.verify');
+      return;
+    }
+    const why = reason?.value.trim() || '';
+    if (!why) {
+      out.innerHTML = insight('warn', 'السبب إلزامي', 'يُحفظ مع كل قرار ويظهر في التدقيق');
+      return;
+    }
+    if (!previewed.length) {
+      out.innerHTML = insight('warn', 'عايِن أولاً', 'لا يُطبَّق شيء قبل أن يُعرض أثره');
+      return;
+    }
+
+    apply.disabled = true;
+    out.innerHTML = loading('جارٍ تطبيق التدقيق…');
+    try {
+      const result = await rpc<Row>('apply_bulk_invoice_upload', {
+        p_rows: previewed,
+        p_filename: filename || 'لصق يدوي',
+        p_note: why,
+        p_request_id: crypto.randomUUID(),
+      });
+      if (!view.live) return;
+      out.innerHTML = result?.['idempotent'] === true
+        ? insight('good', 'هذا الرفع مسجَّل مسبقاً', 'لم يُدقَّق شيء مرّةً ثانية')
+        : insight('good', `دُقِّقت ${count(Number(result?.['applied'] || 0))} فاتورة`,
+            `تُرك ${count(Number(result?.['skipped'] || 0))} — تعارض أو مكرَّر أو غير مطابق.`)
+          + `<div class="actions" style="margin-top:10px">
+              <a class="btn" href="${esc(href('/installation/invoices'))}">افتح طابور المراجعة</a></div>`;
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'لم يُطبَّق التدقيق',
+        error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      apply.disabled = false;
+    }
+  });
+}
+
+function renderInvoicePreview(doc: Row | null): string {
+  const counts = (doc?.['counts'] || {}) as Record<string, number>;
+  const rows = (doc?.['rows'] || []) as Row[];
+  const submitted = Number(doc?.['submitted'] || 0);
+
+  const order = ['matched', 'conflict', 'duplicate', 'already_used', 'unknown', 'invalid'];
+  const chips = order
+    .filter((k) => Number(counts[k] || 0) > 0)
+    .map((k) => `<div class="minirow">
+      <span>${chip(INVOICE_BUCKET_AR[k] || k, INVOICE_BUCKET_TONE[k] || 'neutral')}</span>
+      <b>${count(Number(counts[k]))}</b></div>`).join('');
+
+  return `<div class="box">
+    <h3>المعاينة</h3>
+    <div class="minirow"><span class="muted">في الملف</span><b>${count(submitted)}</b></div>
+    ${chips}
+    <p class="muted" style="font-size:11px;margin-top:8px">
+      لن تُدقَّق إلا «ستُدقَّق». الباقي يُترك كما هو، ولا شيء يُحذف.</p>
+    ${rows.length ? table<Row>([
+      { key: 'id', label: 'المعرّف', cell: (r) => `<span dir="ltr">${esc(str(r, 'subscriber_id'))}</span>` },
+      { key: 'inv', label: 'رقم الفاتورة', cell: (r) => `<span dir="ltr">${esc(str(r, 'invoice_number'))}</span>` },
+      { key: 'stage', label: 'المرحلة', cell: (r) => str(r, 'stage') ? chip(str(r, 'stage'), 'info') : '—' },
+      { key: 'b', label: 'النتيجة', cell: (r) => {
+        const b = str(r, 'bucket');
+        return chip(INVOICE_BUCKET_AR[b] || b, INVOICE_BUCKET_TONE[b] || 'neutral');
+      } },
+    ], rows.slice(0, 200)) : ''}
+    ${rows.length > 200
+      ? `<p class="muted" style="font-size:11px">تُعرض أوّل 200 صفّاً من ${count(rows.length)}.</p>`
+      : ''}
+  </div>`;
+}
+
+export const routes: Route[] = [invoiceReview, bulkInvoiceAudit];
