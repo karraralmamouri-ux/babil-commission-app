@@ -417,9 +417,19 @@ fi
 echo "$out45" | grep -E "^ {8,10}(ok|==) " || true
 passed=$((passed + $(echo "$out45" | grep -c "ok ")))
 
+echo "== invoice identity dedup (IMP-001) =="
+out46=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/invoice-identity-dedup.sql 2>&1) || true
+if echo "$out46" | grep -qE "FAILED|ERROR"; then
+  echo "$out46" | grep -E "FAILED|ERROR" || true
+  echo "INVOICE IDENTITY DEDUP TESTS FAILED" >&2; exit 1
+fi
+echo "$out46" | grep -E "^ {2,7}(ok|==) " || true
+passed=$((passed + $(echo "$out46" | grep -c "ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
+bash tests/sql/invoice-dedup-concurrency.sh
 
 echo
 echo "local database assertions passed: $((passed + 1))"
