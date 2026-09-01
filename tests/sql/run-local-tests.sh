@@ -426,6 +426,15 @@ fi
 echo "$out46" | grep -E "^ {2,7}(ok|==) " || true
 passed=$((passed + $(echo "$out46" | grep -c "ok ")))
 
+echo "== installation kpi reconciliation (INS-009) =="
+out47=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-kpi-reconciliation.sql 2>&1) || true
+if echo "$out47" | grep -qE "FAILED|ERROR"; then
+  echo "$out47" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION KPI RECONCILIATION TESTS FAILED" >&2; exit 1
+fi
+echo "$out47" | grep -E "^ {2,7}(ok|==) " || true
+passed=$((passed + $(echo "$out47" | grep -c "ok ")))
+
 echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
