@@ -259,6 +259,19 @@ function wireImport(view: View): void {
           const batch = (r?.['batch'] || {}) as Row;
           parts.push(`أحداث: مقبول ${count(num(batch, 'accepted'))} · مكرّر ${count(num(batch, 'duplicates'))}`
             + ` · مرفوض ${count(num(batch, 'rejected'))}`);
+
+          // الاستيراد وحده لا يُنشئ حالة تنصيب. الجسر هو ما يُحوّل التفعيل
+          // الخام إلى تسجيلٍ ثم حالةٍ رسمية — وبالبوابة نفسها، فلا يُسجَّل من
+          // لم تُجزه. أكثر الصفوف تُمنع هنا بحق (الهوية والتصنيف واكتمال
+          // المصدر تُحسم بعد الرفع)، ولذلك يُعاد المسح من مركز الاستيراد.
+          const bridge = await rpc<Row>('bridge_saas_activations_to_enrollments', {
+            p_batch_id: str(batch, 'batch_id') || null,
+            p_limit: 5000,
+            p_request_id: crypto.randomUUID(),
+          });
+          const swept = (bridge?.['result'] || {}) as Row;
+          parts.push(`تسجيل: مؤهَّل ${count(num(swept, 'enrolled'))}`
+            + ` · بانتظار المراجعة ${count(num(swept, 'blocked'))}`);
         }
         if (users.length) {
           const r = await rpc<Row>('import_saas_user_snapshot', {

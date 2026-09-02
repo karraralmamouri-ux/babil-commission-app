@@ -31,6 +31,21 @@ exception when others then return '   ok ' || p_label;
 end;
 $$;
 
+-- الرفض بسببه المعلن، لا بأي سبب. رسالة الخطأ جزء من العقد هنا.
+create or replace function pg_temp.must_fail_with(
+  p_sql text, p_label text, p_needle text)
+returns text language plpgsql as $$
+begin
+  execute p_sql;
+  return 'FAILED: ' || p_label || ' — مرّ وكان يجب أن يُرفض';
+exception when others then
+  if pg_catalog.strpos(sqlerrm, p_needle) > 0 then
+    return '   ok ' || p_label;
+  end if;
+  return 'FAILED: ' || p_label || ' — رُفض بسبب آخر: ' || sqlerrm;
+end;
+$$;
+
 -- خطوة كاملة على السلّم: فاتورة مُتحقَّقة للمرحلة، ثم تثبيت الشهر، ثم الصرف.
 -- لا Remaining يُمرَّر في أي منها: التوقيع نفسه لا يقبله.
 create or replace function pg_temp.advance(
@@ -96,7 +111,8 @@ insert into public.saas_activation_events
   (import_batch_id, saas_event_id, username, profile_name, canceled, raw_parent, fdt_code)
 values
   ('bd000000-0000-0000-0000-0000000000b1', 'RB-EV-NEW', 'rb-new', 'RB-PKG', false, 'rb.raw.agent', '105'),
-  ('bd000000-0000-0000-0000-0000000000b1', 'RB-EV-MID', 'rb-mid', 'RB-PKG', false, 'rb.raw.agent', '105')
+  ('bd000000-0000-0000-0000-0000000000b1', 'RB-EV-MID', 'rb-mid', 'RB-PKG', false, 'rb.raw.agent', '105'),
+  ('bd000000-0000-0000-0000-0000000000b1', 'RB-EV-CLASH', 'rb-clash', 'RB-PKG', false, 'rb.raw.agent', '105')
 on conflict do nothing;
 
 insert into public.subscriber_identities
@@ -209,8 +225,13 @@ select pg_temp.ok(
   not exists (select 1 from public.installation_subscribers where subscriber_id = 'rb-new'),
   '٣ · قبل التسجيل: لا سجلّ مشترك ولا حالة لمن عُرف بالتفعيل وحده');
 
-select public.enroll_new_installation(
-  'rb-new', 'RB-EV-NEW', null, 'bd000000-0000-0000-0000-00000000f003');
+-- المسح الجماعي على دفعة الاستيراد نفسها: لا enroll_new_installation بيد
+-- المشغّل، ولا اسم مشترك يُكتب في أي استدعاء. هذا هو المسار الشهري العادي.
+select pg_temp.ok(
+  (public.bridge_saas_activations_to_enrollments(
+     'bd000000-0000-0000-0000-0000000000b1', 500,
+     'bd000000-0000-0000-0000-00000000f003') #>> '{result,enrolled}')::int = 1,
+  '  · مسحُ الدفعة الخام يُسجّل المؤهَّل وحده — بلا استدعاءٍ فرديّ');
 
 select pg_temp.ok(
   (select count(*) from public.installation_subscribers where subscriber_id = 'rb-new') = 1,
@@ -432,9 +453,32 @@ select pg_temp.ok(
        where subscriber_uuid = 'bd000000-0000-0000-0000-0000000000c1') = 'P2',
   '  · فتقدّم إلى P2 / 10000');
 
-select public.record_installation_payment(
-  'bd000000-0000-0000-0000-0000000000e1', null,
-  'bd000000-0000-0000-0000-00000000f006');
+-- المطلوب ليس «لا يتقدّم مرّتين» بل «لا يُدفع مرّتين»: المحاولة تسقط ذرّياً
+-- قبل installation_payments وقبل financial_ledger وقبل تحوّل الاستحقاق وقبل
+-- تدقيق النجاح.
+select pg_temp.must_fail_with(
+  $q$select public.record_installation_payment(
+       'bd000000-0000-0000-0000-0000000000e1', null,
+       'bd000000-0000-0000-0000-00000000f006')$q$,
+  '  · واستحقاقٌ ثانٍ لنفس المرحلة في شهرٍ آخر يُرفض صرفه',
+  'STAGE_ALREADY_PAID');
+
+select pg_temp.ok(
+  (select count(*) from public.installation_payments
+   where entitlement_id = 'bd000000-0000-0000-0000-0000000000e1') = 0
+  and (select payment_status from public.installation_entitlements
+       where id = 'bd000000-0000-0000-0000-0000000000e1') = 'eligible'
+  and (select paid_amount from public.installation_entitlements
+       where id = 'bd000000-0000-0000-0000-0000000000e1') = 0,
+  '  · ولا دفعة ولا تحوّل إلى «مدفوع» على الاستحقاق المرفوض');
+
+select pg_temp.ok(
+  (select count(*) from public.financial_ledger
+   where source_id = 'bd000000-0000-0000-0000-0000000000e1'
+     and txn_type = 'PAYMENT') = 0
+  and (select count(*) from public.audit_logs
+       where request_id = 'bd000000-0000-0000-0000-00000000f006') = 0,
+  '  · ولا قيد مالي ولا تدقيق نجاحٍ للمحاولة المرفوضة');
 
 select pg_temp.ok(
   (select remaining from public.installation_subscriber_state
@@ -443,7 +487,7 @@ select pg_temp.ok(
        where subscriber_uuid = 'bd000000-0000-0000-0000-0000000000c1') = 'P2'
   and (select count(*) from public.installation_payment_history
        where subscriber_uuid = 'bd000000-0000-0000-0000-0000000000c1') = 1,
-  '  · واستحقاقٌ ثانٍ لنفس المرحلة في شهرٍ آخر يُصرف ولا يُقدّم مرّةً ثانية');
+  '  · والحالة والواقعة كما كانتا: خطوة واحدة، مرّة واحدة');
 
 -- (هـ) محاولتان متزامنتان: المفتاح الفريد يمنع الالتزام المكرَّر أصلاً.
 select pg_temp.must_fail(
@@ -532,5 +576,166 @@ select pg_temp.ok(
               where action = 'installation.stage.advanced'
                 and request_id is not null),
   '  · وأثر التقدّم بلا معرّف طلب — لا يُربك حرّاس الإعادة المالية');
+
+-- ===========================================================================
+-- ١٣. المسح الجماعي لا يُسجّل أحداً أعمى، ويعود بالممنوعين وأسبابهم (INS-013).
+-- ===========================================================================
+
+-- rb-clash في الملف الخام نفسه، وباقته مؤهِّلة ومصدره معلَن الاكتمال —
+-- لكن هويته متعارضة وبلا تصنيف. فالبوابة تمنعه، ولا يُسجَّل، ولا تُمسّ حالته.
+select pg_temp.ok(
+  (select count(*) from public.installation_enrollments
+   where subscriber_id = 'rb-clash') = 0,
+  '١٣ · مَن لم تُجزه البوابة لا يُسجَّل مهما كان في الملف');
+
+select pg_temp.ok(
+  (select st.current_stage from public.installation_subscriber_state st
+   join public.installation_subscribers s on s.id = st.subscriber_uuid
+   where s.subscriber_id = 'rb-mid') = 'P3'
+  and (select st.remaining from public.installation_subscriber_state st
+       join public.installation_subscribers s on s.id = st.subscriber_uuid
+       where s.subscriber_id = 'rb-mid') = 7000,
+  '  · والمشترك التاريخي في الملف نفسه باقٍ عند P3 / 7000 — لا إعادة إلى P1');
+
+-- إعادة التشغيل بمعرّف طلبٍ جديد: الهوية والتصنيف يُحسمان بعد الرفع عادةً،
+-- فالمسح يُعاد. ولا ازدواج: المسجَّل مُستبعَد أصلاً.
+select pg_temp.ok(
+  (public.bridge_saas_activations_to_enrollments(
+     'bd000000-0000-0000-0000-0000000000b1', 500,
+     'bd000000-0000-0000-0000-00000000f050') #>> '{result,enrolled}')::int = 0,
+  '  · وإعادة المسح لا تُسجّل أحداً مرّتين');
+
+select pg_temp.ok(
+  (public.bridge_saas_activations_to_enrollments(
+     'bd000000-0000-0000-0000-0000000000b1', 500,
+     'bd000000-0000-0000-0000-00000000f050') #>> '{result,blocked}')::int = 1
+  and (public.bridge_saas_activations_to_enrollments(
+     'bd000000-0000-0000-0000-0000000000b1', 500,
+     'bd000000-0000-0000-0000-00000000f050')
+       #>> '{result,reasons,IDENTITY_CONFLICT}')::int = 1,
+  '  · والممنوع يعود بسببه نصاً: IDENTITY_CONFLICT × 1');
+
+select pg_temp.ok(
+  (public.bridge_saas_activations_to_enrollments(
+     'bd000000-0000-0000-0000-0000000000b1', 500,
+     'bd000000-0000-0000-0000-00000000f050') ->> 'replayed')::boolean = true,
+  '  · ونفس معرّف الطلب إعادةٌ بلا أثر ثانٍ');
+
+-- ===========================================================================
+-- ١٤. التقدّم يتبع إصدار التسجيل المجمَّد، لا السلّم التاريخي (INS-015).
+-- ===========================================================================
+
+-- (أ) المبالغ المصروفة فعلاً جاءت من تعريفات إصدار التسجيل.
+select pg_temp.ok(
+  (select public.stage_amount_for_version(e.scheme_version_id, 'P1')
+   from public.installation_enrollments e where e.subscriber_id = 'rb-new') = 3000
+  and (select public.stage_amount_for_version(e.scheme_version_id, 'P4')
+       from public.installation_enrollments e where e.subscriber_id = 'rb-new') = 4000
+  and (select public.next_stage_for_version(e.scheme_version_id, 'P3')
+       from public.installation_enrollments e where e.subscriber_id = 'rb-new') = 'P4',
+  '١٤ · سلّم rb-new ومبالغه مقروءان من إصدار تسجيله');
+
+-- (ب) إصدارٌ ثانٍ منشور بسلّمٍ مختلف: 9000 بدل 10000 بعد P1.
+reset role;
+
+insert into public.installation_fee_schemes (id, code, name_ar, is_active, created_by)
+values ('bd000000-0000-0000-0000-0000000000f1', 'RB-SCHEME-2', 'مخطط الاختبار الثاني',
+        true, 'bd000000-0000-0000-0000-0000000000a1');
+
+insert into public.installation_scheme_versions
+  (id, scheme_id, version, status, effective_from, total_amount, created_by)
+values ('bd000000-0000-0000-0000-0000000000f2',
+        'bd000000-0000-0000-0000-0000000000f1', 1, 'DRAFT', current_date, 13000,
+        'bd000000-0000-0000-0000-0000000000a1');
+
+insert into public.installation_stage_definitions
+  (scheme_version_id, sequence, code, display_name_ar, amount, expected_remaining, is_terminal)
+values
+  ('bd000000-0000-0000-0000-0000000000f2', 1, 'P1', 'الأولى', 3000, 13000, false),
+  ('bd000000-0000-0000-0000-0000000000f2', 2, 'P2', 'الثانية', 3000,  9000, false),
+  ('bd000000-0000-0000-0000-0000000000f2', 3, 'DONE', 'منتهية',   0,     0, true);
+
+update public.installation_scheme_versions
+set status = 'PUBLISHED', published_at = now(),
+    published_by = 'bd000000-0000-0000-0000-0000000000a1'
+where id = 'bd000000-0000-0000-0000-0000000000f2';
+
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, canceled, raw_parent, fdt_code)
+values ('bd000000-0000-0000-0000-0000000000b1', 'RB-EV-V2', 'rb-v2', 'RB-PKG', false,
+        'rb.raw.agent', '105');
+
+insert into public.subscriber_identities
+  (username, identity_status, match_method, source_classification, effective_agent_id, fdt_code)
+values ('rb-v2', 'MATCHED', 'EXACT_USERNAME', 'RESELLER',
+        'bd000000-0000-0000-0000-0000000000a2', '105');
+
+insert into public.subscriber_classifications
+  (username_key, classification, reason_code, source_completeness)
+values ('rb-v2', 'NEW', 'COMPLETE_LIFETIME_HISTORY_OBSERVED', 'COMPLETE');
+
+insert into public.subscriber_ownership
+  (username_key, ownership_type, agent_id, effective_from, reason, performed_by)
+values ('rb-v2','RESELLER','bd000000-0000-0000-0000-0000000000a2',
+        timestamptz '2026-01-01 00:00+03','تثبيت','bd000000-0000-0000-0000-0000000000a1');
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'bd000000-0000-0000-0000-0000000000a1';
+
+select pg_temp.ok(
+  (public.bridge_saas_activations_to_enrollments(
+     'bd000000-0000-0000-0000-0000000000b1', 500,
+     'bd000000-0000-0000-0000-00000000f060') #>> '{result,enrolled}')::int = 1,
+  '  · والمشترك الجديد يُسجَّل على الإصدار المنشور الساري');
+
+select pg_temp.ok(
+  (select scheme_version_id from public.installation_enrollments
+   where subscriber_id = 'rb-v2') = 'bd000000-0000-0000-0000-0000000000f2',
+  '  · فيتجمّد إصداره الثاني في تسجيله هو، لا الأول');
+
+-- (ج) الصرف يقرأ سلّم إصداره: بعد 3000 يصير المتبقي 10000، ولا مرحلة عنده
+--     بهذا المتبقي. السلّم التاريخي كان سيقول P2 ويُمرّرها بصمت — وهذا هو
+--     الفارق الذي يُثبته الرفض.
+select public.review_invoice('rb-v2', 'P1', 'VERIFIED', 'مطابقة', 'RB-INV-V2-P1',
+  'bd000000-0000-0000-0000-00000000f061');
+select public.materialize_installation_entitlements('2026-11', null, 500,
+  'bd000000-0000-0000-0000-00000000f062');
+
+select pg_temp.ok(
+  (select count(*) from public.installation_entitlements
+   where subscriber_id = 'rb-v2' and stage = 'P1') = 1,
+  '  · واستحقاق P1 يُشتقّ له عادياً');
+
+select pg_temp.must_fail_with(
+  $q$select public.record_installation_payment(
+       (select id from public.installation_entitlements
+        where subscriber_id = 'rb-v2' and stage = 'P1'),
+       null, 'bd000000-0000-0000-0000-00000000f063')$q$,
+  '  · لكن الصرف يسقط ذرّياً لأن سلّم إصداره لا يعرف متبقّي 10000',
+  'INSTALLATION_SCHEME_LADDER_MISMATCH');
+
+select pg_temp.ok(
+  (select st.current_stage from public.installation_subscriber_state st
+   join public.installation_subscribers s on s.id = st.subscriber_uuid
+   where s.subscriber_id = 'rb-v2') = 'P1'
+  and (select st.remaining from public.installation_subscriber_state st
+       join public.installation_subscribers s on s.id = st.subscriber_uuid
+       where s.subscriber_id = 'rb-v2') = 13000
+  and not exists (select 1 from public.installation_payment_history h
+                  join public.installation_subscribers s on s.id = h.subscriber_uuid
+                  where s.subscriber_id = 'rb-v2')
+  and not exists (select 1 from public.financial_ledger
+                  where subscriber_id = 'rb-v2'),
+  '  · ولا واقعة ولا قيد ولا تقدّم: الفشل ذرّيّ لا صامت');
+
+-- (د) الحدّ يُعلن صراحةً: قيود التخزين نفسها مكتوبة على سلّم V1، فلا يُدّعى
+--     دعمٌ كامل للإصدارات المختلفة — يُقرأ الإصدار ويُرفَض ما لا يُمثَّل.
+select pg_temp.ok(
+  (select count(*) from pg_catalog.pg_constraint
+   where conname in ('installation_state_stage_matches_remaining',
+                     'installation_entitlements_stage_matches_remaining',
+                     'installation_entitlements_amount_matches_stage')
+     and pg_catalog.pg_get_constraintdef(oid) like '%installation\_%\_for\_%') = 3,
+  '  · وقيود التخزين الثلاثة مكتوبة على الدوال التاريخية — حدٌّ معلن لا مُدّعى');
 
 rollback;

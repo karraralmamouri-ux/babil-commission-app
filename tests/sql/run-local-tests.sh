@@ -439,6 +439,7 @@ echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
 bash tests/sql/invoice-dedup-concurrency.sh
+bash tests/sql/installation-cross-period-payment-concurrency.sh
 
 echo "== installation entitlements lifecycle + ownership =="
 out50=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-entitlements-lifecycle-and-ownership.sql 2>&1) || true
@@ -503,6 +504,15 @@ if echo "$out54" | grep -qE "FAILED|ERROR"; then
 fi
 echo "$out54" | grep -E "^ {2,4}(ok|==) " || true
 passed=$((passed + $(echo "$out54" | grep -c "   ok ")))
+
+echo "== installation upgrade backfill =="
+out55=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-upgrade-backfill.sql 2>&1) || true
+if echo "$out55" | grep -qE "FAILED|ERROR"; then
+  echo "$out55" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION UPGRADE BACKFILL TESTS FAILED" >&2; exit 1
+fi
+echo "$out55" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out55" | grep -c "   ok ")))
 
 echo
 echo "local database assertions passed: $((passed + 1))"

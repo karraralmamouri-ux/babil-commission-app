@@ -248,6 +248,8 @@ export const importDetail: Route = {
 
       + declarePanel(id, str(b, 'completeness_status'))
 
+      + (str(b, 'source_kind') === 'ACTIVATION_EVENTS' ? bridgePanel(id) : '')
+
       + `<div class="box" style="margin-top:12px">
           <h3>الآباء في هذه الدفعة</h3>
           ${parents.length ? table<Row>([
@@ -266,6 +268,7 @@ export const importDetail: Route = {
         </div>`;
 
     wireDeclare(view);
+    wireBridge(view);
   },
 };
 
@@ -299,6 +302,62 @@ function declarePanel(batchId: string, current: string): string {
     </div>
     <div id="dcResult"></div>
   </div>`;
+}
+
+/**
+ * الاستيراد يضع الأحداث في الجدول ولا يُنشئ حالة تنصيب. الجسر هو ما يُحوّل
+ * التفعيل الخام إلى تسجيلٍ ثم حالةٍ رسمية — بالبوابة القائمة نفسها، فلا
+ * يُسجَّل من لم تُجزه.
+ *
+ * وهو يُعاد هنا لا في الرفع وحده: الهوية والتصنيف واكتمال المصدر تُحسم بعد
+ * الرفع عادةً، فأكثر الصفوف تُمنع في التشغيلة الأولى بحق ثم تُسجَّل لاحقاً.
+ */
+function bridgePanel(batchId: string): string {
+  return `<div class="box" style="margin-top:12px" id="brBox" data-batch="${esc(batchId)}">
+    <h3>تسجيل المؤهَّلين من هذه الدفعة</h3>
+    <p class="muted" style="font-size:11px;margin:0 0 8px">
+      يمرّ كل مشترك ببوابة التسجيل كما هي. مَن لم تُجزه يعود بسببه ولا يُسجَّل.
+      أعِد التشغيل بعد حسم الهوية والتصنيف وإعلان الاكتمال.</p>
+    <div class="actions"><button class="btn" id="brRun">شغّل الجسر</button></div>
+    <div id="brResult"></div>
+  </div>`;
+}
+
+function wireBridge(view: View): void {
+  const box = view.el.querySelector<HTMLElement>('#brBox');
+  if (!box) return;
+  const batchId = box.dataset['batch'] || '';
+  const run = box.querySelector<HTMLButtonElement>('#brRun');
+  const out = box.querySelector<HTMLElement>('#brResult');
+  if (!run || !out) return;
+
+  run.addEventListener('click', async () => {
+    run.disabled = true;
+    out.innerHTML = loading('جارٍ تقييم المرشّحين على الخادم…');
+    try {
+      const r = await rpc<Row>('bridge_saas_activations_to_enrollments', {
+        p_batch_id: batchId,
+        p_limit: 5000,
+        p_request_id: crypto.randomUUID(),
+      });
+      if (!view.live) return;
+      const res = (r?.['result'] || {}) as Row;
+      const reasons = (res['reasons'] || {}) as Record<string, number>;
+      const why = Object.entries(reasons)
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, n]) => `${k}: ${count(Number(n))}`)
+        .join(' · ');
+      out.innerHTML = insight(num(res, 'enrolled') ? 'good' : 'warn',
+        `سُجّل ${count(num(res, 'enrolled'))} من ${count(num(res, 'considered'))} مرشّحاً`,
+        why ? `الممنوعون — ${why}` : 'لا ممنوعين');
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'لم يُشغَّل الجسر',
+        error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      run.disabled = false;
+    }
+  });
 }
 
 function wireDeclare(view: View): void {
