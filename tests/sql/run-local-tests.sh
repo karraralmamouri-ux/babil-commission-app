@@ -495,5 +495,14 @@ fi
 echo "$out53" | grep -E "^ {2,4}(ok|==) " || true
 passed=$((passed + $(echo "$out53" | grep -c "   ok ")))
 
+echo "== installation raw activation bridge =="
+out54=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-raw-activation-bridge.sql 2>&1) || true
+if echo "$out54" | grep -qE "FAILED|ERROR"; then
+  echo "$out54" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION RAW ACTIVATION BRIDGE TESTS FAILED" >&2; exit 1
+fi
+echo "$out54" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out54" | grep -c "   ok ")))
+
 echo
 echo "local database assertions passed: $((passed + 1))"

@@ -55,6 +55,7 @@ const ACTION_AR: Record<string, string> = {
   'commission.activation.correction.revoked': 'إلغاء تصحيح تفعيل',
   'installation.batch.paid': 'صرف دفعة أجور تنصيب',
   'installation.entitlements.materialized': 'بناء استحقاقات التنصيب',
+  'installation.stage.advanced': 'تقدّم مرحلة التنصيب',
   'installation.batch.created': 'إنشاء دفعة أجور تنصيب',
   'installation.batch.cancelled': 'إلغاء دفعة أجور تنصيب',
   'installation.enrollment.created': 'تسجيل مشترك في التنصيب',

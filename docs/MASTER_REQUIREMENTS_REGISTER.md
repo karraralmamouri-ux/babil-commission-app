@@ -95,6 +95,11 @@ Every new user clarification must first receive a requirement ID and be added he
 - INS-009: Dashboard totals/eligible P1-P4 reconcile correctly. **VERIFY**
 - INS-010: Entitlement rules are server-authoritative. **PASS / VERIFY**
 - INS-011: Installation correction/reversal exists without mutating original posted money. **PASS**
+- INS-012: Historical installation baseline is the one-time opening authority for each subscriber's prior installment/payment state, Remaining and current stage. **PASS** — `import_installation_history` → `installation_subscribers` / `installation_subscriber_state` / `installation_payment_history` (`20260816090000`). Retained unchanged for cutover/repair; not to be deleted. The raw-activation bridge never overwrites a state row that already exists, so a historical subscriber resumes from its own stage and is never reset to P1.
+- INS-013: Recurring monthly installation-fee processing consumes the normal raw SaaS Activation source file. The operator must NOT manually manufacture or append a Remaining column every month. **PASS (`20261103090000`)** — raw activations reached `saas_activation_events` but never reached `installation_subscriber_state`, so a monthly Remaining column was the only way to produce state. An `after insert on installation_enrollments` trigger now opens authoritative state from the published scheme version, and no monthly Remaining column is read anywhere.
+- INS-014: The server derives the subscriber's current/next installation stage, Remaining and entitlement from authoritative historical/current state, qualifying source events, and recorded financial history. **PASS (`20261103090000`)** — `materialize_installation_entitlements` already derived stage/Remaining/amount server-side from `installation_subscriber_state`, trusting no client Remaining; the missing input was authoritative state for activation-only subscribers, which the bridge now supplies. Whether each stage additionally requires a fresh qualifying activation event in its own period is open — see DEC-007 in `docs/BUSINESS_DECISIONS_REQUIRED.md`; no such gate was added.
+- INS-015: Progression is deterministic, sequential, idempotent and auditable: P1 → P2 → P3 → P4 → DONE. A replay, duplicate event, duplicate file, browser restart or repeated calculation must never advance a subscriber twice. **PASS (`20261103090000`)** — no code path advanced `installation_subscriber_state` after the baseline import; `next_stage_for_version` was unreachable, and `STAGE_OUT_OF_SEQUENCE` therefore blocked every second stage forever. Progression is now recorded financial history: an `after update` trigger on the paid transition writes `installation_payment_history` (unique per subscriber+stage) and advances Remaining exactly once, under a row lock.
+- INS-016: Deriving an installation entitlement does NOT bypass invoice controls. No installation fee becomes payable without the required verified invoice and all existing eligibility/hold/identity/ownership controls. **PASS** — enforced unchanged in `materialize_installation_entitlements` (VERIFIED invoice for the stage, holds, identity CONFLICT, `subscriber_ownership_type = RESELLER`) and `record_installation_payment` (`invoice_status = approved`). The raw-activation bridge adds no payment authority.
 
 ## Invoice audit
 - INV-001: Accounting uploads the COMPLETE invoice file, not only row-by-row manual review. **MISSING**
@@ -257,6 +262,7 @@ Every new user clarification must first receive a requirement ID and be added he
 - DEC-004: invoice evidence storage/security/retention.
 - DEC-005: bad import cancellation semantics.
 - DEC-006: cross-username subscriber identity resolution.
+- DEC-007: whether a mid-installment subscriber needs a fresh qualifying activation event in each period to earn that period's stage entitlement. Opened by the raw-activation bridge (INS-013/INS-014); the conservative reading — no new gate, `materialize_installation_entitlements` behaviourally unchanged — is what ships, so no money is withheld on an unproven rule. Full statement in `docs/BUSINESS_DECISIONS_REQUIRED.md`.
 
 ## Mandatory acceptance cases
 1. OLD/NEW follows settings, not numeric constant.
@@ -287,7 +293,7 @@ Every new user clarification must first receive a requirement ID and be added he
 ## Execution order
 A. Commit this register and point stale status docs to it.  
 B. Build configuration foundation (CFG/ZON).  
-C. Close business decisions DEC-001..006.  
+C. Close business decisions DEC-001..007.  
 D. Build invoice engine + multi-invoice logic.  
 E. Close commission correction UI, import/cycle cancellation, Free P1, ownership E2E.  
 F. Reconciliation/security/backup.  
