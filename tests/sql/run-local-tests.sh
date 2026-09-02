@@ -486,5 +486,14 @@ fi
 echo "$out52" | grep -E "^ {2,4}(ok|==) " || true
 passed=$((passed + $(echo "$out52" | grep -c "   ok ")))
 
+echo "== installation entitlements overlap content integrity =="
+out53=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-entitlements-overlap-content-integrity.sql 2>&1) || true
+if echo "$out53" | grep -qE "FAILED|ERROR"; then
+  echo "$out53" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION ENTITLEMENTS OVERLAP CONTENT INTEGRITY TESTS FAILED" >&2; exit 1
+fi
+echo "$out53" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out53" | grep -c "   ok ")))
+
 echo
 echo "local database assertions passed: $((passed + 1))"
