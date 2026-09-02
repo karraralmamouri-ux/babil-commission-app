@@ -439,6 +439,100 @@ echo "== concurrency =="
 bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
 bash tests/sql/invoice-dedup-concurrency.sh
+bash tests/sql/installation-cross-period-payment-concurrency.sh
+bash tests/sql/saas-activation-import-concurrency.sh
+bash tests/sql/saas-activation-large-import.sh
+
+echo "== installation entitlements lifecycle + ownership =="
+out50=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-entitlements-lifecycle-and-ownership.sql 2>&1) || true
+if echo "$out50" | grep -qE "FAILED|ERROR"; then
+  echo "$out50" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION ENTITLEMENTS LIFECYCLE + OWNERSHIP TESTS FAILED" >&2; exit 1
+fi
+echo "$out50" | grep -E "^ {4,6}(ok|==) " || true
+passed=$((passed + $(echo "$out50" | grep -c "     ok ")))
+
+echo "== installation import timeout benchmark (8s) =="
+out51=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-import-timeout-benchmark.sql 2>&1) || true
+if echo "$out51" | grep -qE "FAILED|ERROR"; then
+  echo "$out51" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION IMPORT TIMEOUT BENCHMARK FAILED" >&2; exit 1
+fi
+echo "$out51" | grep -E "^ {2,4}(ok|==) " || true
+echo "$out51" | grep -E "^Time:" || true
+passed=$((passed + $(echo "$out51" | grep -c "    ok ")))
+
+echo "== stale unknown_fdt read model =="
+out48=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/stale-unknown-fdt-read-model.sql 2>&1) || true
+if echo "$out48" | grep -qE "FAILED|ERROR"; then
+  echo "$out48" | grep -E "FAILED|ERROR" || true
+  echo "STALE UNKNOWN_FDT READ MODEL TESTS FAILED" >&2; exit 1
+fi
+echo "$out48" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out48" | grep -c "  ok ")))
+
+echo "== fdt workcenter operative cycle =="
+out49=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/fdt-workcenter-operative-cycle.sql 2>&1) || true
+if echo "$out49" | grep -qE "FAILED|ERROR"; then
+  echo "$out49" | grep -E "FAILED|ERROR" || true
+  echo "FDT WORKCENTER OPERATIVE CYCLE TESTS FAILED" >&2; exit 1
+fi
+echo "$out49" | grep -E "^ {3,5}(ok|==) " || true
+passed=$((passed + $(echo "$out49" | grep -c "   ok ")))
+
+echo "== installation entitlements restart/replay safety =="
+out52=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-entitlements-restart-replay-safety.sql 2>&1) || true
+if echo "$out52" | grep -qE "FAILED|ERROR"; then
+  echo "$out52" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION ENTITLEMENTS RESTART/REPLAY SAFETY TESTS FAILED" >&2; exit 1
+fi
+echo "$out52" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out52" | grep -c "   ok ")))
+
+echo "== installation entitlements overlap content integrity =="
+out53=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-entitlements-overlap-content-integrity.sql 2>&1) || true
+if echo "$out53" | grep -qE "FAILED|ERROR"; then
+  echo "$out53" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION ENTITLEMENTS OVERLAP CONTENT INTEGRITY TESTS FAILED" >&2; exit 1
+fi
+echo "$out53" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out53" | grep -c "   ok ")))
+
+echo "== installation raw activation bridge =="
+out54=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-raw-activation-bridge.sql 2>&1) || true
+if echo "$out54" | grep -qE "FAILED|ERROR"; then
+  echo "$out54" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION RAW ACTIVATION BRIDGE TESTS FAILED" >&2; exit 1
+fi
+echo "$out54" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out54" | grep -c "   ok ")))
+
+echo "== installation upgrade backfill =="
+out55=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-upgrade-backfill.sql 2>&1) || true
+if echo "$out55" | grep -qE "FAILED|ERROR"; then
+  echo "$out55" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION UPGRADE BACKFILL TESTS FAILED" >&2; exit 1
+fi
+echo "$out55" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out55" | grep -c "   ok ")))
+
+echo "== saas activation chunked intake =="
+out56=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/saas-activation-chunked-intake.sql 2>&1) || true
+if echo "$out56" | grep -qE "FAILED|ERROR"; then
+  echo "$out56" | grep -E "FAILED|ERROR" || true
+  echo "SAAS ACTIVATION CHUNKED INTAKE TESTS FAILED" >&2; exit 1
+fi
+echo "$out56" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out56" | grep -c "   ok ")))
+
+echo "== installation DEC-007 monthly entitlement =="
+out57=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-dec007-monthly-entitlement.sql 2>&1) || true
+if echo "$out57" | grep -qE "FAILED|ERROR"; then
+  echo "$out57" | grep -E "FAILED|ERROR" || true
+  echo "DEC-007 MONTHLY ENTITLEMENT TESTS FAILED" >&2; exit 1
+fi
+echo "$out57" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out57" | grep -c "   ok ")))
 
 echo
 echo "local database assertions passed: $((passed + 1))"

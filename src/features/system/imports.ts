@@ -17,6 +17,7 @@ import { href } from '../../app/router';
 import { dateTime } from '../../domain/time';
 import { rpc, pageRpc, can, ApiError } from '../../services/api';
 import { count } from '../../domain/money';
+import { bridgeSweepAll, bridgeReasons } from './bridge-sweep';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -248,6 +249,8 @@ export const importDetail: Route = {
 
       + declarePanel(id, str(b, 'completeness_status'))
 
+      + (str(b, 'source_kind') === 'ACTIVATION_EVENTS' ? bridgePanel(id) : '')
+
       + `<div class="box" style="margin-top:12px">
           <h3>الآباء في هذه الدفعة</h3>
           ${parents.length ? table<Row>([
@@ -266,6 +269,7 @@ export const importDetail: Route = {
         </div>`;
 
     wireDeclare(view);
+    wireBridge(view);
   },
 };
 
@@ -299,6 +303,60 @@ function declarePanel(batchId: string, current: string): string {
     </div>
     <div id="dcResult"></div>
   </div>`;
+}
+
+/**
+ * الاستيراد يضع الأحداث في الجدول ولا يُنشئ حالة تنصيب. الجسر هو ما يُحوّل
+ * التفعيل الخام إلى تسجيلٍ ثم حالةٍ رسمية — بالبوابة القائمة نفسها، فلا
+ * يُسجَّل من لم تُجزه.
+ *
+ * وهو يُعاد هنا لا في الرفع وحده: الهوية والتصنيف واكتمال المصدر تُحسم بعد
+ * الرفع عادةً، فأكثر الصفوف تُمنع في التشغيلة الأولى بحق ثم تُسجَّل لاحقاً.
+ */
+function bridgePanel(batchId: string): string {
+  return `<div class="box" style="margin-top:12px" id="brBox" data-batch="${esc(batchId)}">
+    <h3>تسجيل المؤهَّلين من هذه الدفعة</h3>
+    <p class="muted" style="font-size:11px;margin:0 0 8px">
+      يمرّ كل مشترك ببوابة التسجيل كما هي. مَن لم تُجزه يعود بسببه ولا يُسجَّل.
+      أعِد التشغيل بعد حسم الهوية والتصنيف وإعلان الاكتمال.</p>
+    <div class="actions"><button class="btn" id="brRun">شغّل الجسر</button></div>
+    <div id="brResult"></div>
+  </div>`;
+}
+
+function wireBridge(view: View): void {
+  const box = view.el.querySelector<HTMLElement>('#brBox');
+  if (!box) return;
+  const batchId = box.dataset['batch'] || '';
+  const run = box.querySelector<HTMLButtonElement>('#brRun');
+  const out = box.querySelector<HTMLElement>('#brResult');
+  if (!run || !out) return;
+
+  run.addEventListener('click', async () => {
+    run.disabled = true;
+    out.innerHTML = loading('جارٍ تقييم المرشّحين على الخادم…');
+    try {
+      // مسحةٌ واحدةٌ لا تكفي: نافذة النداء محدودة، والممنوعون يبقون مرشّحين
+      // فيملؤونها في كل مرّة. المرور الكامل بالمؤشّر في bridge-sweep.
+      const swept = await bridgeSweepAll(batchId, (t) => {
+        if (!view.live) return;
+        out.innerHTML = loading(`جارٍ تقييم المرشّحين… (سُجّل ${count(t.enrolled)}`
+          + ` · بقي ${count(t.remaining)})`);
+      });
+      if (!view.live) return;
+      const why = bridgeReasons(swept);
+      out.innerHTML = insight(swept.enrolled ? 'good' : 'warn',
+        `سُجّل ${count(swept.enrolled)} من ${count(swept.considered)} مرشّحاً`,
+        (why ? `الممنوعون — ${why}` : 'لا ممنوعين')
+        + (swept.complete ? '' : ` · بقي ${count(swept.remaining)} مرشّحاً بلا نظر`));
+    } catch (error) {
+      if (!view.live) return;
+      out.innerHTML = insight('danger', 'لم يُشغَّل الجسر',
+        error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      run.disabled = false;
+    }
+  });
 }
 
 function wireDeclare(view: View): void {

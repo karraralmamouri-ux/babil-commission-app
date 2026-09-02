@@ -255,6 +255,72 @@ with upd as (
 )
 select pg_temp.ok((select count(*) from upd) = 0, 'النسخ الرجعي: تشغيل ثانٍ لا يُغيّر أي صفّ');
 
+-- ===========================================================================
+-- 6. مركز العمل (page_unknown_fdts / fdt_detail) — تدقيق QA (2026-09-01):
+--    كابينات ٢٧/٦١/٨٧/٩٥ غير المسجَّلة في fdts كانت تظهر «بلا تصنيف» رغم أن
+--    أرقامها تحسم منطقتها بيقين. المنطقة هنا يجب أن تُحسب دوماً من
+--    fdt_commission_scope، بصرف النظر عن التسجيل — راجع 20261026090000.
+-- ===========================================================================
+
+reset role;
+
+insert into public.saas_activation_events
+  (import_batch_id, saas_event_id, username, profile_name, canceled, fdt_code)
+values
+  ('ac000000-0000-0000-0000-0000000000b1', 'ZC-EV-27', 'zc-fdt-27', 'ZC-PKG', false, '27'),
+  ('ac000000-0000-0000-0000-0000000000b1', 'ZC-EV-61', 'zc-fdt-61', 'ZC-PKG', false, '61'),
+  ('ac000000-0000-0000-0000-0000000000b1', 'ZC-EV-87', 'zc-fdt-87', 'ZC-PKG', false, '87'),
+  ('ac000000-0000-0000-0000-0000000000b1', 'ZC-EV-95', 'zc-fdt-95', 'ZC-PKG', false, '95')
+on conflict do nothing;
+
+-- لا صفّ لهذه الرموز في fdts — بالضبط حالة QA المُبلَّغة.
+select pg_temp.ok(
+  not exists (select 1 from public.fdts where code in ('27','61','87','95')),
+  'كابينات ٢٧/٦١/٨٧/٩٥ غير مسجَّلة في fdts — نفس حالة QA المُبلَّغة');
+
+set local role authenticated;
+set local request.jwt.claim.sub = 'ac000000-0000-0000-0000-0000000000a1';
+
+select (public.fdt_detail('27')  ->> 'zone') as zc_detail_27  \gset
+select (public.fdt_detail('61')  ->> 'zone') as zc_detail_61  \gset
+select (public.fdt_detail('87')  ->> 'zone') as zc_detail_87  \gset
+select (public.fdt_detail('95')  ->> 'zone') as zc_detail_95  \gset
+select (public.fdt_detail('93')  ->> 'zone') as zc_detail_93  \gset
+select (public.fdt_detail('94')  ->> 'zone') as zc_detail_94  \gset
+select (public.fdt_detail('119') ->> 'zone') as zc_detail_119 \gset
+select (public.fdt_detail('120') ->> 'zone') as zc_detail_120 \gset
+
+select pg_temp.ok(:'zc_detail_27'  = 'old', 'fdt_detail: كابينة ٢٧ غير المسجَّلة — منطقة قديمة (وكيل)، لا "بلا تصنيف"');
+select pg_temp.ok(:'zc_detail_61'  = 'old', 'fdt_detail: كابينة ٦١ غير المسجَّلة — منطقة قديمة (وكيل)');
+select pg_temp.ok(:'zc_detail_87'  = 'old', 'fdt_detail: كابينة ٨٧ غير المسجَّلة — منطقة قديمة (وكيل)');
+select pg_temp.ok(:'zc_detail_95'  = 'new', 'fdt_detail: كابينة ٩٥ غير المسجَّلة — منطقة جديدة (كابينة)، لا "غير معرَّفة"');
+select pg_temp.ok(:'zc_detail_93'  = 'old', 'fdt_detail: حدّ أسفل خارج النطاق — ٩٣ وكيل');
+select pg_temp.ok(:'zc_detail_94'  = 'new', 'fdt_detail: الحدّ الأدنى — ٩٤ كابينة');
+select pg_temp.ok(:'zc_detail_119' = 'new', 'fdt_detail: الحدّ الأعلى — ١١٩ كابينة');
+select pg_temp.ok(:'zc_detail_120' = 'old', 'fdt_detail: حدّ أعلى خارج النطاق — ١٢٠ وكيل');
+
+-- التسجيل (للعائديّة) منفصل تماماً عن المنطقة — راجع طلب #3.
+select pg_temp.ok(
+  (public.fdt_detail('27') ->> 'registered')::boolean = false,
+  'fdt_detail: التسجيل منفصل عن المنطقة — ٢٧ بلا وكيل مسجَّل رغم أن منطقتها معروفة');
+select pg_temp.ok(
+  (public.fdt_detail('95') ->> 'scope_type') = 'FDT',
+  'fdt_detail: scope_type يوافق fdt_commission_scope حرفياً');
+
+-- طابور مركز العمل: عمود zone لكل صفّ محسوبٌ، لا فارغ ولا مشتقّاً من التسجيل.
+select pg_temp.ok(
+  (select (elem ->> 'zone') from jsonb_array_elements(
+     (public.page_unknown_fdts('27', 50, 0) -> 'rows')) elem
+   where elem ->> 'fdt_code' = '27') = 'old',
+  'طابور مركز العمل: صفّ الكابينة ٢٧ يحمل عمود zone محسوباً = قديمة');
+select pg_temp.ok(
+  (select (elem ->> 'zone') from jsonb_array_elements(
+     (public.page_unknown_fdts('95', 50, 0) -> 'rows')) elem
+   where elem ->> 'fdt_code' = '95') = 'new',
+  'طابور مركز العمل: صفّ الكابينة ٩٥ يحمل عمود zone محسوباً = جديدة — لا "غير معرَّفة" (طلب #4)');
+
+reset role;
+
 select '              == zone consistency: done ==';
 
 rollback;

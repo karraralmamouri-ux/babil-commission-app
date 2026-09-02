@@ -339,11 +339,12 @@ export const bulkInvoiceAudit: Route = {
         <h3>١ · الملف</h3>
         <p class="muted" style="font-size:11px;margin:0 0 8px">
           ثلاثة أعمدة بهذا الترتيب: معرّف المشترك، رقم الفاتورة، تاريخها
-          (YYYY-MM-DD). الصيغ المقبولة: CSV أو نصّ بسطرٍ لكل فاتورة.
+          (YYYY-MM-DD). الصيغ المقبولة: CSV أو إكسل (xlsx/xls) — الورقة
+          الأولى فقط — أو نصّ بسطرٍ لكل فاتورة.
           مشتركٌ له أكثر من فاتورة في الملف نفسه يُرفض تعارضاً — لا تخمين
           لأيّ مرحلة تليها.</p>
         <div class="toolbar">
-          <input type="file" id="biFile" accept=".csv,.txt" class="search"
+          <input type="file" id="biFile" accept=".csv,.txt,.xlsx,.xls" class="search"
             aria-label="ملف الفواتير">
           <button class="btn" id="biParse">اقرأ الملف</button>
         </div>
@@ -371,20 +372,54 @@ export const bulkInvoiceAudit: Route = {
   },
 };
 
-function parseInvoiceRows(text: string): Array<Record<string, string>> {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const rows = lines.map((line) => {
-    const cols = line.split(/[,;\t]/).map((c) => c.trim());
-    return {
-      subscriber_id: cols[0] || '',
-      invoice_number: cols[1] || '',
-      invoice_date: cols[2] || '',
-    };
-  }).filter((r) => r.subscriber_id);
+/** المحلِّل الفعلي — يعمل على خلايا مجرَّدة مهما كان مصدرها: نصٌّ مفصولٌ
+ * بفواصل، أو صفوف ورقة إكسل. مصدرٌ واحدٌ للقاعدة، لا محلِّلان يمكن أن ينحرفا. */
+function rowsFromCells(cellRows: string[][]): Array<Record<string, string>> {
+  const rows = cellRows.map((cols) => ({
+    subscriber_id: (cols[0] || '').trim(),
+    invoice_number: (cols[1] || '').trim(),
+    invoice_date: (cols[2] || '').trim(),
+  })).filter((r) => r.subscriber_id);
   if (rows.length && /^(subscriber[\s_-]?id|id|المشترك|معرّف)$/i.test(rows[0]?.subscriber_id || '')) {
     rows.shift();
   }
   return rows;
+}
+
+function parseInvoiceRows(text: string): Array<Record<string, string>> {
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const cellRows = lines.map((line) => line.split(/[,;\t]/));
+  return rowsFromCells(cellRows);
+}
+
+declare global {
+  interface Window {
+    XLSX?: {
+      read: (data: ArrayBuffer, opts: { type: string }) => { SheetNames: string[]; Sheets: Record<string, unknown> };
+      utils: { sheet_to_json: (sheet: unknown, opts: { defval: string; header?: number; raw?: boolean }) => Row[] };
+    };
+  }
+}
+
+/** يقرأ أول ورقة من ملف xlsx/xls عبر SheetJS المُحمَّلة سلفاً (raw: false —
+ * القيم كما تُعرض في إكسل، لا الرقم التسلسلي الخام لتاريخٍ مثلاً)، ويمرّرها
+ * لنفس محلِّل الخلايا الذي يقرأ CSV — لا قاعدة مطابقة أو تكرار ثانية. */
+async function parseInvoiceWorkbook(file: File): Promise<Array<Record<string, string>>> {
+  const xlsx = window.XLSX;
+  if (!xlsx) throw new Error('مكتبة قراءة إكسل غير محمَّلة — أعِد تحميل الصفحة ثم حاول مرّةً أخرى.');
+  const buffer = await file.arrayBuffer();
+  const book = xlsx.read(buffer, { type: 'array' });
+  const sheet = book.Sheets[book.SheetNames[0] || ''];
+  if (!sheet) return [];
+  const raw = xlsx.utils.sheet_to_json(sheet, { defval: '', header: 1, raw: false }) as unknown as unknown[][];
+  const cellRows = raw.map((cols) => cols.map((c) => String(c ?? '').trim()));
+  return rowsFromCells(cellRows);
+}
+
+/** يُعيد صفوفاً مُحلَّلة إلى نصّ الصندوق — يبقى مربّع النصّ مصدر الحقيقة
+ * الوحيد الذي يراه المستخدم ويعدّله قبل المعاينة، مهما كان مصدر الملف. */
+function rowsToText(rows: Array<Record<string, string>>): string {
+  return rows.map((r) => `${r.subscriber_id},${r.invoice_number},${r.invoice_date}`).join('\n');
 }
 
 function wireBulkInvoiceAudit(view: View): void {
@@ -402,10 +437,21 @@ function wireBulkInvoiceAudit(view: View): void {
   let filename = '';
   let previewed: Array<Record<string, string>> = [];
 
-  parse?.addEventListener('click', () => {
+  parse?.addEventListener('click', async () => {
     const f = file?.files?.[0];
     if (!f) { if (info) info.textContent = 'اختر ملفاً أولاً'; return; }
     filename = f.name;
+    if (/\.xlsx?$/i.test(f.name)) {
+      if (info) info.textContent = 'جارٍ قراءة ملف الإكسل…';
+      try {
+        const rows = await parseInvoiceWorkbook(f);
+        rowsBox.value = rowsToText(rows);
+        if (info) info.textContent = `${f.name} — ${rows.length.toLocaleString('en-US')} صفّاً`;
+      } catch (e) {
+        if (info) info.textContent = e instanceof Error ? e.message : 'تعذّرت قراءة ملف الإكسل';
+      }
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       rowsBox.value = String(reader.result || '');

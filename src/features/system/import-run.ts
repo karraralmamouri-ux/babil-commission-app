@@ -18,6 +18,7 @@ import { href } from '../../app/router';
 import { rpc, can, ApiError } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { esc, loading, pageHeader, table, chip, kpiRow, type Column } from '../../components/ui';
+import { bridgeSweepAll } from './bridge-sweep';
 
 type Row = Record<string, unknown>;
 const num = (r: Row, k: string) => Number(r[k] || 0);
@@ -27,7 +28,7 @@ declare global {
   interface Window {
     XLSX?: {
       read: (data: ArrayBuffer, opts: { type: string }) => XlsxBook;
-      utils: { sheet_to_json: (sheet: unknown, opts: { defval: string }) => Row[] };
+      utils: { sheet_to_json: (sheet: unknown, opts: { defval: string; header?: number; raw?: boolean }) => Row[] };
     };
     InstallationFees?: {
       buildImportPreview: (rows: Row[], options: Record<string, unknown>) => Row;
@@ -249,16 +250,35 @@ function wireImport(view: View): void {
         const parts: string[] = [];
 
         if (events.length) {
-          const r = await rpc<Row>('import_saas_activation_events', {
-            p_file_name: parsed.fileName,
-            p_file_checksum: parsed.checksum,
-            p_parser_version: 'saas-import.js',
-            p_rows: events,
-            p_request_id: crypto.randomUUID(),
-          });
-          const batch = (r?.['batch'] || {}) as Row;
-          parts.push(`أحداث: مقبول ${count(num(batch, 'accepted'))} · مكرّر ${count(num(batch, 'duplicates'))}`
-            + ` · مرفوض ${count(num(batch, 'rejected'))}`);
+          const batch = await importSaasEventsChunked(
+            parsed.fileName, parsed.checksum, events,
+            (done, total) => {
+              if (!view.live) return;
+              out.innerHTML = loading(total > SAAS_EVENTS_CHUNK_SIZE
+                ? `جارٍ اعتماد أحداث التفعيل… (${count(done)} من ${count(total)})`
+                : 'جارٍ الاعتماد على الخادم…');
+            });
+          // batch_totals إجماليّ الملف كله عبر كل أجزائه، لا الجزء الأخير وحده.
+          const totals = (batch['batch_totals'] as Row) || batch;
+          parts.push(`أحداث: مقبول ${count(num(totals, 'accepted'))} · مكرّر ${count(num(totals, 'duplicates'))}`
+            + ` · مرفوض ${count(num(totals, 'rejected'))}`);
+
+          // الاستيراد وحده لا يُنشئ حالة تنصيب. الجسر هو ما يُحوّل التفعيل
+          // الخام إلى تسجيلٍ ثم حالةٍ رسمية — وبالبوابة نفسها، فلا يُسجَّل من
+          // لم تُجزه. أكثر الصفوف تُمنع هنا بحق (الهوية والتصنيف واكتمال
+          // المصدر تُحسم بعد الرفع)، ولذلك يُعاد المسح من مركز الاستيراد.
+          //
+          // ولا يُشغَّل إلا بعد أن يكتمل الاستيراد فعلاً: أيّ جزءٍ يسقط يرمي،
+          // فلا يُقيَّم مرشّحو ملفٍّ نصفِ مرفوع.
+          const swept = await bridgeSweepAll(str(batch, 'batch_id') || null,
+            (t) => {
+              if (!view.live) return;
+              out.innerHTML = loading(`جارٍ تقييم المرشّحين… (سُجّل ${count(t.enrolled)}`
+                + ` · بقي ${count(t.remaining)})`);
+            });
+          parts.push(`تسجيل: مؤهَّل ${count(swept.enrolled)}`
+            + ` · بانتظار المراجعة ${count(swept.blocked)}`
+            + (swept.complete ? '' : ` · بقي ${count(swept.remaining)} بلا نظر`));
         }
         if (users.length) {
           const r = await rpc<Row>('import_saas_user_snapshot', {
@@ -290,19 +310,22 @@ function wireImport(view: View): void {
             p_rows: fees ? fees.buildHistoricalImportRows(preview) : [],
             p_request_id: crypto.randomUUID(),
           })
-        : await rpc<Row>('import_installation_entitlements', {
-            p_period: period?.value.trim(),
-            p_file_name: parsed.fileName,
-            p_file_checksum: parsed.checksum,
-            p_rows: entitlementRows(preview),
-            p_request_id: crypto.randomUUID(),
-          });
+        : await importEntitlementsChunked(
+            period?.value.trim() || '', parsed.fileName, parsed.checksum, entitlementRows(preview),
+            (done, total) => {
+              if (!view.live) return;
+              out.innerHTML = loading(total > ENTITLEMENTS_CHUNK_SIZE
+                ? `جارٍ الاعتماد على الخادم… (${count(done)} من ${count(total)})`
+                : 'جارٍ الاعتماد على الخادم…');
+            });
       if (!view.live) return;
 
       const batch = (result?.['batch'] || result || {}) as Row;
+      // batch_totals إجماليّ الدفعة كلّها عبر كلّ أجزائها، لا الجزء الأخير وحده.
+      const totals = (batch['batch_totals'] as Row) || batch;
       out.innerHTML = insight('good', 'اعتُمد الاستيراد',
-        `مقبول ${count(num(batch, 'accepted'))} · مكرّر ${count(num(batch, 'duplicates'))}`
-        + ` · مرفوض ${count(num(batch, 'rejected'))} من ${count(num(batch, 'source_rows'))} صفّاً`)
+        `مقبول ${count(num(totals, 'accepted'))} · مكرّر ${count(num(totals, 'duplicates'))}`
+        + ` · مرفوض ${count(num(totals, 'rejected'))} من ${count(num(totals, 'source_rows'))} صفّاً`)
         + `<div class="actions" style="margin-top:10px">
             <a class="btn" href="${esc(href('/system/imports'))}">افتح مركز الاستيراد</a></div>`;
       parsed = null;
@@ -315,6 +338,102 @@ function wireImport(view: View): void {
       confirm.disabled = false;
     }
   });
+}
+
+/** حجم الجزء في import_saas_activation_events (20261104090000).
+ *
+ *  تدقيق QA ما بعد الإطلاق (2026-09-02): Activations Report_Aug-2026.xlsx
+ *  فيه 29,427 حدثاً، وكان يُرسَل كله في نداءٍ واحد فيعود بـ statement
+ *  timeout. القياس على قاعدةٍ محلية بعد جعل الاستيعاب مجموعياً: النداء
+ *  الواحد بـ30,000 صفٍّ ≈ 5.3 ثانية من ميزانية الثماني ثوانٍ — هامشٌ لا
+ *  يُبنى عليه؛ والجزء بـ5,000 صفٍّ مكتمل الحقول ≈ ثانيةٌ واحدة، والملف كله
+ *  بستّة أجزاء ≈ 4.4–5.7 ثانية في قياسين. المقاس محفوظٌ في
+ *  tests/sql/saas-activation-large-import.sh ويُعاد قياسه في كل تشغيل. */
+const SAAS_EVENTS_CHUNK_SIZE = 5000;
+
+/** يُقسّم أحداث التفعيل إلى نداءاتٍ ضمن دفعةٍ منطقيةٍ واحدة للملف.
+ *
+ *  batchId هنا متغيّرٌ محليٌّ فقط: لو أُعيد تحميل الصفحة أثناء الرفع فُقِد،
+ *  وتُعاد المحاولة من i=0 بمعرّفات طلبٍ جديدة. الصحّة لا تعتمد على بقائه —
+ *  p_row_offset يُعلن دوماً موضع الجزء الحقيقي داخل الملف، والخادم هو من
+ *  يقرّر بمدى المواضع المُستقبَلة هل هذا وارد جديدٌ أم إعادة إرسال، فلا
+ *  يُعيد عدّه ولا يُعيد قراءته. وبصمة الملف تُعيده إلى دفعته نفسها، فلا
+ *  تنشأ دفعةٌ ثانيةٌ لملفٍّ واحد. */
+async function importSaasEventsChunked(
+  fileName: string, fileChecksum: string, rows: Row[],
+  onProgress: (done: number, total: number) => void,
+): Promise<Row> {
+  let batchId: string | null = null;
+  let last: Row = {};
+  for (let i = 0; i < rows.length; i += SAAS_EVENTS_CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + SAAS_EVENTS_CHUNK_SIZE);
+    const params: Row = {
+      p_file_name: fileName,
+      p_file_checksum: fileChecksum,
+      p_parser_version: 'saas-import.js',
+      p_rows: chunk,
+      p_request_id: crypto.randomUUID(),
+      p_expected_rows: rows.length,
+      // الإنهاء للجزء الأخير وحده: أيّ جزءٍ يسقط يترك الدفعة مفتوحةً
+      // مستأنَفة، لا مقفلةً زوراً وهي منقوصة.
+      p_finalize: i + chunk.length >= rows.length,
+      p_row_offset: i,
+    };
+    if (batchId) params['p_batch_id'] = batchId;
+    const r = await rpc<Row>('import_saas_activation_events', params);
+    last = (r?.['batch'] || {}) as Row;
+    batchId = str(last, 'batch_id') || batchId;
+    onProgress(Math.min(i + chunk.length, rows.length), rows.length);
+  }
+  return last;
+}
+
+/** حدّ النداء الواحد في import_installation_entitlements — صار حجم دفعةٍ داخلية
+ *  لا سقف ملفٍّ (20261027090000). ملفّات الاستحقاقات الحقيقية قد تتجاوزه. */
+const ENTITLEMENTS_CHUNK_SIZE = 20000;
+
+/** يُقسّم صفوف استحقاقات الشهر إلى نداءاتٍ ≤20000 ضمن دفعةٍ منطقيةٍ واحدة:
+ *  النداء الأول بلا p_batch_id ينشئ الدفعة، وكلّ نداءٍ لاحقٍ يُلحِق بها عبر
+ *  batch_id الذي أعاده النداء السابق. يعيد استجابة آخر نداءٍ — تحمل
+ *  batch_totals لإجماليّ الدفعة كلّها، لا الجزء الأخير وحده.
+ *
+ *  تدقيق QA ما بعد الإطلاق (2026-09-02، إغلاق عوائق Codex #2): كل نداءٍ
+ *  ناجحٍ كان يُقفل الدفعة `completed` فوراً — فجزءٌ لاحقٌ فاشلٌ يترك الدفعة
+ *  مقفلةً زوراً وهي منقوصة (20261031090000). الآن p_finalize صريحة: false
+ *  لكل جزءٍ ما عدا الأخير، وp_expected_rows تُعلَن دوماً فيتحقّق الخادم من
+ *  اكتمال العدد قبل القفل — لا إنهاء صامتٌ ولا إنهاءٌ مبكِّر.
+ *
+ *  إغلاق عوائق Codex الأخير (20261101090000): batchId هنا متغيّرٌ محليٌّ فقط
+ *  — لو أُعيد تحميل الصفحة أثناء الرفع يُفقَد، وتُعاد المحاولة من i=0 بمعرّف
+ *  طلبٍ جديد. الصحّة لم تعد تعتمد على بقاء هذا المتغيّر: p_row_offset يُعلن
+ *  دوماً موضع هذا الجزء الحقيقي داخل الملف (i نفسها)، والخادم هو من يقرّر
+ *  — عبر مدى المواضع المُستقبلة فعلياً لهذه الدفعة — هل هذا الجزء وارد
+ *  جديدٌ أم إعادة إرسالٍ لِما استُقبل من قبل، فلا يُعيد عدّه في الحالتين. */
+async function importEntitlementsChunked(
+  period: string, fileName: string, fileChecksum: string, rows: Row[],
+  onProgress: (done: number, total: number) => void,
+): Promise<Row> {
+  let batchId: string | null = null;
+  let last: Row = {};
+  for (let i = 0; i < rows.length; i += ENTITLEMENTS_CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + ENTITLEMENTS_CHUNK_SIZE);
+    const isLast = i + chunk.length >= rows.length;
+    const params: Row = {
+      p_period: period,
+      p_file_name: fileName,
+      p_file_checksum: fileChecksum,
+      p_rows: chunk,
+      p_request_id: crypto.randomUUID(),
+      p_expected_rows: rows.length,
+      p_finalize: isLast,
+      p_row_offset: i,
+    };
+    if (batchId) params['p_batch_id'] = batchId;
+    last = await rpc<Row>('import_installation_entitlements', params);
+    batchId = str((last['batch'] || {}) as Row, 'batch_id') || batchId;
+    onProgress(Math.min(i + chunk.length, rows.length), rows.length);
+  }
+  return last;
 }
 
 /** صفوف الاستحقاق بالشكل الذي تنتظره دالة الخادم. */

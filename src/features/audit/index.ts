@@ -21,7 +21,12 @@ import {
 type Row = Record<string, unknown>;
 const str = (r: Row, k: string) => String(r[k] ?? '');
 
-/** أسماء الأفعال بالعربية. المجهول يُعرض كما هو لا يُخفى. */
+/**
+ * أسماء الأفعال بالعربية. المجهول يُعرض كما هو لا يُخفى — لكن القائمة هنا
+ * شاملة لكل فعلٍ فعليّ يُسجَّل في audit_logs عبر كل migration حالياً
+ * (تدقيق QA 2026-09-01، طلب #8)، فلا يبقى فعلٌ حقيقيٌّ خارجها إلا فعلٌ
+ * مستقبليٌّ لم يُضَف بعد.
+ */
 const ACTION_AR: Record<string, string> = {
   'commission.payment.recorded': 'تسجيل دفعة عمولة',
   'commission.month.published': 'اعتماد شهر عمولات',
@@ -29,6 +34,61 @@ const ACTION_AR: Record<string, string> = {
   'settings.import.saved': 'حفظ إعدادات الاستيراد',
   'master.parent.classified': 'تصنيف أب',
   'subscriber.ownership.transferred': 'نقل عائدية مشترك',
+  'installation.batch.imported': 'استيراد دفعة أجور تنصيب',
+  'installation.invoice.audited': 'تدقيق فاتورة تنصيب',
+  'installation.payment.recorded': 'تسجيل دفعة تنصيب',
+  'report.exported': 'تصدير تقرير',
+  'master.agent.saved': 'حفظ بيانات وكيل',
+  'master.package.saved': 'حفظ بيانات باقة',
+  'admin.user.updated': 'تعديل بيانات مستخدم',
+  'commission.version.drafted': 'إنشاء مسودّة نسخة عمولات',
+  'commission.draft.tier.changed': 'تعديل تير في مسودّة العمولات',
+  'commission.draft.rate.changed': 'تعديل سعر في مسودّة العمولات',
+  'installation.invoice.reviewed': 'مراجعة فاتورة تنصيب',
+  'commission.cycle.finalized': 'اعتماد دورة عمولات نهائياً',
+  'commission.cycle.opened': 'فتح دورة عمولات',
+  'commission.cycle.cancelled': 'إلغاء دورة عمولات',
+  'installation.hold.placed': 'تعليق تنصيب',
+  'commission.batch.posted': 'ترحيل دفعة عمولات',
+  'commission.activation.excluded': 'استبعاد تفعيل من العمولة',
+  'commission.activation.added': 'إضافة تفعيل يدوياً',
+  'commission.activation.correction.revoked': 'إلغاء تصحيح تفعيل',
+  'installation.batch.paid': 'صرف دفعة أجور تنصيب',
+  'installation.entitlements.materialized': 'بناء استحقاقات التنصيب',
+  'installation.stage.advanced': 'تقدّم مرحلة التنصيب',
+  'installation.enrollment.bulk_bridged': 'تسجيل جماعي من ملف التفعيل',
+  'installation.batch.created': 'إنشاء دفعة أجور تنصيب',
+  'installation.batch.cancelled': 'إلغاء دفعة أجور تنصيب',
+  'installation.enrollment.created': 'تسجيل مشترك في التنصيب',
+  'installation.cycle.closed': 'إغلاق دورة تنصيب',
+  'installation.cycle.reopened': 'إعادة فتح دورة تنصيب',
+  'commission.cycle.closed': 'إغلاق دورة عمولات',
+  'commission.cycle.reopened': 'إعادة فتح دورة عمولات',
+  'commission.exception.resolved': 'حلّ استثناء عمولة',
+  'saas.import_batch.voided': 'إبطال دفعة استيراد SaaS',
+  'commission.scheme.published': 'اعتماد مخطط عمولات',
+  'commission.cycle.recalculated': 'إعادة احتساب دورة عمولات',
+  'installation.invoice.bulk_uploaded': 'رفع فواتير تنصيب دفعة واحدة',
+  'installation.manual_exception.created': 'تسجيل استثناء تنصيب يدوي',
+  'installation.manual_exception.resolved': 'حلّ استثناء تنصيب يدوي',
+  'import.completeness.declared': 'تأكيد اكتمال استيراد',
+  'installation.hold.released': 'رفع تعليق تنصيب',
+  'installation.hold.bulk_applied': 'تعليق تنصيب جماعي',
+  'installation.grace.overridden': 'تجاوز مهلة تنصيب',
+  'financial.reversed': 'عكس قيد مالي',
+  'financial.corrected': 'تصحيح قيد مالي',
+  'scheme.version.published': 'اعتماد نسخة مخطط',
+  'identity.bootstrap.run': 'تشغيل مطابقة الهويات',
+  'permission.changed': 'تعديل صلاحية',
+  'saas.activation_events.imported': 'استيراد أحداث تفعيل SaaS',
+  'saas.activation_events.chunk_received': 'استلام جزء من أحداث تفعيل SaaS',
+  'saas.user_snapshot.imported': 'استيراد لقطة مستخدمي SaaS',
+  'integration.odoo.invoice.checked': 'فحص فاتورة أودو',
+  'master.fdt.classified': 'تصنيف FDT',
+  'master.fdt.bulk_classified': 'تصنيف FDT جماعي',
+  'commission.row.updated': 'تعديل صفّ عمولة',
+  'commission.free_p1.threshold_set': 'ضبط حدّ Free P1',
+  'commission.free_p1.granted': 'منح Free P1',
 };
 
 /** الأفعال التي تحرّك مالاً أو تحسم عائدية تُميَّز بصرياً. */

@@ -10,7 +10,7 @@ import { href } from '../../app/router';
 import { rpc, select, toPage, envelope, can } from '../../services/api';
 import { money, count } from '../../domain/money';
 import {
-  readCycleResult, knownAgentTotal, cycleStatusAr, isProjectedStatus,
+  readCycleResult, knownAgentTotal, cycleStatusAr, isProjectedStatus, currentCycleId,
   type CycleResult, type UnresolvedOwnership,
 } from '../../domain/cycle';
 import { dateTime } from '../../domain/time';
@@ -63,9 +63,24 @@ export const overview: Route = {
   breadcrumb: () => [{ label: 'الرئيسية', href: href('/') }, { label: 'عمولات الوكلاء' }],
   async render(view) {
     view.write(loading('جارٍ تحميل الدورات…'));
-    const list = await cycles();
+    // القائمة كاملة للجدول أسفل الشاشة (وفيها الملغاة، للتصفّح الصريح).
+    // الدورة الافتراضية من الخادم وحده: مسوّدةٌ فارغة أو ملغاة أحدثُ فترةً
+    // كانت تسحب الشاشة إليها فتُعرض أصفاراً لدورةٍ لا أحد يقصدها. راجع
+    // corrections.ts وreports/index.ts لنفس النمط.
+    const [list, currentId] = await Promise.all([cycles(), currentCycleId()]);
     if (!list.length) { view.write(empty('لا توجد دورات عمولة بعد')); return; }
-    const current = list[0] as Cycle;
+    // لا دورة عاملة الآن (كلّ ما هنا ملغاة أو مسوّدة لم يُشغَّل حسابها) —
+    // لا يُختار أحدث صفٍّ بديلاً؛ هذا بالضبط الخلل الذي أصلحته #1 لولا هذا
+    // السطر. الجدول أدناه يبقى للتصفّح الصريح لأيّ دورة، الملغاة ضمنها.
+    if (!currentId) {
+      view.write(pageHeader('عمولات الوكلاء')
+        + empty('لا دورة عاملة حالياً', 'افتح دورةً من الجدول أدناه صراحةً')
+        + `<div class="box" style="margin-top:12px"><h3>الدورات</h3>${
+            table<Cycle>(cycleColumns(), list,
+              (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`)}</div>`);
+      return;
+    }
+    const current = list.find((c) => c.id === currentId) as Cycle;
 
     // بطاقةٌ توجيهية فقط. القرار — DRAFT + القدرة — هو نفس شرط ظهور زرّ
     // الإلغاء في تبويب المراجعة والاعتماد، فيُعاد استعماله لا يُكتب ثانيةً.

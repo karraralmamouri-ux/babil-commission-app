@@ -287,4 +287,209 @@ select pg_temp.expect(
   (select coalesce(sum(amount), 0) = 4021000 + 3132000
    from public.installation_entitlements where period = '2026-09'));
 
+-- ================================================================================
+-- استيراد مجزّأ (تدقيق QA ما بعد الإطلاق، 2026-09-01، طلب #5): ملف Activations
+-- Report الحقيقي فيه 29,427 صفاً يتجاوز حدّ النداء الواحد (20000). p_batch_id
+-- الاختياري الجديد (20261027090000) يحوّل هذا الحدّ من سقفٍ صلبٍ للملف إلى حجم
+-- دفعةٍ داخلية: نداءٌ بلا p_batch_id ينشئ الدفعة كما كان تماماً، ونداءٌ لاحقٌ
+-- بنفس p_batch_id يُلحِق صفوفه بها. مصفوفة الاختبار المطلوبة: صفّ واحد، 20000
+-- صفّ، 20001، ~30000، تكرارٌ عبر حدود الأجزاء، رفع الملف نفسه مرتين، السجلّ
+-- نفسه في ملفٍّ آخر، فشل جزءٍ لاحق، والإجماليّات صحيحة.
+-- ================================================================================
+
+select pg_temp.expect(
+  'مجزّأ: صفّ واحد يُقبل مباشرة بلا p_batch_id',
+  (with result as (
+     select public.import_installation_entitlements('2026-10','chunk-one.xlsx','sha-chunk-one',
+       pg_temp.rows_at('CHK-ONE', 13000, 1, 'a'), gen_random_uuid()) as payload)
+   select (payload -> 'batch' ->> 'accepted')::int = 1
+      and (payload -> 'batch' ->> 'batch_id') is not null
+   from result));
+
+select pg_temp.expect(
+  'مجزّأ: 20000 صفّ بالضبط تُقبل في نداءٍ واحد (الحدّ صار حجم دفعةٍ داخلية لا سقفاً)',
+  (with result as (
+     select public.import_installation_entitlements('2026-10','chunk-20k.xlsx','sha-chunk-20k',
+       pg_temp.rows_at('CHK-20K', 13000, 20000, 'a'), gen_random_uuid()) as payload)
+   select (payload -> 'batch' ->> 'accepted')::int = 20000
+      and (payload -> 'batch' ->> 'source_rows')::int = 20000
+   from result));
+
+-- 20001 صفاً: نداءان بنفس p_batch_id — الأول 20000 والثاني صفّ واحد يُلحَق.
+-- p_finalize := false على الأول: جزءٌ غير نهائيّ، لا يُقفَل بعده (Blocker 2).
+select (public.import_installation_entitlements('2026-10','chunk-20001.xlsx','sha-chunk-20001',
+  pg_temp.rows_at('CHK-20001', 13000, 20000, 'a'), gen_random_uuid(),
+  null, 20001, false) -> 'batch') as chk20001_c1 \gset
+
+select pg_temp.expect(
+  'مجزّأ 20001: الجزء الأول يقبل 20000 صفّ وينشئ الدفعة',
+  ((:'chk20001_c1'::jsonb ->> 'accepted')::int = 20000
+    and (:'chk20001_c1'::jsonb ->> 'batch_id') is not null));
+
+select pg_temp.expect(
+  'مجزّأ 20001: الجزء الأول غير النهائيّ يترك الدفعة IN_PROGRESS لا مكتملة',
+  ((:'chk20001_c1'::jsonb ->> 'status') = 'in_progress'));
+
+select (:'chk20001_c1'::jsonb ->> 'batch_id') as chk20001_batch_id \gset
+
+select (public.import_installation_entitlements('2026-10','chunk-20001.xlsx','sha-chunk-20001',
+  pg_temp.rows_at('CHK-20001', 13000, 1, 'b'), gen_random_uuid(), :'chk20001_batch_id'::uuid, 20001) -> 'batch') as chk20001_c2 \gset
+
+select pg_temp.expect(
+  'مجزّأ 20001: الجزء الثاني (صفّ واحد) يُلحَق بنفس الدفعة لا ينشئ دفعةً جديدة',
+  ((:'chk20001_c2'::jsonb ->> 'accepted')::int = 1
+    and (:'chk20001_c2'::jsonb ->> 'batch_id') = :'chk20001_batch_id'));
+
+select pg_temp.expect(
+  'مجزّأ 20001: إجماليّ الدفعة (batch_totals) بعد الجزء الثاني = 20001 لا 1',
+  ((:'chk20001_c2'::jsonb -> 'batch_totals' ->> 'accepted')::int = 20001
+    and (:'chk20001_c2'::jsonb -> 'batch_totals' ->> 'source_rows')::int = 20001));
+
+select pg_temp.expect(
+  'مجزّأ 20001: صفّ الدفعة نفسه في installation_batches يعكس إجماليّ الأجزاء',
+  (select accepted_rows = 20001 and source_rows = 20001 and status = 'completed'
+   from public.installation_batches where id = (:'chk20001_batch_id')::uuid));
+
+select pg_temp.expect(
+  'مجزّأ 20001: 20001 صفاً محفوظة فعلاً في الجدول، لا أكثر ولا أقلّ',
+  (select count(*) = 20001 from public.installation_entitlements
+   where period = '2026-10' and reseller = 'CHK-20001'));
+
+-- ~30000 صفاً: نداءان بنفس p_batch_id (20000 ثم 10000). الأول غير نهائيّ.
+select (public.import_installation_entitlements('2026-10','chunk-30k.xlsx','sha-chunk-30k',
+  pg_temp.rows_at('CHK-30K', 10000, 20000, 'a'), gen_random_uuid(),
+  null, 30000, false) -> 'batch') as chk30k_c1 \gset
+
+select (:'chk30k_c1'::jsonb ->> 'batch_id') as chk30k_batch_id \gset
+
+select (public.import_installation_entitlements('2026-10','chunk-30k.xlsx','sha-chunk-30k',
+  pg_temp.rows_at('CHK-30K', 10000, 10000, 'b'), gen_random_uuid(), :'chk30k_batch_id'::uuid, 30000) -> 'batch') as chk30k_c2 \gset
+
+select pg_temp.expect(
+  'مجزّأ ~30000: نداءان (20000+10000) يجمعان إلى 30000 صفٍّ مقبول في batch_totals',
+  ((:'chk30k_c2'::jsonb -> 'batch_totals' ->> 'accepted')::int = 30000
+    and (:'chk30k_c2'::jsonb -> 'batch_totals' ->> 'source_rows')::int = 30000));
+
+select pg_temp.expect(
+  'مجزّأ ~30000: 30000 صفاً فعلياً في الجدول بمبلغٍ إجماليٍّ صحيح',
+  -- المتبقّي 10000 => المرحلة P2 => القسط 3000 (installation_amount_for_stage)، لا 10000 نفسها.
+  (select count(*) = 30000 and coalesce(sum(amount), 0) = 30000 * 3000
+   from public.installation_entitlements where period = '2026-10' and reseller = 'CHK-30K'));
+
+-- تكرارٌ عبر حدود الأجزاء: السجلّ نفسه (subscriber+stage) يظهر في الجزء
+-- الأول ثم يُعاد في الثاني — كلّ جزءٍ يُثبَّت قبل التالي فيُكتشَف كالتكرار العادي.
+select (public.import_installation_entitlements('2026-10','chunk-dup.xlsx','sha-chunk-dup',
+  jsonb_build_array(jsonb_build_object('subscriber_id','CHK-DUP-1','reseller','CHK-DUP','remaining',13000)),
+  gen_random_uuid(), null, 3, false) -> 'batch') as chkdup_c1 \gset
+
+select (:'chkdup_c1'::jsonb ->> 'batch_id') as chkdup_batch_id \gset
+
+select (public.import_installation_entitlements('2026-10','chunk-dup.xlsx','sha-chunk-dup',
+  jsonb_build_array(
+    jsonb_build_object('subscriber_id','CHK-DUP-1','reseller','CHK-DUP','remaining',13000),
+    jsonb_build_object('subscriber_id','CHK-DUP-2','reseller','CHK-DUP','remaining',13000)
+  ), gen_random_uuid(), :'chkdup_batch_id'::uuid, 3) -> 'batch') as chkdup_c2 \gset
+
+select pg_temp.expect(
+  'مجزّأ: تكرارٌ عبر حدود الأجزاء يُكتشف — سجلّ الجزء الأول يُرفض كتكرارٍ في الثاني',
+  ((:'chkdup_c2'::jsonb ->> 'accepted')::int = 1
+    and (:'chkdup_c2'::jsonb ->> 'duplicates')::int = 1));
+
+select pg_temp.expect(
+  'مجزّأ: السجلّ المكرَّر محفوظٌ مرّةً واحدة فقط رغم ظهوره في جزأين',
+  (select count(*) = 1 from public.installation_entitlements
+   where period = '2026-10' and subscriber_id = 'CHK-DUP-1'));
+
+-- رفع الملف نفسه مرتين (دفعتان منفصلتان، كلٌّ منهما نداءٌ واحدٌ غير مجزّأ):
+-- لا تجزئة هنا، لكنه جزءٌ صريحٌ من مصفوفة الاختبار المطلوبة.
+select (public.import_installation_entitlements('2026-10','chunk-repeat.xlsx','sha-chunk-repeat',
+  jsonb_build_array(jsonb_build_object('subscriber_id','CHK-REPEAT-1','reseller','CHK-REPEAT','remaining',13000)),
+  gen_random_uuid()) -> 'batch') as chkrepeat_c1 \gset
+
+select pg_temp.expect(
+  'مجزّأ: رفع الملف نفسه مرتين — الرفعة الأولى تُقبل',
+  ((:'chkrepeat_c1'::jsonb ->> 'accepted')::int = 1));
+
+select (public.import_installation_entitlements('2026-10','chunk-repeat.xlsx','sha-chunk-repeat',
+  jsonb_build_array(jsonb_build_object('subscriber_id','CHK-REPEAT-1','reseller','CHK-REPEAT','remaining',13000)),
+  gen_random_uuid()) -> 'batch') as chkrepeat_c2 \gset
+
+select pg_temp.expect(
+  'مجزّأ: رفع الملف نفسه مرتين — الرفعة الثانية دفعةٌ جديدة لكن صفّها تكرارٌ بلا أثرٍ ماليٍّ إضافي',
+  ((:'chkrepeat_c2'::jsonb ->> 'accepted')::int = 0
+    and (:'chkrepeat_c2'::jsonb ->> 'duplicates')::int = 1
+    and (:'chkrepeat_c2'::jsonb ->> 'batch_id') <> (:'chkrepeat_c1'::jsonb ->> 'batch_id')));
+
+select pg_temp.expect(
+  'مجزّأ: لا أثر مالي مضاعف من رفعتين — السجلّ محفوظ مرّةً واحدة',
+  (select count(*) = 1 from public.installation_entitlements
+   where period = '2026-10' and subscriber_id = 'CHK-REPEAT-1'));
+
+-- السجلّ نفسه في ملفٍّ آخر (بصمة مختلفة تماماً) — يبقى تكراراً بمعيار العمل لا الملف.
+select (public.import_installation_entitlements('2026-10','chunk-otherfile.xlsx','sha-chunk-otherfile',
+  jsonb_build_array(jsonb_build_object('subscriber_id','CHK-REPEAT-1','reseller','CHK-REPEAT','remaining',13000)),
+  gen_random_uuid()) -> 'batch') as chkotherfile \gset
+
+select pg_temp.expect(
+  'مجزّأ: السجلّ نفسه في ملفٍّ آخر ببصمةٍ مختلفة يبقى تكراراً',
+  ((:'chkotherfile'::jsonb ->> 'duplicates')::int = 1
+    and (:'chkotherfile'::jsonb ->> 'accepted')::int = 0));
+
+-- فشل جزءٍ لاحق: فترة مختلفة، ثم بصمة ملفٍّ مختلفة، ثم دفعةٌ غير موجودة أصلاً —
+-- كلّها تُرفض دون أن تُفسد ما أنجزته الأجزاء الناجحة السابقة.
+select (public.import_installation_entitlements('2026-10','chunk-fail.xlsx','sha-chunk-fail',
+  jsonb_build_array(jsonb_build_object('subscriber_id','CHK-FAIL-1','reseller','CHK-FAIL','remaining',13000)),
+  gen_random_uuid()) -> 'batch') as chkfail_c1 \gset
+
+select (:'chkfail_c1'::jsonb ->> 'batch_id') as chkfail_batch_id \gset
+
+select pg_temp.expect_error(
+  'مجزّأ: جزءٌ لاحق بفترةٍ مختلفة عن الدفعة يُرفض',
+  format($q$select public.import_installation_entitlements('2026-11','chunk-fail.xlsx','sha-chunk-fail',
+      '[{"subscriber_id":"CHK-FAIL-2","reseller":"CHK-FAIL","remaining":13000}]'::jsonb,
+      gen_random_uuid(), %L::uuid)$q$, :'chkfail_batch_id'),
+  '22023');
+
+select pg_temp.expect_error(
+  'مجزّأ: جزءٌ لاحق ببصمة ملفٍّ مختلفة عن الدفعة يُرفض',
+  format($q$select public.import_installation_entitlements('2026-10','chunk-fail.xlsx','sha-chunk-fail-WRONG',
+      '[{"subscriber_id":"CHK-FAIL-3","reseller":"CHK-FAIL","remaining":13000}]'::jsonb,
+      gen_random_uuid(), %L::uuid)$q$, :'chkfail_batch_id'),
+  '22023');
+
+select pg_temp.expect_error(
+  'مجزّأ: p_batch_id لدفعةٍ غير موجودة أصلاً يُرفض',
+  $q$select public.import_installation_entitlements('2026-10','chunk-fail.xlsx','sha-chunk-fail',
+      '[{"subscriber_id":"CHK-FAIL-4","reseller":"CHK-FAIL","remaining":13000}]'::jsonb,
+      gen_random_uuid(), gen_random_uuid())$q$,
+  '22023');
+
+select pg_temp.expect(
+  'مجزّأ: فشل الأجزاء اللاحقة لا يفسد إجماليّات الدفعة من الجزء الناجح الوحيد',
+  (select accepted_rows = 1 and source_rows = 1 and status = 'completed'
+   from public.installation_batches where id = (:'chkfail_batch_id')::uuid));
+
+select pg_temp.expect(
+  'مجزّأ: فشل الأجزاء اللاحقة لم يُدرج أي صفٍّ إضافي في الجدول',
+  (select count(*) = 1 from public.installation_entitlements where reseller = 'CHK-FAIL'));
+
+-- أمان إعادة الطلب يبقى لكلّ جزءٍ على حدة: إعادة نفس request_id لنفس الجزء
+-- تُعيد النتيجة الأصلية دون استيرادٍ مضاعف.
+select (public.import_installation_entitlements('2026-10','chunk-replay.xlsx','sha-chunk-replay',
+  jsonb_build_array(jsonb_build_object('subscriber_id','CHK-REPLAY-1','reseller','CHK-REPLAY','remaining',13000)),
+  '99999999-9999-9999-9999-999999999901'::uuid) -> 'batch') as chkreplay_c1 \gset
+
+select pg_temp.expect(
+  'مجزّأ: أمان إعادة الطلب لكلّ جزءٍ — النداء الأول يُقبل',
+  ((:'chkreplay_c1'::jsonb ->> 'accepted')::int = 1));
+
+select (public.import_installation_entitlements('2026-10','chunk-replay.xlsx','sha-chunk-replay',
+  jsonb_build_array(jsonb_build_object('subscriber_id','CHK-REPLAY-1','reseller','CHK-REPLAY','remaining',13000)),
+  '99999999-9999-9999-9999-999999999901'::uuid) ->> 'replayed') as chkreplay_replayed \gset
+
+select pg_temp.expect(
+  'مجزّأ: إعادة نفس request_id لنفس الجزء تُعاد نتيجتها الأصلية بلا استيرادٍ مضاعف',
+  ((:'chkreplay_replayed') = 'true'
+    and (select count(*) = 1 from public.installation_entitlements where subscriber_id = 'CHK-REPLAY-1')));
+
 rollback;

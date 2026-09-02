@@ -226,9 +226,28 @@ select pg_temp.ok(
      'e0000000-0000-0000-0000-00000000ab09') ->> 'created')::int = 0,
   '  · ولا التزام ثانٍ عن مرحلةٍ دُفعت');
 
--- ١١. التاريخ لم يُمسّ.
+-- ١١. التاريخ المستورد لم يُمسّ، والتقدّم سُجِّل واقعةً واحدة.
+--
+-- قبل جسر التفعيل الخام لم يكن الدفع يكتب في التاريخ إطلاقاً، فكان الصفر
+-- وصفاً للفجوة لا للقاعدة. صار التقدّم نفسه تاريخاً مالياً مسجَّلاً
+-- (INS-015): واقعة واحدة لكل (مشترك، مرحلة). والمعنى الأصلي باقٍ ومُشدَّد
+-- هنا: لا صفّ مستورد أُعيدت كتابته، ولا واقعة ثانية عن المرحلة نفسها.
 select pg_temp.ok(
-  (select count(*) from public.installation_payment_history) = 0,
-  '١١ · لا صفّ يُضاف إلى التاريخ المستورد');
+  (select count(*) from public.installation_payment_history) = 1,
+  '١١ · الدفع يُسجِّل واقعة تقدّم واحدة لا أكثر');
+
+select pg_temp.ok(
+  (select stage from public.installation_payment_history) = 'P1'
+  and (select amount from public.installation_payment_history) = 3000
+  and (select subscriber_uuid from public.installation_payment_history)
+      = 'e0000000-0000-0000-0000-0000000000b1'::uuid,
+  '  · بالمرحلة والمبلغ والمشترك الصحيحة');
+
+select pg_temp.ok(
+  (select remaining from public.installation_subscriber_state
+   where subscriber_uuid = 'e0000000-0000-0000-0000-0000000000b1') = 10000
+  and (select current_stage from public.installation_subscriber_state
+       where subscriber_uuid = 'e0000000-0000-0000-0000-0000000000b1') = 'P2',
+  '  · والحالة تقدّمت خطوة واحدة إلى P2');
 
 rollback;

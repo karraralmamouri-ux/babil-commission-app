@@ -135,9 +135,14 @@ Engine: `calculate_commission_cycle`, `supabase/migrations/20261011090000_effect
 | INS-006 | Blank/unknown Remaining never guessed | PASS | returns NULL for unmapped values, import rejects | `installation_state_unknown_remaining_has_no_stage` CHECK, `20260816090000...sql:123-125` | — | — | DB-CHECK-level guarantee |
 | INS-007 | Independent financial domain | PASS | `financial_ledger_domain_check in ('commission','installation')` | — | — | — | — |
 | INS-008 | Settled entitlement cannot be silently edited/deleted | PASS | `protect_settled_installation_entitlement` trigger | `20260815160000...sql:152-178`; `installation_payments_entitlement_key unique(entitlement_id)` | — | — | — |
-| INS-009 | Dashboard totals reconcile | VERIFY | `installation_financials()`, `20260822120000_add_reporting_layer.sql:109-186` | — | — | `tests/installation-dashboard-source.test.js` pins one previously-shipped merge bug (fixed) | Entitlements table and enrollments/stage-distribution table are separate, not cross-checked figures — can diverge given `installation_enrollments.current_stage_code` is never updated post-enrollment (see architecture note under INV) |
+| INS-009 | Dashboard totals reconcile | VERIFY | `installation_financials()`, `20260822120000_add_reporting_layer.sql:109-186` | — | — | `tests/installation-dashboard-source.test.js` pins one previously-shipped merge bug (fixed) | Entitlements table and enrollments/stage-distribution table are separate, not cross-checked figures — were previously able to diverge because `installation_enrollments.current_stage_code` was never updated post-enrollment; `20261103090000` now advances it on the paid transition alongside `installation_subscriber_state` (see architecture note under INV) |
 | INS-010 | Entitlement rules server-authoritative | PASS | all mutating RPCs derive stage/amount server-side | `guard_installation_payment` trigger, `20260820180000...sql:297-343`, closes direct-table-write bypass | — | — | Two independent server-side gates |
 | INS-011 | Correction/reversal exists without mutating original | PASS | `reverse_financial_entry`/`correct_financial_entry` | `20260818090000_add_financial_correction_ledger.sql:287-499` | `src/features/installation/index.ts` wires `paymentCorrections.ts` | — | Closed per `docs/engineering/risk-and-open-decisions.md:41-75` (R-03) |
+| INS-012 | Historical baseline is the one-time opening authority | PASS | `import_installation_history`, `20260816090000_add_installation_history.sql` | `installation_subscribers` / `installation_subscriber_state` / `installation_payment_history` | — | `tests/sql/installation-history-rules.sql`, `tests/sql/installation-raw-activation-bridge.sql` §8 | Bridge inserts state with `on conflict do nothing`, so a historical subscriber resumes from its own stage and is never reset to P1 |
+| INS-013 | Recurring monthly path consumes the raw SaaS Activation file — no hand-made Remaining column | PASS | `bridge_saas_activations_to_enrollments` + `ensure_installation_state_for_enrollment`, `20261103090000_installation_raw_activation_bridge.sql` | bulk sweep gated by the existing `evaluate_enrollment_gate`; `trg_installation_enrollment_opens_state` after insert on `installation_enrollments` | `src/features/system/import-run.ts` (after the raw import), `src/features/system/imports.ts` (re-run panel) | `tests/sql/installation-raw-activation-bridge.sql` §1, §3, §4, §13 | `enroll_new_installation` previously had no UI caller at all. No blind enrolment: blocked subscribers are returned with their reasons and stay reviewable; re-runnable because identity/classification/completeness are settled after upload. Amended by `20261104090000` (§16): chunked intake keeps one logical batch per file under the 8s authenticated timeout, and the sweep is cursored (`p_after_username`) so blocked candidates cannot starve the ones behind them; the caller sweeps to exhaustion via `src/features/system/bridge-sweep.ts` |
+| INS-014 | Server derives current/next stage, Remaining and entitlement from authoritative state | PASS | `materialize_installation_entitlements`, `20260913090000_materialize_and_batch.sql`; reconciliation in `ensure_installation_state_for_enrollment` | reads `installation_subscriber_state`; no Remaining parameter exists on any recurring RPC; opening state reconciled against paid entitlements/payments | — | `tests/sql/installation-raw-activation-bridge.sql` §2, §4; `tests/sql/installation-upgrade-backfill.sql` §1–§5 | An upgraded subscriber with prior paid stages opens at the correct next stage, never at a fresh P1; an inconsistent history opens as `unresolved` with the reason in `warnings` instead of a guess. DEC-007 (per-period qualifying event) was RESOLVED by the owner on 2026-09-02 in favour of option (a) — stage + VERIFIED invoice for that same stage + existing eligibility controls, no fresh activation required in the period; that is the shipped behaviour, so no gate was added and no code changed (§17), pinned by `tests/sql/installation-dec007-monthly-entitlement.sql` |
+| INS-015 | Progression P1→P2→P3→P4→DONE is deterministic, sequential, idempotent, auditable | PASS | `trg_payment_advances_installation_state` + `guard_installation_stage_paid_once`, `20261103090000_installation_raw_activation_bridge.sql` | before insert on `installation_payments` writes `installation_payment_history` (unique `subscriber_uuid, stage`); after update on the paid transition advances state under `for update`, reading `stage_amount_for_version` / `next_stage_for_version` / `stage_for_remaining_in_version` of the enrollment's frozen version | — | `tests/sql/installation-raw-activation-bridge.sql` §5–§9, §14; `tests/sql/installation-cross-period-payment-concurrency.sh`; `tests/sql/payout-end-to-end.sql` §11 | Same subscriber + same stage is now payable once across all periods and paths, failing atomically before the payment row, ledger entry, paid transition and success audit — proven sequentially and under true concurrency on two entitlement ids. Stated limit: storage CHECK constraints encode the V1 ladder, so a different versioned ladder is rejected as `SCHEME_NOT_REPRESENTABLE_IN_STORAGE` rather than silently mapped through the legacy function |
+| INS-016 | Deriving an entitlement does not bypass invoice/hold/identity/ownership controls | PASS | `materialize_installation_entitlements`, `installation_entitlement_eligibility`, `record_installation_payment`, `guard_installation_stage_paid_once` | VERIFIED invoice per stage, effective holds, identity CONFLICT, `subscriber_ownership_type = RESELLER`, `guard_installation_payment` before update, stage-paid-once before insert on `installation_payments` | — | `tests/sql/installation-raw-activation-bridge.sql` §10, §9(د) | The bridge writes only subscriber/state rows; it adds no payment authority and touches no entitlement or ledger row. The new guard only ever removes payment authority |
 
 ### Invoice audit (INV) — 19 IDs
 
@@ -755,3 +760,114 @@ Full sequence re-run after 15.1–15.3: `tests/sql/rebuild-local.sh` — 91/91 m
 ### 15.5 Scope discipline
 
 No merge, no deploy, no Production financial data touched, no payment executed, no July recalculation performed. `free_p1_grants` remains structurally payment-incapable (§14.1, unchanged) — this addendum fixed a comparison operator and added a read surface, neither of which required or involved any payment-authority schema change. Free P1 remains, and remains provably, informational-only.
+
+## 16. 2026-09-02 Large-Import Addendum — SaaS activation intake made chunked, bridge sweep made complete
+
+**Type:** Sixth delta on this branch. A manual QA pass against Commission **STAGING** (never Production) imported the real `Activations Report_Aug-2026.xlsx` — 29,427 activation events. The browser preview accepted all 29,427 rows (0 duplicates, 0 rejected, 0 unknown-date, 0 user-snapshot rows); pressing "اعتمد الاستيراد" returned `canceling statement due to statement timeout`, and a follow-up query on `saas_import_batches` for that filename returned zero rows — the whole import had rolled back, leaving no batch and no partial state. Authenticated PostgREST calls run under an 8-second `statement_timeout`. This addendum removes the per-row work that caused it; it does **not** raise any timeout.
+
+### 16.1 Root cause — one subtransaction per row, not the inserts
+
+`import_saas_activation_events` (`20261003090000_saas_activation_intake.sql`) looped over the incoming rows and wrapped each `insert` in `begin … exception when unique_violation … when others … end`. In PL/pgSQL an exception block opens a subtransaction, so a 29,427-row file opened 29,427 savepoints. Measured locally on a machine benchmarked at ≥1.55× the throughput of the box that timed out, a 30,000-row single call took **5.21 s** in the loop form — already outside a safe margin there, and past 8 s on the slower host.
+
+Two further defects on the same path were found while measuring and are closed here:
+
+- `bridge_saas_activations_to_enrollments` accumulated blocked candidates with `v_blocked := v_blocked || jsonb_build_object(...)` inside its candidate loop — quadratic. Measured: `p_limit` 500 → 0.35 s, `p_limit` 5000 → **16.69 s**. The frontend sent `p_limit: 5000`, so the bridge call the UI actually made could never have completed under an 8-second budget.
+- The bridge selected the *first* `p_limit` unenrolled candidates with no cursor. A candidate the gate blocks stays unenrolled forever, so a batch whose leading 5,000 candidates are blocked can never reach candidate 5,001 — a 29,427-row import could leave eligible subscribers permanently unconsidered no matter how many times the operator pressed the button.
+
+### 16.2 Architecture selected — set-based intake **and** logical chunking
+
+A set-based rewrite alone was measured and judged insufficient: the best single-RPC time for 30,000 rows was 2.98 s (bare prototype) / ~5.3 s (the real function with all 29 columns), against an 8 s budget on slower hardware and a declared per-call ceiling of 100,000 rows. Both were therefore adopted, in `supabase/migrations/20261104090000_saas_activation_chunked_intake.sql` (forward-only; `20261003090000` is not edited):
+
+- **Set-based hot path.** The row loop is replaced by a single CTE chain: `jsonb_array_elements … with ordinality` → classify → `distinct on (saas_event_id)` → `insert … select … on conflict (saas_event_id) do nothing`. Cast validation, which was the reason for the per-row exception handler, now uses `pg_input_is_valid(text, type)` (PG 16 soft-error casts) through the helper `saas_activation_row_is_castable(jsonb)`. That helper deliberately carries **no** `SET search_path` clause — a SQL function with a `SET` clause is never inlined by the planner, which cost 2.6 s per 30k import when first written that way; every identifier inside it is `pg_catalog`-qualified, its only caller runs with an empty `search_path`, and execute is revoked from `public`, `anon` and `authenticated`.
+- **Logical chunking inside one batch.** The RPC gains `p_batch_id`, `p_expected_rows`, `p_finalize` and `p_row_offset`, reusing the `received_rows int8multirange` / `expected_row_count` restart-safety pattern already proven for installation entitlements (`20261101090000`, `20261102090000`).
+
+Rejection semantics are unchanged in both content and priority: `MISSING_EVENT_ID` → `MISSING_USERNAME` → `MALFORMED_ROW`, then duplicate. Deduplication remains at **activation-event** level on `saas_event_id`; it is not, and never was, by subscriber or username.
+
+### 16.3 One file stays one logical batch
+
+`saas_import_batches_checksum_key unique (source_checksum, source_kind)` is unchanged and remains the file identity, so chunking cannot fork a file into two batches: every chunk resolves to the same row. A chunk-bearing call also takes the existing `pg_advisory_xact_lock` for activation-event import, so two chunks arriving together serialize.
+
+The batch's `status` lifecycle carries the distinction with no new CHECK: `draft` = open for further chunks, `imported` = finalized. `p_finalize` is honoured only when `source_row_count` has reached `expected_row_count`; a premature finalize raises `22023` rather than closing an incomplete batch. `trg_flag_overlapping_batches` still fires exactly once, on the `draft → imported` transition.
+
+Audit writes two actions — `saas.activation_events.chunk_received` for a non-final chunk and the pre-existing `saas.activation_events.imported` for the finalizing call — so there is exactly **one** "imported" audit row per logical file, and a half-uploaded batch can never appear completed. The request-idempotency replay guard accepts either action.
+
+### 16.4 Restart, retry and duplicate safety
+
+`received_rows` records which absolute file positions the batch has actually received. An incoming chunk contributes only `int8multirange(int8range(offset, offset+n)) - received_rows`, and the source CTE filters with `not (received_rows @> position)`, so an already-received position is never re-read: resubmitting a chunk — same content or different — adds nothing to `source_rows` and inserts nothing. A browser refresh mid-upload loses only the client's local `batch_id`; the checksum resolves the retry back into the same draft batch and the position filter discards everything already stored. `saas_activation_events`' unique key on `saas_event_id` remains the last line of defence.
+
+Proven under real concurrency in `tests/sql/saas-activation-import-concurrency.sh`: two identical simultaneous submissions of the same offset → one session carries the range, one carries nothing, `source_row_count` 100, 100 events, one batch; two different simultaneous chunks → 300/300, **zero** event ids stored more than once, still one batch, still `draft` until finalized.
+
+### 16.5 Counts and reporting
+
+`source_rows`, `accepted`, `duplicates` and `rejected` accumulate on the batch across chunks; the RPC result now carries both the per-call figures (unchanged keys) and a `batch_totals` object with the file-wide figures, which is what the UI displays. Individual rejection reporting is retained — each rejected row still returns its row number, reason and event id — but capped at 200 entries per call with a `rejects_truncated` flag, so the hot path is not turned back into procedural work building an unbounded array.
+
+### 16.6 Bridge coverage beyond one window
+
+`bridge_saas_activations_to_enrollments` gains `p_after_username` and returns `last_username_key`, `remaining` and `exhausted`; its blocked-candidate sample is bounded at 50 with per-reason counters, which makes it linear (5000 candidates: 16.69 s → 2.96 s). No enrollment rule changed — `evaluate_enrollment_gate` remains the sole arbiter and nothing it blocks is enrolled.
+
+Complete coverage is the caller's job and is now implemented once, in `src/features/system/bridge-sweep.ts`, used by both the import screen and the batch re-run panel so the two cannot drift. It sweeps with `p_limit: 1000` (5000 measured at 2.96 s locally — too little margin on slower hardware) carrying the cursor forward until `exhausted`, and reports `complete: false` with a remaining count if it ever stops early. `tests/sql/saas-activation-chunked-intake.sql` §5 proves the failure this fixes: with `p_limit 5` over 12 blocked candidates, repeating the cursorless sweep makes no progress at all, while three cursored sweeps cover all twelve.
+
+### 16.7 Frontend
+
+`src/features/system/import-run.ts` slices activation events into 5,000-row chunks against one logical batch, shows per-chunk progress, sets `p_finalize` only on the last chunk, and runs the bridge sweep only after the import has genuinely finalized. `src/features/system/imports.ts`'s re-run panel calls the same shared sweep instead of a single `p_limit: 5000` call. No unrelated UI changed.
+
+### 16.8 Measured result and re-verification
+
+30,000 synthetic activation events with **every** imported column populated, submitted as six 5,000-row chunks through the real `authenticated` role with `alter role authenticated set statement_timeout = '8s'` — the same condition PostgREST imposes, set on the role and never touched inside the session (`tests/sql/saas-activation-large-import.sh`):
+
+| chunk | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| ms | 1000 | 883 | 850 | 1024 | 920 | 1013 |
+
+Slowest chunk **1024 ms** against the 8,000 ms budget — a 7.8× margin; 5,690 ms for the whole file. Result: 1 logical batch, status `imported`, 30,000 source / 30,000 accepted, 30,000 events stored, exactly 1 final import audit row.
+
+Full sequence re-run: `tests/sql/rebuild-local.sh` — **101/101 migrations**, clean. `tests/sql/run-local-tests.sh` — **1382 assertions passing**, zero failures, including the new `saas-activation-chunked-intake.sql` and both new shell tests. `npm test` — **713/713 passing**. `npx tsc --noEmit` — clean. `npm run build` — succeeds. `node scripts/check-migration-safety.mjs` — clean. `.github/workflows/ci.yml`'s exact-match gates corrected to the new baseline (101 migrations, 1382 assertions); no check was weakened.
+
+### 16.9 Scope discipline
+
+No merge, no deploy, no Production access, no Production financial data created or modified, no payment executed, no July recalculation. The raw SaaS import still writes only `saas_activation_events` and its batch row — it creates no entitlement, no payment and no ledger entry, re-proven in `tests/sql/saas-activation-chunked-intake.sql` §6. **DEC-007 remains OPEN and is neither resolved nor implemented here.** *(Superseded 2026-09-02: the owner resolved DEC-007 the same day — see §17. Still no code change.)*
+
+## 17. 2026-09-02 Owner Decision Addendum — DEC-007 resolved, no code change
+
+**Type:** Seventh delta on this branch, and a documentation-only one. The owner resolved DEC-007 in writing on 2026-09-02, choosing option (a). It was the last business decision still open in `docs/BUSINESS_DECISIONS_REQUIRED.md`.
+
+### 17.1 The decision as stated
+
+Monthly installation-fee entitlement depends on three things and no fourth:
+
+1. the official current stage — P1/P2/P3/P4;
+2. a valid VERIFIED invoice **for that same stage**;
+3. passing the remaining existing eligibility controls.
+
+A fresh activation event in the same month is **not** required for any later stage. Worked example, as given: a subscriber at P3 holding a VERIFIED P3 invoice earns the P3 instalment of 3,000 IQD that month even with no new activation in it; without a VERIFIED P3 invoice there is neither entitlement nor payment.
+
+### 17.2 Verified against the code before writing anything
+
+`materialize_installation_entitlements` (`20260913090000_materialize_and_batch.sql:47-90`) already implements exactly that, and has since it shipped:
+
+- stage from `installation_subscriber_state` — `st.current_stage in ('P1','P2','P3','P4')`, `resolution = 'resolved'`, `payment_eligible`, `remaining > 0`;
+- `exists (… installation_invoices i where i.subscriber_id = s.subscriber_id and i.stage_code is not distinct from st.current_stage and i.status = 'VERIFIED')` — the invoice must match the stage being materialized, not merely exist;
+- effective holds, identity `CONFLICT`, `subscriber_ownership_type = 'RESELLER'`, and no existing entitlement for the same (period, subscriber, stage);
+- **no reference to `saas_activation_events` anywhere in the function** — there is no per-period activation gate to remove.
+
+`installation_amount_for_stage('P3')` is 3,000, matching the worked example. So option (a) required no change to any financial rule, function, constraint or UI, and none was made.
+
+### 17.3 What was added — a regression that pins the decision
+
+`tests/sql/installation-dec007-monthly-entitlement.sql` (8 assertions) builds three mid-instalment subscribers, all at P3 with 7,000 remaining, whose only activation events are dated January while entitlement is materialized for 2026-09:
+
+- the month contains zero activation events for any of them (asserted, not assumed), and all three sit at the official P3/7,000;
+- with a VERIFIED P3 invoice: one entitlement, stage P3, amount 3,000, remaining 7,000 — and `record_installation_payment` then actually pays 3,000, so the absence of a monthly activation withholds nothing;
+- with no VERIFIED invoice: no entitlement, no payment, no ledger row;
+- with a VERIFIED **P2** invoice left over from the previous instalment while the state is P3: likewise nothing — the invoice must match the stage;
+- `pg_get_functiondef` of the monthly engine contains no mention of `saas_activation_events`, so a per-period gate cannot be reintroduced silently.
+
+That last assertion is the point of the file: option (b) would have withheld instalments the engine grants today, and the regression makes any future move in that direction fail loudly rather than quietly.
+
+### 17.4 Re-verification
+
+`tests/sql/run-local-tests.sh` — **1390 assertions passing** (1382 per §16.8, +8 from the new file), zero failures. `npm test` — 713/713. `npx tsc --noEmit` — clean. `npm run build` — succeeds. `node scripts/check-migration-safety.mjs` — clean. `.github/workflows/ci.yml`'s assertion gate moved 1382 → 1390; the migration-count gate is unchanged at 101 because this addendum adds no migration.
+
+### 17.5 Scope discipline
+
+Documentation and one test file. No migration, no function, no financial rule, no production code, and no UI changed. No merge, no deploy, no Production access, no Production financial data created or modified, no payment executed, no July recalculation. §16.9's closing sentence — "DEC-007 remains OPEN" — was accurate when written and is superseded here.

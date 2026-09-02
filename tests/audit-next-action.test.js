@@ -71,6 +71,41 @@ test('كل إجراء يقول سببه ويقود إلى شاشته', () => {
   assert.match(inst, /if \(!a \|\| str\(a, 'code'\) === 'NONE'\) return ''/);
 });
 
+test('كل فعل مكتوب فعلياً في audit_logs (بترتيب العمود الشائع v_actor أولاً) له ترجمة عربية في ACTION_AR', () => {
+  // تدقيق QA 2026-09-01، طلب #8: كانت الأفعال غير المُترجَمة تظهر خاماً
+  // بالإنجليزية المنقّطة في عمود «الفعل» الأساسي. هذا الفحص يمسح كل
+  // migration بحثاً عن نمط الإدراج الشائع (v_actor ثم فعلٌ حرفي)، فيرصد أيّ
+  // فعلٍ مستقبليٍّ يُضاف بلا ترجمةٍ مقابلة — لا فقط الأفعال المعروفة اليوم.
+  const migrationsDir = path.join(root, 'supabase/migrations');
+  const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql'));
+  const found = new Set();
+  const actionRe = /v_actor,\s*(?:p_\w+,\s*)?'([a-z][a-z_]*(?:\.[a-z_]+)+)'/g;
+  for (const f of files) {
+    const sql = fs.readFileSync(path.join(migrationsDir, f), 'utf8');
+    let m;
+    while ((m = actionRe.exec(sql))) found.add(m[1]);
+  }
+  // ضبط الفحص نفسه: النمط يجب أن يرصد عدداً معقولاً من الأفعال الحقيقية،
+  // لا صفراً — لولا ذلك لكان الفحص عديم الفائدة (يمرّ دوماً بلا رصدٍ فعلي).
+  assert.ok(found.size > 40, `اكتشاف الأفعال ضعيف جداً (${found.size}) — النمط ربما انكسر`);
+
+  const mapMatch = audit.match(/const ACTION_AR: Record<string, string> = \{([\s\S]*?)\n\};/);
+  assert.ok(mapMatch, 'تعريف ACTION_AR غير موجود بالشكل المتوقَّع');
+  const mapBody = mapMatch[1];
+  const missing = [...found].filter((a) => !mapBody.includes(`'${a}':`));
+  assert.deepEqual(missing, [], `أفعال بلا ترجمة عربية في ACTION_AR: ${missing.join(', ')}`);
+});
+
+test('كل ترجمة في ACTION_AR عربيةٌ فعلاً، لا تكرارٌ للمفتاح الإنجليزي نفسه', () => {
+  const mapMatch = audit.match(/const ACTION_AR: Record<string, string> = \{([\s\S]*?)\n\};/);
+  const pairs = [...mapMatch[1].matchAll(/'([a-z][a-z_.]*)':\s*'([^']+)'/g)];
+  assert.ok(pairs.length > 40, `عدد أزواج ACTION_AR ضعيف (${pairs.length})`);
+  for (const [, key, value] of pairs) {
+    assert.notEqual(value, key, `الترجمة لـ${key} تكرّر المفتاح الإنجليزي نفسه`);
+    assert.match(value, /[؀-ۿ]/, `الترجمة لـ${key} لا تحتوي حرفاً عربياً: ${value}`);
+  }
+});
+
 test('المسار مسجَّل في المُوجِّه والملاحة', () => {
   const main = read('src/main.ts');
   assert.match(main, /routes as auditRoutes/);

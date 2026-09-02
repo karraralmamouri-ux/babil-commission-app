@@ -95,6 +95,11 @@ Every new user clarification must first receive a requirement ID and be added he
 - INS-009: Dashboard totals/eligible P1-P4 reconcile correctly. **VERIFY**
 - INS-010: Entitlement rules are server-authoritative. **PASS / VERIFY**
 - INS-011: Installation correction/reversal exists without mutating original posted money. **PASS**
+- INS-012: Historical installation baseline is the one-time opening authority for each subscriber's prior installment/payment state, Remaining and current stage. **PASS** — `import_installation_history` → `installation_subscribers` / `installation_subscriber_state` / `installation_payment_history` (`20260816090000`). Retained unchanged for cutover/repair; not to be deleted. The raw-activation bridge never overwrites a state row that already exists, so a historical subscriber resumes from its own stage and is never reset to P1.
+- INS-013: Recurring monthly installation-fee processing consumes the normal raw SaaS Activation source file. The operator must NOT manually manufacture or append a Remaining column every month. **PASS (`20261103090000`)** — the raw import wrote `saas_activation_events` and stopped there: `enroll_new_installation` had no caller anywhere in the UI, so nothing ever reached `installation_subscriber_state` and a hand-made Remaining column was the only way to produce state. `bridge_saas_activations_to_enrollments` now sweeps a batch, evaluates the existing `evaluate_enrollment_gate` per candidate, enrolls only those it allows, and returns every blocked subscriber with its reasons; an `after insert on installation_enrollments` trigger then opens authoritative state from the enrollment's frozen scheme version. Re-runnable by design — identity, classification and source completeness are usually settled after upload. No monthly Remaining column is read anywhere. Amended by `20261104090000` (§16): the raw import is chunked so a ~30k-row file lands as one logical batch under the 8s authenticated timeout, and the bridge sweep now carries a cursor (`p_after_username`) so blocked candidates cannot occupy the window and hide eligible ones behind them.
+- INS-014: The server derives the subscriber's current/next installation stage, Remaining and entitlement from authoritative historical/current state, qualifying source events, and recorded financial history. **PASS (`20261103090000`)** — `materialize_installation_entitlements` already derived stage/Remaining/amount server-side from `installation_subscriber_state`, trusting no client Remaining; the missing input was authoritative state for activation-only subscribers, which the bridge now supplies. Opening state is reconciled against recorded financial history: already-paid entitlements and payments move the subscriber to the correct next stage, and an inconsistent history yields an explicit unresolved review row rather than a guess. Whether each stage additionally requires a fresh qualifying activation event in its own period was DEC-007; the owner resolved it on 2026-09-02 in favour of option (a) — monthly entitlement is driven by the official stage plus a VERIFIED invoice **for that same stage** plus the existing eligibility controls, and no fresh activation is required in the period. That is exactly the behaviour already shipped, so no gate was added and no code changed; pinned by `tests/sql/installation-dec007-monthly-entitlement.sql`.
+- INS-015: Progression is deterministic, sequential, idempotent and auditable: P1 → P2 → P3 → P4 → DONE. A replay, duplicate event, duplicate file, browser restart or repeated calculation must never advance a subscriber twice. **PASS (`20261103090000`)** — no code path advanced `installation_subscriber_state` after the baseline import, so `STAGE_OUT_OF_SEQUENCE` blocked every second stage forever. Progression now follows the enrollment's frozen `scheme_version_id` through `stage_amount_for_version` / `next_stage_for_version` / `stage_for_remaining_in_version`; every disagreement raises and aborts the transaction rather than falling back silently to the legacy V1 mapping. Stated limitation, not a claim of full multi-version support: the storage CHECK constraints (`installation_state_stage_matches_remaining`, `installation_entitlements_stage_matches_remaining`, `installation_entitlements_amount_matches_stage`, and the literal `P1..P4,DONE` stage checks) are written against the V1 ladder, so a version with a different ladder cannot be stored at all and is rejected explicitly as `SCHEME_NOT_REPRESENTABLE_IN_STORAGE`. Relaxing those constraints to a version-tagged ladder is separate work.
+- INS-016: Deriving an installation entitlement does NOT bypass invoice controls. No installation fee becomes payable without the required verified invoice and all existing eligibility/hold/identity/ownership controls. **PASS** — enforced unchanged in `materialize_installation_entitlements` (VERIFIED invoice for the stage, holds, identity CONFLICT, `subscriber_ownership_type = RESELLER`) and `record_installation_payment` (`invoice_status = approved`). The raw-activation bridge adds no payment authority. A new subscriber-level guard removes one: `guard_installation_stage_paid_once` (before insert on `installation_payments`) makes each of P1..P4 payable at most once per subscriber across all periods and all payment paths, aborting the transaction before the payment row, the ledger entry, the paid transition and the success audit.
 
 ## Invoice audit
 - INV-001: Accounting uploads the COMPLETE invoice file, not only row-by-row manual review. **MISSING**
@@ -251,12 +256,16 @@ Every new user clarification must first receive a requirement ID and be added he
 17. Backup/recovery strategy.
 
 ## Explicit business decisions still required
+
+> Historical list of what was opened. DEC-001..006 were resolved in writing by the owner on 2026-09-01, and DEC-007 — the last one still open — on 2026-09-02. Every decision below now has its statement and evidence in `docs/BUSINESS_DECISIONS_REQUIRED.md`.
+
 - DEC-001: ACTIVE USER formula.
 - DEC-002: NEW ZONE tier grouping.
 - DEC-003: invoice identity authority.
 - DEC-004: invoice evidence storage/security/retention.
 - DEC-005: bad import cancellation semantics.
 - DEC-006: cross-username subscriber identity resolution.
+- DEC-007: **RESOLVED 2026-09-02 — option (a).** Monthly installation-fee entitlement is driven by the official current stage P1..P4, a VERIFIED invoice for that same stage, and the existing eligibility controls; a fresh qualifying activation event in the period is NOT required. A subscriber at P3 with a VERIFIED P3 invoice earns 3,000 IQD that month with no new activation; without a VERIFIED P3 invoice there is neither entitlement nor payment. This is the behaviour already shipped in `materialize_installation_entitlements`, so nothing changed in code. Full statement in `docs/BUSINESS_DECISIONS_REQUIRED.md`; regression in `tests/sql/installation-dec007-monthly-entitlement.sql`.
 
 ## Mandatory acceptance cases
 1. OLD/NEW follows settings, not numeric constant.
@@ -287,7 +296,7 @@ Every new user clarification must first receive a requirement ID and be added he
 ## Execution order
 A. Commit this register and point stale status docs to it.  
 B. Build configuration foundation (CFG/ZON).  
-C. Close business decisions DEC-001..006.  
+C. Close business decisions DEC-001..007.  
 D. Build invoice engine + multi-invoice logic.  
 E. Close commission correction UI, import/cycle cancellation, Free P1, ownership E2E.  
 F. Reconciliation/security/backup.  

@@ -79,7 +79,7 @@ test('المعاينة والتطبيق يحتاجان صلاحيتين مختل
 /* ---- الشاشة ---------------------------------------------------------------- */
 
 test('قارئ الصفوف يُسقط سطر العنوان ويقبل ثلاثة أعمدة', () => {
-  const src = invoicesUi.slice(invoicesUi.indexOf('function parseInvoiceRows'));
+  const src = invoicesUi.slice(invoicesUi.indexOf('function rowsFromCells'));
   const compiled = ts.transpileModule(
     src.slice(0, src.indexOf('function wireBulkInvoiceAudit')), { compilerOptions: { target: 'ES2022' } });
   const ctx = { module: { exports: {} } };
@@ -104,6 +104,60 @@ test('قارئ الصفوف يُسقط سطر العنوان ويقبل ثلاث
   // سطرٌ بلا معرّف مشترك يُسقَط.
   assert.deepEqual(parseInvoiceRows('a-1,INV-1,2026-09-01\n,INV-2,2026-09-02'),
     [{ subscriber_id: 'a-1', invoice_number: 'INV-1', invoice_date: '2026-09-01' }]);
+});
+
+// طلب #9 — دعم إكسل (xlsx/xls) إلى جانب CSV: يمرّ عبر SheetJS المُحمَّلة سلفاً
+// (assets/vendor/xlsx.full.min.js) بنفس النمط الذي تستخدمه شاشة الاستيراد
+// الشهري (import-run.ts)، ثم يمرّ عبر rowsFromCells نفسها التي يقرأ منها
+// CSV — لا محلِّل ثانٍ لشكل الصفّ.
+
+function extractUiFunctions() {
+  const src = invoicesUi.slice(invoicesUi.indexOf('function rowsFromCells'));
+  const compiled = ts.transpileModule(
+    src.slice(0, src.indexOf('function wireBulkInvoiceAudit')), { compilerOptions: { target: 'ES2022' } });
+  return compiled.outputText;
+}
+
+test('محلِّل الإكسل يقرأ الورقة الأولى بصيغة العرض (raw: false) ويُسقط العنوان', async () => {
+  const sandbox = {
+    window: {
+      XLSX: {
+        read: () => ({ SheetNames: ['Sheet1'], Sheets: { Sheet1: {} } }),
+        utils: {
+          sheet_to_json: (_sheet, opts) => {
+            assert.equal(opts.header, 1, 'يجب طلب صفوفٍ خام (مصفوفة أعمدة) لا كائنات');
+            assert.equal(opts.raw, false, 'يجب طلب القيم كما تُعرض، لا الرقم التسلسلي الخام للتاريخ');
+            return [
+              ['subscriber_id', 'invoice_number', 'invoice_date'],
+              ['a-1', 'INV-1', '2026-09-01'],
+              ['', 'INV-2', '2026-09-02'],
+            ];
+          },
+        },
+      },
+    },
+    module: { exports: {} },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(extractUiFunctions() + '\nmodule.exports = { parseInvoiceWorkbook };', sandbox);
+  const fakeFile = { name: 'invoices.xlsx', arrayBuffer: async () => new ArrayBuffer(0) };
+  const rows = JSON.parse(JSON.stringify(await sandbox.module.exports.parseInvoiceWorkbook(fakeFile)));
+  assert.deepEqual(rows, [{ subscriber_id: 'a-1', invoice_number: 'INV-1', invoice_date: '2026-09-01' }]);
+});
+
+test('لا مكتبة إكسل محمَّلة = خطأ عربيّ واضح، لا انهيارٌ صامت', async () => {
+  const sandbox = { window: {}, module: { exports: {} } };
+  vm.createContext(sandbox);
+  vm.runInContext(extractUiFunctions() + '\nmodule.exports = { parseInvoiceWorkbook };', sandbox);
+  await assert.rejects(
+    () => sandbox.module.exports.parseInvoiceWorkbook({ name: 'x.xlsx', arrayBuffer: async () => new ArrayBuffer(0) }),
+    /مكتبة قراءة إكسل غير محمَّلة/);
+});
+
+test('الملف يقبل xlsx/xls إلى جانب csv، والزرّ يفرّع بالامتداد إلى المحلِّل نفسه', () => {
+  assert.match(invoicesUi, /accept="\.csv,\.txt,\.xlsx,\.xls"/);
+  assert.ok(invoicesUi.includes('/\\.xlsx?$/i.test(f.name)'), 'لا فحص امتداد إكسل في زرّ القراءة');
+  assert.match(invoicesUi, /rowsBox\.value = rowsToText\(rows\)/);
 });
 
 test('لا يُطبَّق تدقيق قبل معاينة، ولا بلا سبب', () => {
