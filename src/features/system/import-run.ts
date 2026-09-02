@@ -327,7 +327,13 @@ const ENTITLEMENTS_CHUNK_SIZE = 20000;
 /** يُقسّم صفوف استحقاقات الشهر إلى نداءاتٍ ≤20000 ضمن دفعةٍ منطقيةٍ واحدة:
  *  النداء الأول بلا p_batch_id ينشئ الدفعة، وكلّ نداءٍ لاحقٍ يُلحِق بها عبر
  *  batch_id الذي أعاده النداء السابق. يعيد استجابة آخر نداءٍ — تحمل
- *  batch_totals لإجماليّ الدفعة كلّها، لا الجزء الأخير وحده. */
+ *  batch_totals لإجماليّ الدفعة كلّها، لا الجزء الأخير وحده.
+ *
+ *  تدقيق QA ما بعد الإطلاق (2026-09-02، إغلاق عوائق Codex #2): كل نداءٍ
+ *  ناجحٍ كان يُقفل الدفعة `completed` فوراً — فجزءٌ لاحقٌ فاشلٌ يترك الدفعة
+ *  مقفلةً زوراً وهي منقوصة (20261031090000). الآن p_finalize صريحة: false
+ *  لكل جزءٍ ما عدا الأخير، وp_expected_rows تُعلَن دوماً فيتحقّق الخادم من
+ *  اكتمال العدد قبل القفل — لا إنهاء صامتٌ ولا إنهاءٌ مبكِّر. */
 async function importEntitlementsChunked(
   period: string, fileName: string, fileChecksum: string, rows: Row[],
   onProgress: (done: number, total: number) => void,
@@ -336,12 +342,15 @@ async function importEntitlementsChunked(
   let last: Row = {};
   for (let i = 0; i < rows.length; i += ENTITLEMENTS_CHUNK_SIZE) {
     const chunk = rows.slice(i, i + ENTITLEMENTS_CHUNK_SIZE);
+    const isLast = i + chunk.length >= rows.length;
     const params: Row = {
       p_period: period,
       p_file_name: fileName,
       p_file_checksum: fileChecksum,
       p_rows: chunk,
       p_request_id: crypto.randomUUID(),
+      p_expected_rows: rows.length,
+      p_finalize: isLast,
     };
     if (batchId) params['p_batch_id'] = batchId;
     last = await rpc<Row>('import_installation_entitlements', params);

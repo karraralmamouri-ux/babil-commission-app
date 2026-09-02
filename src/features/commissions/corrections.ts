@@ -55,8 +55,19 @@ export const corrections: Route = {
     if (!view.live) return;
     if (!list?.length) { view.innerHTML = empty('لا دورة بعد'); return; }
 
-    const cycleId = m.query.get('cycle') || current || str(list[0] || {}, 'id');
-    const cycle = list.find((c) => str(c, 'id') === cycleId) || list[0] || {};
+    // لا اختيار صريح ولا دورة عاملة: لا تُختار أحدث دورة بديلاً — قد تكون
+    // ملغاة. راجع commissions/index.ts لنفس الإصلاح.
+    const cycleId = m.query.get('cycle') || current || '';
+    if (!cycleId) {
+      view.innerHTML = pageHeader('تصحيح التفعيلات')
+        + empty('لا دورة عاملة حالياً', 'اختر دورةً صراحةً');
+      return;
+    }
+    const cycle = list.find((c) => str(c, 'id') === cycleId);
+    if (!cycle) {
+      view.innerHTML = pageHeader('تصحيح التفعيلات') + empty('الدورة المطلوبة غير موجودة');
+      return;
+    }
 
     const args: Record<string, unknown> = {
       p_cycle_id: cycleId, p_limit: limit, p_offset: offset,

@@ -69,7 +69,18 @@ export const overview: Route = {
     // corrections.ts وreports/index.ts لنفس النمط.
     const [list, currentId] = await Promise.all([cycles(), currentCycleId()]);
     if (!list.length) { view.write(empty('لا توجد دورات عمولة بعد')); return; }
-    const current = (currentId && list.find((c) => c.id === currentId)) || (list[0] as Cycle);
+    // لا دورة عاملة الآن (كلّ ما هنا ملغاة أو مسوّدة لم يُشغَّل حسابها) —
+    // لا يُختار أحدث صفٍّ بديلاً؛ هذا بالضبط الخلل الذي أصلحته #1 لولا هذا
+    // السطر. الجدول أدناه يبقى للتصفّح الصريح لأيّ دورة، الملغاة ضمنها.
+    if (!currentId) {
+      view.write(pageHeader('عمولات الوكلاء')
+        + empty('لا دورة عاملة حالياً', 'افتح دورةً من الجدول أدناه صراحةً')
+        + `<div class="box" style="margin-top:12px"><h3>الدورات</h3>${
+            table<Cycle>(cycleColumns(), list,
+              (c) => `location.hash='${href(`/commissions/cycles/${c.id}`).slice(1)}'`)}</div>`);
+      return;
+    }
+    const current = list.find((c) => c.id === currentId) as Cycle;
 
     // بطاقةٌ توجيهية فقط. القرار — DRAFT + القدرة — هو نفس شرط ظهور زرّ
     // الإلغاء في تبويب المراجعة والاعتماد، فيُعاد استعماله لا يُكتب ثانيةً.

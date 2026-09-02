@@ -440,5 +440,42 @@ bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
 bash tests/sql/invoice-dedup-concurrency.sh
 
+echo "== installation entitlements lifecycle + ownership =="
+out50=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-entitlements-lifecycle-and-ownership.sql 2>&1) || true
+if echo "$out50" | grep -qE "FAILED|ERROR"; then
+  echo "$out50" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION ENTITLEMENTS LIFECYCLE + OWNERSHIP TESTS FAILED" >&2; exit 1
+fi
+echo "$out50" | grep -E "^ {4,6}(ok|==) " || true
+passed=$((passed + $(echo "$out50" | grep -c "     ok ")))
+
+echo "== installation import timeout benchmark (8s) =="
+out51=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-import-timeout-benchmark.sql 2>&1) || true
+if echo "$out51" | grep -qE "FAILED|ERROR"; then
+  echo "$out51" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION IMPORT TIMEOUT BENCHMARK FAILED" >&2; exit 1
+fi
+echo "$out51" | grep -E "^ {2,4}(ok|==) " || true
+echo "$out51" | grep -E "^Time:" || true
+passed=$((passed + $(echo "$out51" | grep -c "    ok ")))
+
+echo "== stale unknown_fdt read model =="
+out48=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/stale-unknown-fdt-read-model.sql 2>&1) || true
+if echo "$out48" | grep -qE "FAILED|ERROR"; then
+  echo "$out48" | grep -E "FAILED|ERROR" || true
+  echo "STALE UNKNOWN_FDT READ MODEL TESTS FAILED" >&2; exit 1
+fi
+echo "$out48" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out48" | grep -c "  ok ")))
+
+echo "== fdt workcenter operative cycle =="
+out49=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/fdt-workcenter-operative-cycle.sql 2>&1) || true
+if echo "$out49" | grep -qE "FAILED|ERROR"; then
+  echo "$out49" | grep -E "FAILED|ERROR" || true
+  echo "FDT WORKCENTER OPERATIVE CYCLE TESTS FAILED" >&2; exit 1
+fi
+echo "$out49" | grep -E "^ {3,5}(ok|==) " || true
+passed=$((passed + $(echo "$out49" | grep -c "   ok ")))
+
 echo
 echo "local database assertions passed: $((passed + 1))"

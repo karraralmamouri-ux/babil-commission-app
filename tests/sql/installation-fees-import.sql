@@ -316,13 +316,19 @@ select pg_temp.expect(
    from result));
 
 -- 20001 صفاً: نداءان بنفس p_batch_id — الأول 20000 والثاني صفّ واحد يُلحَق.
+-- p_finalize := false على الأول: جزءٌ غير نهائيّ، لا يُقفَل بعده (Blocker 2).
 select (public.import_installation_entitlements('2026-10','chunk-20001.xlsx','sha-chunk-20001',
-  pg_temp.rows_at('CHK-20001', 13000, 20000, 'a'), gen_random_uuid()) -> 'batch') as chk20001_c1 \gset
+  pg_temp.rows_at('CHK-20001', 13000, 20000, 'a'), gen_random_uuid(),
+  null, null, false) -> 'batch') as chk20001_c1 \gset
 
 select pg_temp.expect(
   'مجزّأ 20001: الجزء الأول يقبل 20000 صفّ وينشئ الدفعة',
   ((:'chk20001_c1'::jsonb ->> 'accepted')::int = 20000
     and (:'chk20001_c1'::jsonb ->> 'batch_id') is not null));
+
+select pg_temp.expect(
+  'مجزّأ 20001: الجزء الأول غير النهائيّ يترك الدفعة IN_PROGRESS لا مكتملة',
+  ((:'chk20001_c1'::jsonb ->> 'status') = 'in_progress'));
 
 select (:'chk20001_c1'::jsonb ->> 'batch_id') as chk20001_batch_id \gset
 
@@ -349,9 +355,10 @@ select pg_temp.expect(
   (select count(*) = 20001 from public.installation_entitlements
    where period = '2026-10' and reseller = 'CHK-20001'));
 
--- ~30000 صفاً: نداءان بنفس p_batch_id (20000 ثم 10000).
+-- ~30000 صفاً: نداءان بنفس p_batch_id (20000 ثم 10000). الأول غير نهائيّ.
 select (public.import_installation_entitlements('2026-10','chunk-30k.xlsx','sha-chunk-30k',
-  pg_temp.rows_at('CHK-30K', 10000, 20000, 'a'), gen_random_uuid()) -> 'batch') as chk30k_c1 \gset
+  pg_temp.rows_at('CHK-30K', 10000, 20000, 'a'), gen_random_uuid(),
+  null, null, false) -> 'batch') as chk30k_c1 \gset
 
 select (:'chk30k_c1'::jsonb ->> 'batch_id') as chk30k_batch_id \gset
 
@@ -373,7 +380,7 @@ select pg_temp.expect(
 -- الأول ثم يُعاد في الثاني — كلّ جزءٍ يُثبَّت قبل التالي فيُكتشَف كالتكرار العادي.
 select (public.import_installation_entitlements('2026-10','chunk-dup.xlsx','sha-chunk-dup',
   jsonb_build_array(jsonb_build_object('subscriber_id','CHK-DUP-1','reseller','CHK-DUP','remaining',13000)),
-  gen_random_uuid()) -> 'batch') as chkdup_c1 \gset
+  gen_random_uuid(), null, null, false) -> 'batch') as chkdup_c1 \gset
 
 select (:'chkdup_c1'::jsonb ->> 'batch_id') as chkdup_batch_id \gset
 
