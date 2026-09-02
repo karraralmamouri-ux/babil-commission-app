@@ -81,6 +81,7 @@ const ACTION_AR: Record<string, string> = {
   'identity.bootstrap.run': 'تشغيل مطابقة الهويات',
   'permission.changed': 'تعديل صلاحية',
   'saas.activation_events.imported': 'استيراد أحداث تفعيل SaaS',
+  'saas.activation_events.chunk_received': 'استلام جزء من أحداث تفعيل SaaS',
   'saas.user_snapshot.imported': 'استيراد لقطة مستخدمي SaaS',
   'integration.odoo.invoice.checked': 'فحص فاتورة أودو',
   'master.fdt.classified': 'تصنيف FDT',

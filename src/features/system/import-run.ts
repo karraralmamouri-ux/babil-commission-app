@@ -18,6 +18,7 @@ import { href } from '../../app/router';
 import { rpc, can, ApiError } from '../../services/api';
 import { money, count } from '../../domain/money';
 import { esc, loading, pageHeader, table, chip, kpiRow, type Column } from '../../components/ui';
+import { bridgeSweepAll } from './bridge-sweep';
 
 type Row = Record<string, unknown>;
 const num = (r: Row, k: string) => Number(r[k] || 0);
@@ -249,29 +250,35 @@ function wireImport(view: View): void {
         const parts: string[] = [];
 
         if (events.length) {
-          const r = await rpc<Row>('import_saas_activation_events', {
-            p_file_name: parsed.fileName,
-            p_file_checksum: parsed.checksum,
-            p_parser_version: 'saas-import.js',
-            p_rows: events,
-            p_request_id: crypto.randomUUID(),
-          });
-          const batch = (r?.['batch'] || {}) as Row;
-          parts.push(`أحداث: مقبول ${count(num(batch, 'accepted'))} · مكرّر ${count(num(batch, 'duplicates'))}`
-            + ` · مرفوض ${count(num(batch, 'rejected'))}`);
+          const batch = await importSaasEventsChunked(
+            parsed.fileName, parsed.checksum, events,
+            (done, total) => {
+              if (!view.live) return;
+              out.innerHTML = loading(total > SAAS_EVENTS_CHUNK_SIZE
+                ? `جارٍ اعتماد أحداث التفعيل… (${count(done)} من ${count(total)})`
+                : 'جارٍ الاعتماد على الخادم…');
+            });
+          // batch_totals إجماليّ الملف كله عبر كل أجزائه، لا الجزء الأخير وحده.
+          const totals = (batch['batch_totals'] as Row) || batch;
+          parts.push(`أحداث: مقبول ${count(num(totals, 'accepted'))} · مكرّر ${count(num(totals, 'duplicates'))}`
+            + ` · مرفوض ${count(num(totals, 'rejected'))}`);
 
           // الاستيراد وحده لا يُنشئ حالة تنصيب. الجسر هو ما يُحوّل التفعيل
           // الخام إلى تسجيلٍ ثم حالةٍ رسمية — وبالبوابة نفسها، فلا يُسجَّل من
           // لم تُجزه. أكثر الصفوف تُمنع هنا بحق (الهوية والتصنيف واكتمال
           // المصدر تُحسم بعد الرفع)، ولذلك يُعاد المسح من مركز الاستيراد.
-          const bridge = await rpc<Row>('bridge_saas_activations_to_enrollments', {
-            p_batch_id: str(batch, 'batch_id') || null,
-            p_limit: 5000,
-            p_request_id: crypto.randomUUID(),
-          });
-          const swept = (bridge?.['result'] || {}) as Row;
-          parts.push(`تسجيل: مؤهَّل ${count(num(swept, 'enrolled'))}`
-            + ` · بانتظار المراجعة ${count(num(swept, 'blocked'))}`);
+          //
+          // ولا يُشغَّل إلا بعد أن يكتمل الاستيراد فعلاً: أيّ جزءٍ يسقط يرمي،
+          // فلا يُقيَّم مرشّحو ملفٍّ نصفِ مرفوع.
+          const swept = await bridgeSweepAll(str(batch, 'batch_id') || null,
+            (t) => {
+              if (!view.live) return;
+              out.innerHTML = loading(`جارٍ تقييم المرشّحين… (سُجّل ${count(t.enrolled)}`
+                + ` · بقي ${count(t.remaining)})`);
+            });
+          parts.push(`تسجيل: مؤهَّل ${count(swept.enrolled)}`
+            + ` · بانتظار المراجعة ${count(swept.blocked)}`
+            + (swept.complete ? '' : ` · بقي ${count(swept.remaining)} بلا نظر`));
         }
         if (users.length) {
           const r = await rpc<Row>('import_saas_user_snapshot', {
@@ -331,6 +338,54 @@ function wireImport(view: View): void {
       confirm.disabled = false;
     }
   });
+}
+
+/** حجم الجزء في import_saas_activation_events (20261104090000).
+ *
+ *  تدقيق QA ما بعد الإطلاق (2026-09-02): Activations Report_Aug-2026.xlsx
+ *  فيه 29,427 حدثاً، وكان يُرسَل كله في نداءٍ واحد فيعود بـ statement
+ *  timeout. القياس على قاعدةٍ محلية بعد جعل الاستيعاب مجموعياً: النداء
+ *  الواحد بـ30,000 صفٍّ ≈ 5.3 ثانية من ميزانية الثماني ثوانٍ — هامشٌ لا
+ *  يُبنى عليه؛ والجزء بـ5,000 صفٍّ مكتمل الحقول ≈ ثانيةٌ واحدة، والملف كله
+ *  بستّة أجزاء ≈ 4.4–5.7 ثانية في قياسين. المقاس محفوظٌ في
+ *  tests/sql/saas-activation-large-import.sh ويُعاد قياسه في كل تشغيل. */
+const SAAS_EVENTS_CHUNK_SIZE = 5000;
+
+/** يُقسّم أحداث التفعيل إلى نداءاتٍ ضمن دفعةٍ منطقيةٍ واحدة للملف.
+ *
+ *  batchId هنا متغيّرٌ محليٌّ فقط: لو أُعيد تحميل الصفحة أثناء الرفع فُقِد،
+ *  وتُعاد المحاولة من i=0 بمعرّفات طلبٍ جديدة. الصحّة لا تعتمد على بقائه —
+ *  p_row_offset يُعلن دوماً موضع الجزء الحقيقي داخل الملف، والخادم هو من
+ *  يقرّر بمدى المواضع المُستقبَلة هل هذا وارد جديدٌ أم إعادة إرسال، فلا
+ *  يُعيد عدّه ولا يُعيد قراءته. وبصمة الملف تُعيده إلى دفعته نفسها، فلا
+ *  تنشأ دفعةٌ ثانيةٌ لملفٍّ واحد. */
+async function importSaasEventsChunked(
+  fileName: string, fileChecksum: string, rows: Row[],
+  onProgress: (done: number, total: number) => void,
+): Promise<Row> {
+  let batchId: string | null = null;
+  let last: Row = {};
+  for (let i = 0; i < rows.length; i += SAAS_EVENTS_CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + SAAS_EVENTS_CHUNK_SIZE);
+    const params: Row = {
+      p_file_name: fileName,
+      p_file_checksum: fileChecksum,
+      p_parser_version: 'saas-import.js',
+      p_rows: chunk,
+      p_request_id: crypto.randomUUID(),
+      p_expected_rows: rows.length,
+      // الإنهاء للجزء الأخير وحده: أيّ جزءٍ يسقط يترك الدفعة مفتوحةً
+      // مستأنَفة، لا مقفلةً زوراً وهي منقوصة.
+      p_finalize: i + chunk.length >= rows.length,
+      p_row_offset: i,
+    };
+    if (batchId) params['p_batch_id'] = batchId;
+    const r = await rpc<Row>('import_saas_activation_events', params);
+    last = (r?.['batch'] || {}) as Row;
+    batchId = str(last, 'batch_id') || batchId;
+    onProgress(Math.min(i + chunk.length, rows.length), rows.length);
+  }
+  return last;
 }
 
 /** حدّ النداء الواحد في import_installation_entitlements — صار حجم دفعةٍ داخلية

@@ -17,6 +17,7 @@ import { href } from '../../app/router';
 import { dateTime } from '../../domain/time';
 import { rpc, pageRpc, can, ApiError } from '../../services/api';
 import { count } from '../../domain/money';
+import { bridgeSweepAll, bridgeReasons } from './bridge-sweep';
 import {
   esc, loading, empty, pageHeader, table, pager, kpiRow, chip,
   filterBar, wireFilters, type Column,
@@ -335,21 +336,19 @@ function wireBridge(view: View): void {
     run.disabled = true;
     out.innerHTML = loading('جارٍ تقييم المرشّحين على الخادم…');
     try {
-      const r = await rpc<Row>('bridge_saas_activations_to_enrollments', {
-        p_batch_id: batchId,
-        p_limit: 5000,
-        p_request_id: crypto.randomUUID(),
+      // مسحةٌ واحدةٌ لا تكفي: نافذة النداء محدودة، والممنوعون يبقون مرشّحين
+      // فيملؤونها في كل مرّة. المرور الكامل بالمؤشّر في bridge-sweep.
+      const swept = await bridgeSweepAll(batchId, (t) => {
+        if (!view.live) return;
+        out.innerHTML = loading(`جارٍ تقييم المرشّحين… (سُجّل ${count(t.enrolled)}`
+          + ` · بقي ${count(t.remaining)})`);
       });
       if (!view.live) return;
-      const res = (r?.['result'] || {}) as Row;
-      const reasons = (res['reasons'] || {}) as Record<string, number>;
-      const why = Object.entries(reasons)
-        .sort((a, b) => b[1] - a[1])
-        .map(([k, n]) => `${k}: ${count(Number(n))}`)
-        .join(' · ');
-      out.innerHTML = insight(num(res, 'enrolled') ? 'good' : 'warn',
-        `سُجّل ${count(num(res, 'enrolled'))} من ${count(num(res, 'considered'))} مرشّحاً`,
-        why ? `الممنوعون — ${why}` : 'لا ممنوعين');
+      const why = bridgeReasons(swept);
+      out.innerHTML = insight(swept.enrolled ? 'good' : 'warn',
+        `سُجّل ${count(swept.enrolled)} من ${count(swept.considered)} مرشّحاً`,
+        (why ? `الممنوعون — ${why}` : 'لا ممنوعين')
+        + (swept.complete ? '' : ` · بقي ${count(swept.remaining)} مرشّحاً بلا نظر`));
     } catch (error) {
       if (!view.live) return;
       out.innerHTML = insight('danger', 'لم يُشغَّل الجسر',

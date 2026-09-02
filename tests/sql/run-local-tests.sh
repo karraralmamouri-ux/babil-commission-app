@@ -440,6 +440,8 @@ bash tests/sql/installation-fees-concurrency.sh
 bash tests/sql/financial-correction-concurrency.sh
 bash tests/sql/invoice-dedup-concurrency.sh
 bash tests/sql/installation-cross-period-payment-concurrency.sh
+bash tests/sql/saas-activation-import-concurrency.sh
+bash tests/sql/saas-activation-large-import.sh
 
 echo "== installation entitlements lifecycle + ownership =="
 out50=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-entitlements-lifecycle-and-ownership.sql 2>&1) || true
@@ -513,6 +515,15 @@ if echo "$out55" | grep -qE "FAILED|ERROR"; then
 fi
 echo "$out55" | grep -E "^ {2,4}(ok|==) " || true
 passed=$((passed + $(echo "$out55" | grep -c "   ok ")))
+
+echo "== saas activation chunked intake =="
+out56=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/saas-activation-chunked-intake.sql 2>&1) || true
+if echo "$out56" | grep -qE "FAILED|ERROR"; then
+  echo "$out56" | grep -E "FAILED|ERROR" || true
+  echo "SAAS ACTIVATION CHUNKED INTAKE TESTS FAILED" >&2; exit 1
+fi
+echo "$out56" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out56" | grep -c "   ok ")))
 
 echo
 echo "local database assertions passed: $((passed + 1))"
