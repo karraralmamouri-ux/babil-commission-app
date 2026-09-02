@@ -525,5 +525,14 @@ fi
 echo "$out56" | grep -E "^ {2,4}(ok|==) " || true
 passed=$((passed + $(echo "$out56" | grep -c "   ok ")))
 
+echo "== installation DEC-007 monthly entitlement =="
+out57=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-dec007-monthly-entitlement.sql 2>&1) || true
+if echo "$out57" | grep -qE "FAILED|ERROR"; then
+  echo "$out57" | grep -E "FAILED|ERROR" || true
+  echo "DEC-007 MONTHLY ENTITLEMENT TESTS FAILED" >&2; exit 1
+fi
+echo "$out57" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out57" | grep -c "   ok ")))
+
 echo
 echo "local database assertions passed: $((passed + 1))"

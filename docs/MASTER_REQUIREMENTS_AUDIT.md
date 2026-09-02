@@ -140,7 +140,7 @@ Engine: `calculate_commission_cycle`, `supabase/migrations/20261011090000_effect
 | INS-011 | Correction/reversal exists without mutating original | PASS | `reverse_financial_entry`/`correct_financial_entry` | `20260818090000_add_financial_correction_ledger.sql:287-499` | `src/features/installation/index.ts` wires `paymentCorrections.ts` | — | Closed per `docs/engineering/risk-and-open-decisions.md:41-75` (R-03) |
 | INS-012 | Historical baseline is the one-time opening authority | PASS | `import_installation_history`, `20260816090000_add_installation_history.sql` | `installation_subscribers` / `installation_subscriber_state` / `installation_payment_history` | — | `tests/sql/installation-history-rules.sql`, `tests/sql/installation-raw-activation-bridge.sql` §8 | Bridge inserts state with `on conflict do nothing`, so a historical subscriber resumes from its own stage and is never reset to P1 |
 | INS-013 | Recurring monthly path consumes the raw SaaS Activation file — no hand-made Remaining column | PASS | `bridge_saas_activations_to_enrollments` + `ensure_installation_state_for_enrollment`, `20261103090000_installation_raw_activation_bridge.sql` | bulk sweep gated by the existing `evaluate_enrollment_gate`; `trg_installation_enrollment_opens_state` after insert on `installation_enrollments` | `src/features/system/import-run.ts` (after the raw import), `src/features/system/imports.ts` (re-run panel) | `tests/sql/installation-raw-activation-bridge.sql` §1, §3, §4, §13 | `enroll_new_installation` previously had no UI caller at all. No blind enrolment: blocked subscribers are returned with their reasons and stay reviewable; re-runnable because identity/classification/completeness are settled after upload. Amended by `20261104090000` (§16): chunked intake keeps one logical batch per file under the 8s authenticated timeout, and the sweep is cursored (`p_after_username`) so blocked candidates cannot starve the ones behind them; the caller sweeps to exhaustion via `src/features/system/bridge-sweep.ts` |
-| INS-014 | Server derives current/next stage, Remaining and entitlement from authoritative state | PASS | `materialize_installation_entitlements`, `20260913090000_materialize_and_batch.sql`; reconciliation in `ensure_installation_state_for_enrollment` | reads `installation_subscriber_state`; no Remaining parameter exists on any recurring RPC; opening state reconciled against paid entitlements/payments | — | `tests/sql/installation-raw-activation-bridge.sql` §2, §4; `tests/sql/installation-upgrade-backfill.sql` §1–§5 | An upgraded subscriber with prior paid stages opens at the correct next stage, never at a fresh P1; an inconsistent history opens as `unresolved` with the reason in `warnings` instead of a guess. DEC-007 (per-period qualifying event) remains open; no gate added |
+| INS-014 | Server derives current/next stage, Remaining and entitlement from authoritative state | PASS | `materialize_installation_entitlements`, `20260913090000_materialize_and_batch.sql`; reconciliation in `ensure_installation_state_for_enrollment` | reads `installation_subscriber_state`; no Remaining parameter exists on any recurring RPC; opening state reconciled against paid entitlements/payments | — | `tests/sql/installation-raw-activation-bridge.sql` §2, §4; `tests/sql/installation-upgrade-backfill.sql` §1–§5 | An upgraded subscriber with prior paid stages opens at the correct next stage, never at a fresh P1; an inconsistent history opens as `unresolved` with the reason in `warnings` instead of a guess. DEC-007 (per-period qualifying event) was RESOLVED by the owner on 2026-09-02 in favour of option (a) — stage + VERIFIED invoice for that same stage + existing eligibility controls, no fresh activation required in the period; that is the shipped behaviour, so no gate was added and no code changed (§17), pinned by `tests/sql/installation-dec007-monthly-entitlement.sql` |
 | INS-015 | Progression P1→P2→P3→P4→DONE is deterministic, sequential, idempotent, auditable | PASS | `trg_payment_advances_installation_state` + `guard_installation_stage_paid_once`, `20261103090000_installation_raw_activation_bridge.sql` | before insert on `installation_payments` writes `installation_payment_history` (unique `subscriber_uuid, stage`); after update on the paid transition advances state under `for update`, reading `stage_amount_for_version` / `next_stage_for_version` / `stage_for_remaining_in_version` of the enrollment's frozen version | — | `tests/sql/installation-raw-activation-bridge.sql` §5–§9, §14; `tests/sql/installation-cross-period-payment-concurrency.sh`; `tests/sql/payout-end-to-end.sql` §11 | Same subscriber + same stage is now payable once across all periods and paths, failing atomically before the payment row, ledger entry, paid transition and success audit — proven sequentially and under true concurrency on two entitlement ids. Stated limit: storage CHECK constraints encode the V1 ladder, so a different versioned ladder is rejected as `SCHEME_NOT_REPRESENTABLE_IN_STORAGE` rather than silently mapped through the legacy function |
 | INS-016 | Deriving an entitlement does not bypass invoice/hold/identity/ownership controls | PASS | `materialize_installation_entitlements`, `installation_entitlement_eligibility`, `record_installation_payment`, `guard_installation_stage_paid_once` | VERIFIED invoice per stage, effective holds, identity CONFLICT, `subscriber_ownership_type = RESELLER`, `guard_installation_payment` before update, stage-paid-once before insert on `installation_payments` | — | `tests/sql/installation-raw-activation-bridge.sql` §10, §9(د) | The bridge writes only subscriber/state rows; it adds no payment authority and touches no entitlement or ledger row. The new guard only ever removes payment authority |
 
@@ -825,4 +825,49 @@ Full sequence re-run: `tests/sql/rebuild-local.sh` — **101/101 migrations**, c
 
 ### 16.9 Scope discipline
 
-No merge, no deploy, no Production access, no Production financial data created or modified, no payment executed, no July recalculation. The raw SaaS import still writes only `saas_activation_events` and its batch row — it creates no entitlement, no payment and no ledger entry, re-proven in `tests/sql/saas-activation-chunked-intake.sql` §6. **DEC-007 remains OPEN and is neither resolved nor implemented here.**
+No merge, no deploy, no Production access, no Production financial data created or modified, no payment executed, no July recalculation. The raw SaaS import still writes only `saas_activation_events` and its batch row — it creates no entitlement, no payment and no ledger entry, re-proven in `tests/sql/saas-activation-chunked-intake.sql` §6. **DEC-007 remains OPEN and is neither resolved nor implemented here.** *(Superseded 2026-09-02: the owner resolved DEC-007 the same day — see §17. Still no code change.)*
+
+## 17. 2026-09-02 Owner Decision Addendum — DEC-007 resolved, no code change
+
+**Type:** Seventh delta on this branch, and a documentation-only one. The owner resolved DEC-007 in writing on 2026-09-02, choosing option (a). It was the last business decision still open in `docs/BUSINESS_DECISIONS_REQUIRED.md`.
+
+### 17.1 The decision as stated
+
+Monthly installation-fee entitlement depends on three things and no fourth:
+
+1. the official current stage — P1/P2/P3/P4;
+2. a valid VERIFIED invoice **for that same stage**;
+3. passing the remaining existing eligibility controls.
+
+A fresh activation event in the same month is **not** required for any later stage. Worked example, as given: a subscriber at P3 holding a VERIFIED P3 invoice earns the P3 instalment of 3,000 IQD that month even with no new activation in it; without a VERIFIED P3 invoice there is neither entitlement nor payment.
+
+### 17.2 Verified against the code before writing anything
+
+`materialize_installation_entitlements` (`20260913090000_materialize_and_batch.sql:47-90`) already implements exactly that, and has since it shipped:
+
+- stage from `installation_subscriber_state` — `st.current_stage in ('P1','P2','P3','P4')`, `resolution = 'resolved'`, `payment_eligible`, `remaining > 0`;
+- `exists (… installation_invoices i where i.subscriber_id = s.subscriber_id and i.stage_code is not distinct from st.current_stage and i.status = 'VERIFIED')` — the invoice must match the stage being materialized, not merely exist;
+- effective holds, identity `CONFLICT`, `subscriber_ownership_type = 'RESELLER'`, and no existing entitlement for the same (period, subscriber, stage);
+- **no reference to `saas_activation_events` anywhere in the function** — there is no per-period activation gate to remove.
+
+`installation_amount_for_stage('P3')` is 3,000, matching the worked example. So option (a) required no change to any financial rule, function, constraint or UI, and none was made.
+
+### 17.3 What was added — a regression that pins the decision
+
+`tests/sql/installation-dec007-monthly-entitlement.sql` (8 assertions) builds three mid-instalment subscribers, all at P3 with 7,000 remaining, whose only activation events are dated January while entitlement is materialized for 2026-09:
+
+- the month contains zero activation events for any of them (asserted, not assumed), and all three sit at the official P3/7,000;
+- with a VERIFIED P3 invoice: one entitlement, stage P3, amount 3,000, remaining 7,000 — and `record_installation_payment` then actually pays 3,000, so the absence of a monthly activation withholds nothing;
+- with no VERIFIED invoice: no entitlement, no payment, no ledger row;
+- with a VERIFIED **P2** invoice left over from the previous instalment while the state is P3: likewise nothing — the invoice must match the stage;
+- `pg_get_functiondef` of the monthly engine contains no mention of `saas_activation_events`, so a per-period gate cannot be reintroduced silently.
+
+That last assertion is the point of the file: option (b) would have withheld instalments the engine grants today, and the regression makes any future move in that direction fail loudly rather than quietly.
+
+### 17.4 Re-verification
+
+`tests/sql/run-local-tests.sh` — **1390 assertions passing** (1382 per §16.8, +8 from the new file), zero failures. `npm test` — 713/713. `npx tsc --noEmit` — clean. `npm run build` — succeeds. `node scripts/check-migration-safety.mjs` — clean. `.github/workflows/ci.yml`'s assertion gate moved 1382 → 1390; the migration-count gate is unchanged at 101 because this addendum adds no migration.
+
+### 17.5 Scope discipline
+
+Documentation and one test file. No migration, no function, no financial rule, no production code, and no UI changed. No merge, no deploy, no Production access, no Production financial data created or modified, no payment executed, no July recalculation. §16.9's closing sentence — "DEC-007 remains OPEN" — was accurate when written and is superseded here.
