@@ -156,7 +156,7 @@ select pg_temp.ok(
 select pg_temp.act_as('bc000000-0000-0000-0000-0000000000a1');
 select (public.import_installation_entitlements('2026-11','lc-owned-by-a.xlsx','lc-sha-owned-a',
   pg_temp.rows_at('LC-OWNED-A', 13000, 1, 'a'), gen_random_uuid(),
-  null, null, false) -> 'batch') as lc_owned_c1 \gset
+  null, 2, false) -> 'batch') as lc_owned_c1 \gset
 
 select (:'lc_owned_c1'::jsonb ->> 'batch_id') as lc_owned_batch_id \gset
 
@@ -187,7 +187,7 @@ select pg_temp.ok(
 select pg_temp.act_as('bc000000-0000-0000-0000-0000000000a1');
 select (public.import_installation_entitlements('2026-11','lc-owned-by-a.xlsx','lc-sha-owned-a',
   pg_temp.rows_at('LC-OWNED-A', 13000, 1, 'b'), gen_random_uuid(),
-  (:'lc_owned_batch_id')::uuid) -> 'batch') as lc_owned_c2 \gset
+  (:'lc_owned_batch_id')::uuid, 2) -> 'batch') as lc_owned_c2 \gset
 
 select pg_temp.ok(
   (:'lc_owned_c2'::jsonb ->> 'status') = 'completed'

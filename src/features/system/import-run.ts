@@ -333,7 +333,14 @@ const ENTITLEMENTS_CHUNK_SIZE = 20000;
  *  ناجحٍ كان يُقفل الدفعة `completed` فوراً — فجزءٌ لاحقٌ فاشلٌ يترك الدفعة
  *  مقفلةً زوراً وهي منقوصة (20261031090000). الآن p_finalize صريحة: false
  *  لكل جزءٍ ما عدا الأخير، وp_expected_rows تُعلَن دوماً فيتحقّق الخادم من
- *  اكتمال العدد قبل القفل — لا إنهاء صامتٌ ولا إنهاءٌ مبكِّر. */
+ *  اكتمال العدد قبل القفل — لا إنهاء صامتٌ ولا إنهاءٌ مبكِّر.
+ *
+ *  إغلاق عوائق Codex الأخير (20261101090000): batchId هنا متغيّرٌ محليٌّ فقط
+ *  — لو أُعيد تحميل الصفحة أثناء الرفع يُفقَد، وتُعاد المحاولة من i=0 بمعرّف
+ *  طلبٍ جديد. الصحّة لم تعد تعتمد على بقاء هذا المتغيّر: p_row_offset يُعلن
+ *  دوماً موضع هذا الجزء الحقيقي داخل الملف (i نفسها)، والخادم هو من يقرّر
+ *  — عبر مدى المواضع المُستقبلة فعلياً لهذه الدفعة — هل هذا الجزء وارد
+ *  جديدٌ أم إعادة إرسالٍ لِما استُقبل من قبل، فلا يُعيد عدّه في الحالتين. */
 async function importEntitlementsChunked(
   period: string, fileName: string, fileChecksum: string, rows: Row[],
   onProgress: (done: number, total: number) => void,
@@ -351,6 +358,7 @@ async function importEntitlementsChunked(
       p_request_id: crypto.randomUUID(),
       p_expected_rows: rows.length,
       p_finalize: isLast,
+      p_row_offset: i,
     };
     if (batchId) params['p_batch_id'] = batchId;
     last = await rpc<Row>('import_installation_entitlements', params);

@@ -477,5 +477,14 @@ fi
 echo "$out49" | grep -E "^ {3,5}(ok|==) " || true
 passed=$((passed + $(echo "$out49" | grep -c "   ok ")))
 
+echo "== installation entitlements restart/replay safety =="
+out52=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-entitlements-restart-replay-safety.sql 2>&1) || true
+if echo "$out52" | grep -qE "FAILED|ERROR"; then
+  echo "$out52" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION ENTITLEMENTS RESTART/REPLAY SAFETY TESTS FAILED" >&2; exit 1
+fi
+echo "$out52" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out52" | grep -c "   ok ")))
+
 echo
 echo "local database assertions passed: $((passed + 1))"
