@@ -342,13 +342,33 @@ single month when it was calculated, and later grew a second month, cannot be ap
 Updates to an already-`APPROVED` run are left to the existing immutability guard, which
 reports the clearer error.
 
-### 12.11 Uploading the monthly file
+### 12.11 Uploading the monthly file — read, then commit
 
-The monthly screen uploads the activation-events file in place, and the imported batch
-immediately becomes that month's source. It is the same path the import centre uses — the
-same parser, the same chunked `import_saas_activation_events` call with its checksum and row
-offsets, the same enrolment bridge sweep — exported, not duplicated. There is one parser and
-one calculation source for one monthly file.
+The monthly screen uploads the activation-events file in place. It happens in two separate
+steps, and only the second one writes.
+
+**Read and preview** parses the file in the browser and calls nothing on the server. It reports
+the filename and checksum, the source row count, the activation events the parser accepted,
+duplicates, rejected rows, rows whose dates it could not read, the derived month or the reason
+no month can be proved, and per-sheet detail. Nothing has been written at that point, and the
+screen says so.
+
+**Commit the month's source** is a separate button and the only action that writes. It uses the
+same path the import centre uses — the same parser, the same chunked
+`import_saas_activation_events` call with its checksum and row offsets, the same enrolment
+bridge sweep — exported, not duplicated. There is one parser and one calculation source for one
+monthly file. The imported batch then becomes that month's source automatically.
+
+Choosing a different file after a preview discards that preview; the commit button is disabled
+again until the new file has been read.
+
+A source whose month is mixed or unprovable can still be committed. Raw activation events are a
+record, and refusing to store them would lose data the business must keep. The preview says
+plainly what is wrong, and §12.10's server-side gate still refuses to calculate a month it
+cannot prove. Storing the truth and computing on it are separate decisions.
+
+Accepted formats are `.xlsx`, `.xls` and `.csv` — the same three on both screens, read
+through the same vendored SheetJS with the same options.
 
 If the workbook also carries user-snapshot rows, they are reported and left alone; import them
 from the import centre if they are wanted. Nothing is swallowed silently.
@@ -366,5 +386,12 @@ classification, not a second rule engine: no fuzzy matching and no character nor
 any function — rows an auditor can see and an admin can edit. Moving a code from `UNKNOWN` to
 `DEBT_SERVICE` tightens and never loosens, and `guard_debt_service_never_qualifies` makes a
 qualifying rate for it structurally impossible.
+
+A registered spelling is master data an administrator can edit, so the migration that seeds it
+never overwrites what it finds. Each known spelling is inserted if absent, left untouched if it
+is already `DEBT_SERVICE`, and if it exists under any other classification **the migration
+fails and the deployment stops**. Overwriting an administrator's row silently and continuing
+silently with a financially unsafe classification are both refused: a human resolves the
+conflict before the deploy proceeds.
 
 ---

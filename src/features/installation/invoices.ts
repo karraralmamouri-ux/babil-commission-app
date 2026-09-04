@@ -395,7 +395,7 @@ function parseInvoiceRows(text: string): Array<Record<string, string>> {
 declare global {
   interface Window {
     XLSX?: {
-      read: (data: ArrayBuffer, opts: { type: string }) => { SheetNames: string[]; Sheets: Record<string, unknown> };
+      read: (data: ArrayBuffer, opts: { type: string; cellDates?: boolean }) => { SheetNames: string[]; Sheets: Record<string, unknown> };
       utils: { sheet_to_json: (sheet: unknown, opts: { defval: string; header?: number; raw?: boolean }) => Row[] };
     };
   }

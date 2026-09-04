@@ -216,21 +216,81 @@ create trigger trg_guard_calculation_run_period
 -- و`guard_debt_service_never_qualifies` يجعل إسنادَ سعرٍ مؤهِّلٍ لها مستحيلاً
 -- بنيويّاً. الانتقال من UNKNOWN إلى DEBT_SERVICE يُشدِّد ولا يُرخي.
 --
--- و`do nothing` عند التعارض: تصنيفُ مديرٍ قائمٍ لا يُداس.
 -- و«Loan-3» نفسها مذكورة هنا صراحةً: هجاؤها الأصلي لم يكن حقيقةَ ترحيلٍ
--- قط، بل صفّاً تبذره دالّةُ الإعداد `seed_raw_import_reference`. فقاعدةٌ لم
--- تُشغَّل عليها تلك الدالّة كانت تقرأ «Loan-3» باقةً مجهولة. لا مالَ تحرّك
--- بذلك — المجهول مانعٌ أيضاً — لكنّ التصنيف صار الآن حقيقةَ ترحيلٍ في كل
--- بيئة، لا أثراً جانبياً لخطوةِ إعدادٍ يدوية.
+-- قط، بل صفّاً تبذره دالّةُ الإعداد `bootstrap_master_data_from_settings`.
+-- فقاعدةٌ لم تُشغَّل عليها تلك الدالّة كانت تقرأ «Loan-3» باقةً مجهولة. لا
+-- مالَ تحرّك بذلك — المجهول مانعٌ أيضاً — لكنّ التصنيف صار الآن حقيقةَ
+-- ترحيلٍ في كل بيئة، لا أثراً جانبياً لخطوةِ إعدادٍ يدوية.
+--
+-- **والتعارض يسقط مغلقاً.** كان هذا الموضع `on conflict (code) do nothing`،
+-- فبيئةٌ فيها `Loan-3 = PAID_PACKAGE` تمرّ منه صامتةً وتُبقي تصنيفاً يُنتج
+-- مالاً على خدمة دَين. والصمتُ هنا أسوأ الاحتمالين: الترحيل ينجح، والقاعدة
+-- تُخالف قاعدةَ عملٍ مُقرَّرة، ولا أحد يعلم. فصار لكلّ هجاءٍ ثلاثةُ مآلاتٍ
+-- لا اثنان:
+--
+--   • غير موجود  ⇒ يُدرَج DEBT_SERVICE،        وتعيد الدالّة 'INSERTED'.
+--   • DEBT_SERVICE ⇒ يُترك كما هو بلا لمس،      وتعيد 'UNCHANGED'.
+--   • أيُّ تصنيفٍ آخر ⇒ **يسقط الترحيل** بخطأٍ يسمّي الرمز والتصنيف.
+--
+-- ولا يُداس على المدير: التعارض لا يُكتَب فوقه ولا يُتجاهَل — يُوقِف النشر
+-- ليقرّر إنسانٌ أيَّ الاثنين هو الحقّ. والمَخرج مقصود: تصحيحُ صفٍّ واحدٍ
+-- بيدٍ أرخص من مالٍ يُصرف على دَين.
 -- ---------------------------------------------------------------------------
 
-insert into public.packages (code, name, semantic_category, notes) values
-  ('Loan-3', 'Loan-3', 'DEBT_SERVICE', 'debt service, never a paid activation'),
-  ('LONA 3', 'LONA 3', 'DEBT_SERVICE', 'Loan-3 spelling variant observed in source files'),
-  ('LONA-3', 'LONA-3', 'DEBT_SERVICE', 'Loan-3 spelling variant observed in source files'),
-  ('Lona 3', 'Lona 3', 'DEBT_SERVICE', 'Loan-3 spelling variant observed in source files'),
-  ('Loan 3', 'Loan 3', 'DEBT_SERVICE', 'Loan-3 spelling variant observed in source files'),
-  ('LOAN-3', 'LOAN-3', 'DEBT_SERVICE', 'Loan-3 spelling variant observed in source files')
-on conflict (code) do nothing;
+create or replace function public.register_debt_service_package(
+  p_code text,
+  p_notes text default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $fn$
+declare
+  v_existing text;
+begin
+  select p.semantic_category into v_existing
+  from public.packages p where p.code = p_code;
+
+  if v_existing is null then
+    insert into public.packages (code, name, semantic_category, notes)
+    values (p_code, p_code, 'DEBT_SERVICE',
+            coalesce(p_notes, 'debt service, never a paid activation'));
+    return 'INSERTED';
+  end if;
+
+  if v_existing = 'DEBT_SERVICE' then
+    return 'UNCHANGED';
+  end if;
+
+  raise exception
+    'PACKAGE_CLASSIFICATION_CONFLICT: package % is classified %, but it is a debt '
+    'service and can never qualify. Resolve it by hand before deploying: either '
+    'correct the row to DEBT_SERVICE, or remove the code from this list.',
+    p_code, v_existing
+    using errcode = '23514';
+end;
+$fn$;
+
+comment on function public.register_debt_service_package(text, text) is
+  'يُسجّل هجاءَ خدمةِ دَينٍ: يُدرجه إن غاب، ويتركه إن كان DEBT_SERVICE، '
+  'ويُسقط الترحيل إن كان مصنَّفاً خلافها. لا يكتب فوق تصنيف مدير.';
+
+revoke execute on function public.register_debt_service_package(text, text)
+  from public, anon, authenticated;
+
+do $seed$
+declare
+  v_code text;
+begin
+  foreach v_code in array array[
+    'Loan-3', 'LONA 3', 'LONA-3', 'Lona 3', 'Loan 3', 'LOAN-3'
+  ]
+  loop
+    perform public.register_debt_service_package(
+      v_code, 'debt service, never a paid activation');
+  end loop;
+end;
+$seed$;
 
 commit;

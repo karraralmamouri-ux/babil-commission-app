@@ -20,8 +20,12 @@
 import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, pageRpc, can, ApiError } from '../../services/api';
-// مسار الاستيراد القائم نفسه — لا محلِّلَ ثانياً لملفٍّ واحد.
-import { importMonthlyActivationFile } from '../system/import-run';
+// مسار الاستيراد القائم نفسه — لا محلِّلَ ثانياً لملفٍّ واحد، ولا كتابةَ
+// قبل معاينة: القراءة في المتصفّح، والاعتماد وحده يكتب.
+import {
+  parseMonthlyActivationFile, commitMonthlyActivationFile, renderSaasPreview,
+  type MonthlyFilePreview,
+} from '../system/import-run';
 import { money, count } from '../../domain/money';
 import {
   esc, loading, empty, pageHeader, table, pager, chip, kpiRow, type Column,
@@ -186,15 +190,18 @@ export const monthly: Route = {
       + (can('installation.calculate') ? `<div class="box" style="margin-top:14px" id="mcNew">
         <h3>احسب شهراً</h3>
         <p class="muted" style="font-size:11px;margin:0 0 10px">
-          ارفع ملفَ أحداث التفعيل هنا، أو اختر ملفاً رُفع سابقاً. والشهر يُقرأ
-          من الملف نفسه ولا يُكتَب هنا — فلا يُحسب ملفُ شهرٍ على شهرٍ آخر.
-          والحساب معاينةٌ لا تُغيّر حالةَ أيّ مشترك، ويمكن تكرارُه على المصدر
-          نفسه بلا أثرٍ مضاعف.</p>
+          اقرأ ملفَ أحداث التفعيل أولاً وانظر ما فيه، ثم اعتمده مصدراً للشهر.
+          القراءة لا تكتب على الخادم شيئاً. والشهر يُقرأ من الملف نفسه ولا
+          يُكتَب هنا — فلا يُحسب ملفُ شهرٍ على شهرٍ آخر. والحساب بعدهما معاينةٌ
+          لا تُغيّر حالةَ أيّ مشترك، ويمكن تكرارُه على المصدر نفسه بلا أثرٍ
+          مضاعف.</p>
         ${can('saas.import') ? `<div class="toolbar">
-          <input type="file" id="mcFile" accept=".xlsx,.xls"
+          <input type="file" id="mcFile" class="search" accept=".xlsx,.xls,.csv"
             aria-label="ملف أحداث التفعيل">
-          <button class="btn" id="mcUpload">ارفع الملف</button>
-        </div>` : ''}
+          <button class="btn" id="mcParse">اقرأ وعايِن</button>
+          <button class="btn gold" id="mcCommit" disabled>اعتمد مصدر الشهر</button>
+        </div>
+        <div id="mcPreview"></div>` : ''}
         <div class="toolbar">
           <select class="select" id="mcBatch" aria-label="ملف الشهر">
             <option value="">— اختر ملف الشهر —</option>
@@ -224,7 +231,8 @@ export const monthly: Route = {
 };
 
 /** أعطابُ المصدر التي تمنع اشتقاق الشهر — بنصٍّ يقول للمشغّل ما يفعله،
- *  لا برمزٍ يحفظه. والرموز نفسها يرفعها الخادم في `saas_batch_period`. */
+ *  لا برمزٍ يحفظه. والرموز نفسها يرفعها الخادم في `saas_batch_period`،
+ *  ويرفعها المحلِّل في المعاينة قبل أن يُكتب شيء. */
 const PERIOD_FAULT: Record<string, { title: string; detail: string }> = {
   MIXED_MONTH_SOURCE: {
     title: 'هذا الملف يحمل أكثر من شهر',
@@ -242,6 +250,50 @@ const PERIOD_FAULT: Record<string, { title: string; detail: string }> = {
     title: 'هذه الدفعة غير موجودة',
     detail: 'ربما أُلغيت. اختر ملفاً آخر أو ارفع الملف من جديد.' },
 };
+
+/** ما رآه المتصفّح في الملف، قبل أن يُكتب منه حرف: اسم الملف وبصمته وعدد
+ *  صفوف المصدر وما قبله المحلِّل وما كرّره وما رفضه وما لم يفهم تاريخه،
+ *  ثم الشهرُ المتوقَّع وحكمُ صلاحية المصدر. وتفصيلُ الأوراق يأتي من مُصيّر
+ *  المعاينة نفسه المستعمل في مركز الاستيراد — لا عرضَ ثانٍ لنفس الأرقام. */
+function renderMonthlyFilePreview(p: MonthlyFilePreview): string {
+  const fault = PERIOD_FAULT[p.verdict];
+  return `<div class="box" style="margin-top:12px">
+      <h3>ما في الملف</h3>
+      <p class="muted" style="font-size:11px;margin:0 0 10px">
+        <span dir="ltr">${esc(p.fileName)}</span> · بصمة
+        <span dir="ltr">${esc(p.checksum.slice(0, 16))}…</span> ·
+        ${count(p.sourceRowCount)} صفّاً في المصدر.
+        <b>لم يُكتب على الخادم شيء بعد.</b></p>
+      ${kpiRow([
+        { label: 'أحداث تفعيل مقبولة', value: count(p.events.length),
+          tone: p.events.length ? 'green' : 'red', sub: 'كما قرأها المحلِّل' },
+        { label: 'مكرّر', value: count(p.duplicateCount),
+          tone: p.duplicateCount ? 'gold' : 'blue', sub: 'عبر أوراق الملف' },
+        { label: 'صفوف مرفوضة', value: count(p.rejectedCount),
+          tone: p.rejectedCount ? 'red' : 'green', sub: 'لا تدخل الاستيراد' },
+        { label: 'تاريخ غير مفهوم', value: count(p.unparsedDates),
+          tone: p.unparsedDates ? 'red' : 'green',
+          sub: p.unparsedDates ? 'يُسقط برهان الشهر' : 'كل تاريخ فُهم' },
+      ])}
+      ${p.verdict === 'OK'
+        ? insight('good', `الشهر المتوقَّع: ${p.period}`,
+            `${count(p.events.length)} حدثاً، كلُّها في هذا الشهر بتوقيت العمل.`
+            + ' والخادم يعيد اشتقاقه بعد الاعتماد، وهو وحده الحُجّة.')
+        : insight('danger', fault?.title || 'هذا الملف لا يصلح مصدراً لشهر',
+            (fault?.detail || p.verdict)
+            + (p.verdict === 'MIXED_MONTH_SOURCE' && p.months.length
+              ? ` الأشهر التي فيه: ${p.months.join('، ')}.` : '')
+            + (p.verdict === 'PERIOD_NOT_PROVABLE'
+              ? ` وفيه ${count(p.undatedEvents)} حدثاً بلا تاريخٍ مفهوم.` : '')
+            + ' يمكن اعتماده مصدراً — الأحداث الخام سجلٌّ يُحفظ — لكنّه لن'
+            + ' يُحسب شهراً حتى يُصحَّح المصدر.')}
+      ${p.users.length
+        ? insight('warn', `وفيه ${count(p.users.length)} صفَّ لقطة مستخدمين`,
+            'لا تُستورَد من هنا. ارفعها من مركز الاستيراد إن أردتها.')
+        : ''}
+    </div>`
+    + renderSaasPreview(p.raw);
+}
 
 function wireCalculate(view: View): void {
   const box = view.el.querySelector<HTMLElement>('#mcNew');
@@ -291,55 +343,7 @@ function wireCalculate(view: View): void {
   batch.addEventListener('change', () => { void describe(); });
   void describe();
 
-  const file = box.querySelector<HTMLInputElement>('#mcFile');
-  const upload = box.querySelector<HTMLButtonElement>('#mcUpload');
-  if (file && upload) {
-    upload.addEventListener('click', async () => {
-      const f = file.files?.[0];
-      if (!f) {
-        out.innerHTML = insight('danger', 'اختر ملفاً أولاً');
-        return;
-      }
-      upload.disabled = true;
-      run.disabled = true;
-      out.innerHTML = loading('جارٍ قراءة الملف…');
-      try {
-        // مسارُ الاستيراد القائم بحرفه: المحلِّل نفسه والنداء نفسه والجسر
-        // نفسه المستعملة في مركز الاستيراد — مُصدَّرةً لا مكرَّرة.
-        const result = await importMonthlyActivationFile(f, (message) => {
-          if (view.live) out.innerHTML = loading(message);
-        });
-        if (!view.live) return;
-
-        // والدفعة المستورَدة تصير مصدرَ الشهر في الحال — لا خطوةَ اختيارٍ
-        // ثانية يسهو عنها المشغّل فيحسب شهره من ملفٍ قديم.
-        const option = document.createElement('option');
-        option.value = result.batchId;
-        option.textContent = f.name;
-        batch.insertBefore(option, batch.options[1] || null);
-        batch.value = result.batchId;
-
-        out.innerHTML = insight(result.complete ? 'good' : 'warn', 'رُفع ملف الشهر',
-          `أحداث: مقبول ${count(result.accepted)} · مكرّر ${count(result.duplicates)}`
-          + ` · مرفوض ${count(result.rejected)}`
-          + ` — تسجيل: مؤهَّل ${count(result.enrolled)}`
-          + ` · بانتظار المراجعة ${count(result.blocked)}`
-          + (result.complete ? '' : ` · بقي ${count(result.remaining)} بلا نظر`)
-          + (result.usersSkipped
-            ? ` — وفيه ${count(result.usersSkipped)} صفَّ لقطة مستخدمين لم تُستورَد هنا؛`
-              + ' ارفعها من مركز الاستيراد إن أردتها.'
-            : ''));
-        await describe();
-      } catch (error) {
-        if (!view.live) return;
-        out.innerHTML = insight('danger', 'لم يُرفع الملف',
-          error instanceof ApiError ? error.message
-            : error instanceof Error ? error.message : 'خطأ غير متوقّع');
-      } finally {
-        upload.disabled = false;
-      }
-    });
-  }
+  wireUpload(view, box, batch, run, out, describe);
 
   run.addEventListener('click', async () => {
     if (!batch.value || !derived) {
@@ -370,6 +374,107 @@ function wireCalculate(view: View): void {
         error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
     } finally {
       run.disabled = false;
+    }
+  });
+}
+
+/** خطوتان لا واحدة: «اقرأ وعايِن» تقرأ الملف في المتصفّح ولا تنادي الخادم،
+ *  و«اعتمد مصدر الشهر» وحدها تكتب. وبينهما يرى المشغّل ما في يده.
+ *
+ *  وأيّ تبديلٍ للملف بعد القراءة يُسقط المعاينة ويُعطّل الاعتماد، فلا يُعتمَد
+ *  ملفٌ غير الذي عُوين. */
+function wireUpload(
+  view: View, box: HTMLElement, batch: HTMLSelectElement, run: HTMLButtonElement,
+  out: HTMLElement, describe: () => Promise<void>,
+): void {
+  const file = box.querySelector<HTMLInputElement>('#mcFile');
+  const parse = box.querySelector<HTMLButtonElement>('#mcParse');
+  const commit = box.querySelector<HTMLButtonElement>('#mcCommit');
+  const previewBox = box.querySelector<HTMLElement>('#mcPreview');
+  if (!file || !parse || !commit || !previewBox) return;
+
+  let parsed: MonthlyFilePreview | null = null;
+
+  const reset = (): void => {
+    parsed = null;
+    commit.disabled = true;
+    previewBox.innerHTML = '';
+  };
+  file.addEventListener('change', reset);
+
+  parse.addEventListener('click', async () => {
+    const f = file.files?.[0];
+    reset();
+    if (!f) {
+      previewBox.innerHTML = insight('danger', 'اختر ملفاً أولاً');
+      return;
+    }
+    parse.disabled = true;
+    previewBox.innerHTML = loading('جارٍ قراءة الملف…');
+    try {
+      // قراءةٌ في المتصفّح وحده. لا نداءَ خادمٍ في هذا المسار كلّه.
+      const p = await parseMonthlyActivationFile(f);
+      if (!view.live) return;
+      parsed = p;
+      previewBox.innerHTML = renderMonthlyFilePreview(p);
+      commit.disabled = p.events.length === 0;
+    } catch (error) {
+      if (!view.live) return;
+      previewBox.innerHTML = insight('danger', 'لم يُقرأ الملف',
+        error instanceof Error ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      parse.disabled = false;
+    }
+  });
+
+  commit.addEventListener('click', async () => {
+    if (!parsed) {
+      out.innerHTML = insight('danger', 'اقرأ الملف أولاً',
+        'الاعتماد لا يقع إلا على ملفٍ عُوين.');
+      return;
+    }
+    const source = parsed;
+    commit.disabled = true;
+    parse.disabled = true;
+    run.disabled = true;
+    out.innerHTML = loading('جارٍ اعتماد مصدر الشهر…');
+    try {
+      // مسارُ الاستيراد القائم بحرفه: نداءُ الأحداث المقطَّع نفسه وجسرُ
+      // التسجيل نفسه المستعملان في مركز الاستيراد — مُصدَّرَين لا مكرَّرَين.
+      const result = await commitMonthlyActivationFile(source, (message) => {
+        if (view.live) out.innerHTML = loading(message);
+      });
+      if (!view.live) return;
+
+      // والدفعة المستورَدة تصير مصدرَ الشهر في الحال — لا خطوةَ اختيارٍ
+      // ثانية يسهو عنها المشغّل فيحسب شهره من ملفٍ قديم.
+      const option = document.createElement('option');
+      option.value = result.batchId;
+      option.textContent = source.fileName;
+      batch.insertBefore(option, batch.options[1] || null);
+      batch.value = result.batchId;
+
+      out.innerHTML = insight(result.complete ? 'good' : 'warn', 'اعتُمد مصدر الشهر',
+        `أحداث: مقبول ${count(result.accepted)} · مكرّر ${count(result.duplicates)}`
+        + ` · مرفوض ${count(result.rejected)}`
+        + ` — تسجيل: مؤهَّل ${count(result.enrolled)}`
+        + ` · بانتظار المراجعة ${count(result.blocked)}`
+        + (result.complete ? '' : ` · بقي ${count(result.remaining)} بلا نظر`)
+        + (result.usersSkipped
+          ? ` — وفيه ${count(result.usersSkipped)} صفَّ لقطة مستخدمين لم تُستورَد هنا؛`
+            + ' ارفعها من مركز الاستيراد إن أردتها.'
+          : ''));
+      previewBox.innerHTML = '';
+      parsed = null;
+      await describe();
+    } catch (error) {
+      if (!view.live) return;
+      commit.disabled = false;
+      out.innerHTML = insight('danger', 'لم يُعتمَد مصدر الشهر',
+        error instanceof ApiError ? error.message
+          : error instanceof Error ? error.message : 'خطأ غير متوقّع');
+    } finally {
+      parse.disabled = false;
     }
   });
 }

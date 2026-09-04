@@ -351,4 +351,59 @@ select pg_temp.raises_like($q$
   'debt service',
   '٢١ · و«LONA 3» صارت خدمةَ دَين، فلا يُسنَد لها سعرٌ مؤهِّلٌ أبداً');
 
+-- ===========================================================================
+-- ٧ · تسجيلُ هجاءِ خدمةِ الدَّين: يُدرج الناقص، ويترك الصحيح، ويسقط مغلقاً
+--     على المتعارض. (يعمل بصلاحية المالك كما يعمل الترحيل نفسه.)
+-- ===========================================================================
+
+reset role;
+
+-- (أ) هجاءٌ غائب ⇒ يُدرَج خدمةَ دَين.
+delete from public.packages where code = 'LOAN-3';
+-- الاستدعاء في جملةٍ مستقلّة: لو نُودي داخل نفس الـSELECT الذي يقرأ الجدول
+-- لَقرأ ذلك SELECT لقطةَ بداية الجملة، فلا يرى الصفَّ الذي أدرجته الدالّة.
+create temporary table mp_reg on commit drop as
+  select public.register_debt_service_package('LOAN-3') as verdict;
+select pg_temp.ok(
+  (select verdict from mp_reg) = 'INSERTED'
+  and (select semantic_category from public.packages where code = 'LOAN-3')
+      = 'DEBT_SERVICE',
+  '٢٢ · الهجاء الغائب يُدرَج خدمةَ دَين، لا يُترك مجهولاً');
+
+-- (ب) هجاءٌ قائمٌ بالتصنيف الصحيح ⇒ لا يُلمَس، ولا يُعاد إدراجه.
+update public.packages set notes = 'ملاحظةُ مديرٍ لا تُداس' where code = 'Loan-3';
+select pg_temp.ok(
+  public.register_debt_service_package('Loan-3') = 'UNCHANGED'
+  and (select notes from public.packages where code = 'Loan-3')
+      = 'ملاحظةُ مديرٍ لا تُداس',
+  '٢٣ · القائم الصحيح يُترك كما هو — ولا تُمحى ملاحظةُ من سجّله');
+
+-- (ج) هجاءٌ قائمٌ بتصنيفٍ مخالف ⇒ يسقط الترحيل، ولا يُكتَب فوق المدير.
+update public.packages set semantic_category = 'PAID_PACKAGE' where code = 'Lona 3';
+select pg_temp.raises_like(
+  $q$select public.register_debt_service_package('Lona 3')$q$,
+  'PACKAGE_CLASSIFICATION_CONFLICT',
+  '٢٤ · التصنيف المتعارض يُسقط الترحيل بدل أن يمرّ صامتاً');
+
+select pg_temp.ok(
+  (select semantic_category from public.packages where code = 'Lona 3') = 'PAID_PACKAGE',
+  '٢٥ · ولم يُكتَب فوق تصنيف المدير: يُوقَف النشر ليقرّر إنسان');
+
+update public.packages set semantic_category = 'DEBT_SERVICE' where code = 'Lona 3';
+
+-- (د) و(هـ) صراحةً على أسطر التشغيلة: حدثُ الدَّين صفرٌ، والمدفوعُ بعده
+--     يستهلك المرحلة التالية كما لو لم يكن بينهما شيء.
+select pg_temp.ok(
+  (select l.amount = 0 and l.awarded_stage is null
+          and l.opening_stage = l.closing_stage and l.outcome = 'BLOCKED'
+   from public.installation_calculation_lines l
+   where l.run_id = (select id from mp_run) and l.activation_event_id = 'MP-A3'),
+  '٢٦ · حدثُ Loan-3: صفرُ مالٍ، ولا مرحلةَ مُنحت، ولا مرحلةَ استُهلكت');
+
+select pg_temp.ok(
+  (select l.opening_stage = 'P3' and l.awarded_stage = 'P3' and l.closing_stage = 'P4'
+   from public.installation_calculation_lines l
+   where l.run_id = (select id from mp_run) and l.activation_event_id = 'MP-A5'),
+  '٢٧ · والمدفوعُ الذي يليه يفتح عند P3 ويستهلكها — الدَّين لم يُزحزح شيئاً');
+
 rollback;
