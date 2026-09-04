@@ -543,5 +543,14 @@ fi
 echo "$out58" | grep -E "^ {2,4}(ok|==) " || true
 passed=$((passed + $(echo "$out58" | grep -c "   ok ")))
 
+echo "== installation month provenance =="
+out59=$(docker exec -i babil-local-pg psql -U postgres -d babil_local -q < tests/sql/installation-month-provenance.sql 2>&1) || true
+if echo "$out59" | grep -qE "FAILED|ERROR"; then
+  echo "$out59" | grep -E "FAILED|ERROR" || true
+  echo "INSTALLATION MONTH PROVENANCE TESTS FAILED" >&2; exit 1
+fi
+echo "$out59" | grep -E "^ {2,4}(ok|==) " || true
+passed=$((passed + $(echo "$out59" | grep -c "   ok ")))
+
 echo
 echo "local database assertions passed: $((passed + 1))"

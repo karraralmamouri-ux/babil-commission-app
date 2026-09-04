@@ -309,3 +309,62 @@ redistributed, not reset. The old payout path: not deleted.
 version with other amounts computes correctly but cannot be committed; the preview surfaces it
 as `SCHEME_NOT_REPRESENTABLE_IN_STORAGE` rather than letting a table constraint fail at
 approval. Widening the storage is an open decision, not a silent gap.
+
+### 12.10 The month is a property of the file
+
+The operator does not tell the system which month a result belongs to. The system reads it
+from the source batch and refuses anything it cannot prove.
+
+The month of a batch is derived as
+`to_char(event_created_at at time zone business_timezone(), 'YYYY-MM')` — business time
+(`Asia/Baghdad`), the same clock the commission cycle windows use. An event at
+`2026-07-31 23:30+03` is July, not August.
+
+| batch state | verdict | what the operator sees |
+|---|---|---|
+| every event dated, all in one month | `OK` | the derived month; calculation is enabled |
+| events span two or more months | `MIXED_MONTH_SOURCE` | the months found; split the source and re-upload |
+| any event has no date | `PERIOD_NOT_PROVABLE` | fix the dates in the source |
+| no events | `NO_EVENTS` | an empty batch has no month |
+| not an activation-events batch | `NOT_ACTIVATION_EVENTS` | this screen reads activation events only |
+
+One undated event invalidates the whole proof. The rest of the file cannot vouch for a row
+that carries no date — it could belong to any month. Refusing costs an upload; guessing costs
+a month filed under the wrong name.
+
+Enforcement is a `BEFORE INSERT OR UPDATE` trigger on `installation_calculation_runs`, not a
+precondition inside the preview function. Every writer passes it — the preview, the approval,
+and any writer added later. A period that does not match the derived month is rejected as
+`WRONG_MONTH_PAIRING`.
+
+The proof is re-run on **every** write, so approval re-proves it too: a batch that was a
+single month when it was calculated, and later grew a second month, cannot be approved.
+Updates to an already-`APPROVED` run are left to the existing immutability guard, which
+reports the clearer error.
+
+### 12.11 Uploading the monthly file
+
+The monthly screen uploads the activation-events file in place, and the imported batch
+immediately becomes that month's source. It is the same path the import centre uses — the
+same parser, the same chunked `import_saas_activation_events` call with its checksum and row
+offsets, the same enrolment bridge sweep — exported, not duplicated. There is one parser and
+one calculation source for one monthly file.
+
+If the workbook also carries user-snapshot rows, they are reported and left alone; import them
+from the import centre if they are wanted. Nothing is swallowed silently.
+
+### 12.12 Loan-3 spellings
+
+§4 is the rule; this is how it is enforced against real files. `packages.code` is an exact
+match, so `LONA 3` is not `Loan-3`. An unregistered spelling falls to `UNKNOWN_PACKAGE`, which
+also blocks — no money moves either way — but the reason shown to the auditor is wrong: it
+says "unknown package" about a package that is perfectly known, and known never to qualify.
+
+The observed spellings `LONA 3`, `LONA-3`, `Lona 3`, `Loan 3`, `LOAN-3` are therefore
+registered as `DEBT_SERVICE` master data, alongside `Loan-3` itself. This is data
+classification, not a second rule engine: no fuzzy matching and no character normalisation in
+any function — rows an auditor can see and an admin can edit. Moving a code from `UNKNOWN` to
+`DEBT_SERVICE` tightens and never loosens, and `guard_debt_service_never_qualifies` makes a
+qualifying rate for it structurally impossible.
+
+---

@@ -21,9 +21,10 @@
 ## حالة Git المحلية
 
 - توجد مجلدات غير متتبعة: `docs/audits/` و`scratch/` و`.claude/`. لا تحذفها ولا تستبدلها قبل فحص محتواها.
-- الفرع `feat/installation-monthly-calculator` متفرّع من `0269c3b`، ولم يُدفَع إلى البعيد.
+- الفرع `feat/installation-monthly-calculator` متفرّع من `0269c3b`، ومدفوعٌ إلى البعيد. لم يُفتح له PR ولم يُدمَج ولم يُنشَر.
 - PR #95 (`fix/post-deploy-qa-pack`) ما زال مفتوحاً وغير مدموج.
-- بوّابات CI حُدِّثت محلياً: 104 migrations و1423 assertion في `.github/workflows/ci.yml`.
+- بوّابات CI حُدِّثت محلياً: 105 migrations و1445 assertion في `.github/workflows/ci.yml`.
+- التحقق الأخير على هذا الفرع: 1445 تأكيداً في قاعدة محلية مبنيّة من 105 ترحيلات · 713/713 اختبار JS · `tsc` بلا خطأ · بناءٌ نظيف · فحص أمان الترحيلات `safe` لكل ملف.
 
 ## مخاطر مفتوحة
 

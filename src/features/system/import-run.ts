@@ -571,3 +571,77 @@ function insight(tone: 'good' | 'warn' | 'danger', title: string, detail = ''): 
 }
 
 export const routes: Route[] = [importRun];
+
+/* ---- رفعُ ملف الشهر من شاشة الشهر ---------------------------------------
+ *
+ * شاشة `/installation/monthly` تحتاج أن ترفع ملفَ أحداث التفعيل في مكانها،
+ * لا أن تُخرج المشغّل إلى مركز الاستيراد ثم تُعيده. لكنّ «في مكانها» لا يعني
+ * «بمُحلِّلٍ ثانٍ»: هذه الدالّة هي نفسُ الطريق الذي تسلكه هذه الشاشة —
+ * `window.SaasImport.parseWorkbook` نفسها، و`importSaasEventsChunked` نفسها،
+ * و`bridgeSweepAll` نفسه — مُصدَّرةً لا مكرَّرة.
+ *
+ * فلو تغيّر المحلِّل أو تغيّرت قواعد التقطيع تغيّرتا في موضعٍ واحدٍ لكلتا
+ * الشاشتين. ولا تُنشئ هذه الدالّة سياسةً خاصةً بها: كلّ ما تزيده أنها ترفض
+ * ملفاً بلا أحداثِ تفعيل — لأن شاشة الشهر لا شغل لها بغيرها — وتُبلغ عن صفوف
+ * لقطة المستخدمين إن وُجدت بدل أن تبتلعها صامتة. */
+export interface MonthlyFileImport {
+  batchId: string;
+  accepted: number;
+  duplicates: number;
+  rejected: number;
+  enrolled: number;
+  blocked: number;
+  remaining: number;
+  complete: boolean;
+  /** صفوف لقطة المستخدمين في الملف نفسه — لا تُستورَد من هنا، وتُذكر صراحةً. */
+  usersSkipped: number;
+}
+
+export async function importMonthlyActivationFile(
+  file: File,
+  onProgress: (message: string) => void,
+): Promise<MonthlyFileImport> {
+  const xlsx = window.XLSX;
+  const saas = window.SaasImport;
+  if (!xlsx || !saas) {
+    throw new Error('مكتبة قراءة الملفات غير محمَّلة. أعِد تحميل الصفحة ثم حاول مرّةً أخرى.');
+  }
+
+  onProgress('جارٍ قراءة الملف…');
+  const buffer = await file.arrayBuffer();
+  const sum = await checksum(buffer);
+  const book = xlsx.read(buffer, { type: 'array' });
+  const sheets = book.SheetNames.map((name) => ({
+    name, rows: xlsx.utils.sheet_to_json(book.Sheets[name], { defval: '' }) as Row[],
+  }));
+  const preview = saas.parseWorkbook(sheets, {});
+  const events = Array.isArray(preview['events']) ? (preview['events'] as Row[]) : [];
+  const users = Array.isArray(preview['users']) ? (preview['users'] as Row[]) : [];
+  if (!events.length) {
+    throw new Error('لا أحداثَ تفعيلٍ في هذا الملف. شاشة الشهر تقرأ ملفّ أحداث التفعيل وحده.');
+  }
+
+  const batch = await importSaasEventsChunked(file.name, sum, events, (done, total) => {
+    onProgress(total > SAAS_EVENTS_CHUNK_SIZE
+      ? `جارٍ اعتماد أحداث التفعيل… (${count(done)} من ${count(total)})`
+      : 'جارٍ اعتماد أحداث التفعيل…');
+  });
+  const totals = (batch['batch_totals'] as Row) || batch;
+  const batchId = str(batch, 'batch_id');
+
+  const swept = await bridgeSweepAll(batchId || null, (t) => {
+    onProgress(`جارٍ تقييم المرشّحين… (سُجّل ${count(t.enrolled)} · بقي ${count(t.remaining)})`);
+  });
+
+  return {
+    batchId,
+    accepted: num(totals, 'accepted'),
+    duplicates: num(totals, 'duplicates'),
+    rejected: num(totals, 'rejected'),
+    enrolled: swept.enrolled,
+    blocked: swept.blocked,
+    remaining: swept.remaining,
+    complete: swept.complete,
+    usersSkipped: users.length,
+  };
+}

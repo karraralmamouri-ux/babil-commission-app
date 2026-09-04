@@ -20,6 +20,8 @@
 import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, pageRpc, can, ApiError } from '../../services/api';
+// مسار الاستيراد القائم نفسه — لا محلِّلَ ثانياً لملفٍّ واحد.
+import { importMonthlyActivationFile } from '../system/import-run';
 import { money, count } from '../../domain/money';
 import {
   esc, loading, empty, pageHeader, table, pager, chip, kpiRow, type Column,
@@ -184,17 +186,24 @@ export const monthly: Route = {
       + (can('installation.calculate') ? `<div class="box" style="margin-top:14px" id="mcNew">
         <h3>احسب شهراً</h3>
         <p class="muted" style="font-size:11px;margin:0 0 10px">
-          اختر ملفَ أحداث التفعيل والشهرَ الذي يخصّه. الحساب معاينةٌ لا تُغيّر
-          حالةَ أيّ مشترك، ويمكن تكرارُه على المصدر نفسه بلا أثرٍ مضاعف.</p>
+          ارفع ملفَ أحداث التفعيل هنا، أو اختر ملفاً رُفع سابقاً. والشهر يُقرأ
+          من الملف نفسه ولا يُكتَب هنا — فلا يُحسب ملفُ شهرٍ على شهرٍ آخر.
+          والحساب معاينةٌ لا تُغيّر حالةَ أيّ مشترك، ويمكن تكرارُه على المصدر
+          نفسه بلا أثرٍ مضاعف.</p>
+        ${can('saas.import') ? `<div class="toolbar">
+          <input type="file" id="mcFile" accept=".xlsx,.xls"
+            aria-label="ملف أحداث التفعيل">
+          <button class="btn" id="mcUpload">ارفع الملف</button>
+        </div>` : ''}
         <div class="toolbar">
-          <input class="search" id="mcPeriod" placeholder="الشهر YYYY-MM" maxlength="7"
-            aria-label="الشهر" dir="ltr">
           <select class="select" id="mcBatch" aria-label="ملف الشهر">
+            <option value="">— اختر ملف الشهر —</option>
             ${batches.rows.map((b) => `<option value="${esc(str(b, 'id'))}">${
               esc(str(b, 'source_filename') || str(b, 'id'))}</option>`).join('')}
           </select>
-          <button class="btn gold" id="mcRun">احسب نتيجة الشهر</button>
+          <button class="btn gold" id="mcRun" disabled>احسب نتيجة الشهر</button>
         </div>
+        <div id="mcPeriod"></div>
         <div id="mcOut"></div>
       </div>` : '')
 
@@ -214,25 +223,131 @@ export const monthly: Route = {
   },
 };
 
+/** أعطابُ المصدر التي تمنع اشتقاق الشهر — بنصٍّ يقول للمشغّل ما يفعله،
+ *  لا برمزٍ يحفظه. والرموز نفسها يرفعها الخادم في `saas_batch_period`. */
+const PERIOD_FAULT: Record<string, { title: string; detail: string }> = {
+  MIXED_MONTH_SOURCE: {
+    title: 'هذا الملف يحمل أكثر من شهر',
+    detail: 'ملفُ الشهر ملفُ شهرٍ واحد. افصل الأشهر في المصدر ثم أعد الرفع.' },
+  PERIOD_NOT_PROVABLE: {
+    title: 'شهر هذا الملف لا يُثبَت',
+    detail: 'فيه أحداثٌ بلا تاريخ، وقد تكون من شهرٍ آخر. صحّح التواريخ في المصدر.' },
+  NO_EVENTS: {
+    title: 'لا أحداثَ تفعيلٍ في هذه الدفعة',
+    detail: 'دفعةٌ فارغةٌ لا شهرَ لها، فلا شهرَ يُحسب منها.' },
+  NOT_ACTIVATION_EVENTS: {
+    title: 'هذه ليست دفعةَ أحداث تفعيل',
+    detail: 'شاشة الشهر تقرأ ملفّ أحداث التفعيل وحده.' },
+  BATCH_NOT_FOUND: {
+    title: 'هذه الدفعة غير موجودة',
+    detail: 'ربما أُلغيت. اختر ملفاً آخر أو ارفع الملف من جديد.' },
+};
+
 function wireCalculate(view: View): void {
   const box = view.el.querySelector<HTMLElement>('#mcNew');
   if (!box) return;
   const run = box.querySelector<HTMLButtonElement>('#mcRun');
-  const period = box.querySelector<HTMLInputElement>('#mcPeriod');
   const batch = box.querySelector<HTMLSelectElement>('#mcBatch');
+  const periodBox = box.querySelector<HTMLElement>('#mcPeriod');
   const out = box.querySelector<HTMLElement>('#mcOut');
-  if (!run || !period || !batch || !out) return;
+  if (!run || !batch || !periodBox || !out) return;
+
+  // الشهر المشتقّ من الملف المختار. لا يكتبه المشغّل ولا تحسبه هذه الشاشة:
+  // يأتي من `saas_batch_period` كما اشتقّه الخادم من تواريخ الأحداث بتوقيت
+  // العمل. ويُرسَل مع الطلب فيُعاد إثباته على الخادم قبل أن يُكتب أيّ سطر —
+  // فلو تغيّرت الدفعة بين القراءة والضغط رُفض الطلب ولم يُحسب شهرٌ بالخطأ.
+  let derived = '';
+
+  const describe = async (): Promise<void> => {
+    derived = '';
+    run.disabled = true;
+    if (!batch.value) { periodBox.innerHTML = ''; return; }
+    periodBox.innerHTML = loading('جارٍ قراءة شهر الملف…');
+    try {
+      const facts = await rpc<Row>('saas_batch_period', { p_batch_id: batch.value });
+      if (!view.live) return;
+      const status = str(facts, 'status');
+      if (status === 'OK') {
+        derived = str(facts, 'period');
+        periodBox.innerHTML = insight('good', `شهر هذا الملف: ${derived}`,
+          `${count(num(facts, 'events'))} حدثاً، كلُّها في هذا الشهر بتوقيت العمل.`);
+        run.disabled = false;
+        return;
+      }
+      const fault = PERIOD_FAULT[status];
+      const months = Array.isArray(facts['months']) ? (facts['months'] as string[]) : [];
+      periodBox.innerHTML = insight('danger',
+        fault?.title || 'هذا الملف لا يصلح مصدراً لشهر',
+        (fault?.detail || status)
+          + (status === 'MIXED_MONTH_SOURCE' && months.length
+            ? ` الأشهر التي فيه: ${months.join('، ')}.` : ''));
+    } catch (error) {
+      if (!view.live) return;
+      periodBox.innerHTML = insight('danger', 'لم يُقرأ شهر الملف',
+        error instanceof ApiError ? error.message : 'خطأ غير متوقّع');
+    }
+  };
+
+  batch.addEventListener('change', () => { void describe(); });
+  void describe();
+
+  const file = box.querySelector<HTMLInputElement>('#mcFile');
+  const upload = box.querySelector<HTMLButtonElement>('#mcUpload');
+  if (file && upload) {
+    upload.addEventListener('click', async () => {
+      const f = file.files?.[0];
+      if (!f) {
+        out.innerHTML = insight('danger', 'اختر ملفاً أولاً');
+        return;
+      }
+      upload.disabled = true;
+      run.disabled = true;
+      out.innerHTML = loading('جارٍ قراءة الملف…');
+      try {
+        // مسارُ الاستيراد القائم بحرفه: المحلِّل نفسه والنداء نفسه والجسر
+        // نفسه المستعملة في مركز الاستيراد — مُصدَّرةً لا مكرَّرة.
+        const result = await importMonthlyActivationFile(f, (message) => {
+          if (view.live) out.innerHTML = loading(message);
+        });
+        if (!view.live) return;
+
+        // والدفعة المستورَدة تصير مصدرَ الشهر في الحال — لا خطوةَ اختيارٍ
+        // ثانية يسهو عنها المشغّل فيحسب شهره من ملفٍ قديم.
+        const option = document.createElement('option');
+        option.value = result.batchId;
+        option.textContent = f.name;
+        batch.insertBefore(option, batch.options[1] || null);
+        batch.value = result.batchId;
+
+        out.innerHTML = insight(result.complete ? 'good' : 'warn', 'رُفع ملف الشهر',
+          `أحداث: مقبول ${count(result.accepted)} · مكرّر ${count(result.duplicates)}`
+          + ` · مرفوض ${count(result.rejected)}`
+          + ` — تسجيل: مؤهَّل ${count(result.enrolled)}`
+          + ` · بانتظار المراجعة ${count(result.blocked)}`
+          + (result.complete ? '' : ` · بقي ${count(result.remaining)} بلا نظر`)
+          + (result.usersSkipped
+            ? ` — وفيه ${count(result.usersSkipped)} صفَّ لقطة مستخدمين لم تُستورَد هنا؛`
+              + ' ارفعها من مركز الاستيراد إن أردتها.'
+            : ''));
+        await describe();
+      } catch (error) {
+        if (!view.live) return;
+        out.innerHTML = insight('danger', 'لم يُرفع الملف',
+          error instanceof ApiError ? error.message
+            : error instanceof Error ? error.message : 'خطأ غير متوقّع');
+      } finally {
+        upload.disabled = false;
+      }
+    });
+  }
 
   run.addEventListener('click', async () => {
-    const p = period.value.trim();
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(p)) {
-      out.innerHTML = insight('danger', 'الشهر بصيغة YYYY-MM', 'مثال: 2026-07');
+    if (!batch.value || !derived) {
+      out.innerHTML = insight('danger', 'لا ملفَ شهرٍ صالحاً',
+        'اختر ملفاً يُثبِت شهره، أو ارفع ملفَ الشهر أولاً.');
       return;
     }
-    if (!batch.value) {
-      out.innerHTML = insight('danger', 'لا ملفَ شهرٍ مرفوع', 'ارفع ملف أحداث التفعيل أولاً.');
-      return;
-    }
+    const p = derived;
     run.disabled = true;
     out.innerHTML = loading('جارٍ حساب نتيجة الشهر على الخادم…');
     try {
