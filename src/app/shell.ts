@@ -54,6 +54,10 @@ export const NAV: NavGroup[] = [
     key: 'results', label: 'النتائج المالية', items: [
       { label: 'العمولات', path: '/commissions', icon: '◎', capability: 'commission.view' },
       { label: 'أجور التنصيب', path: '/installation', icon: '⊞', capability: 'installation.view' },
+      // مسار الشهر: ملفٌ واحد ← حساب ← اعتماد. صار هو الطريق المعتاد لأجور
+      // التنصيب، ومسار «الدورة ← الفواتير ← الجاهز ← الدفعة» بقي في المُوجِّه
+      // للقراءة التاريخية ولم يعد يُعرّف العمل الشهري (ADR-034).
+      { label: 'شهر التنصيب', path: '/installation/monthly', icon: '⊟', capability: 'installation.view' },
       { label: 'التقارير', path: '/reports', icon: '▧', capability: 'report.view' },
       { label: 'الأرشيف', path: '/reports/archive', icon: '▩', capability: 'report.view' },
     ],
@@ -100,6 +104,13 @@ export const NAV: NavGroup[] = [
  * اسماً بدل أن يتبع ما تقوله النتيجة.
  *
  * تُذكر هنا صراحةً ليبقى وجودها مقصوداً ومُختبَراً، لا منسيّاً.
+ *
+ * ومنذ ADR-034 صارت أربعةٌ منها سابقةً بالمعنى الأدقّ: `/installation/cycle`
+ * و`/installation/invoices` و`/installation/ready`
+ * و`/finance/installation-batches` كانت تشكّل مسار «الدورة ← تدقيق الفواتير
+ * ← الجاهز للصرف ← الدفعة». هذا المسار يعمل بحرفه ولم يُحذف منه شيء — لكن
+ * العمل الشهري صار يمرّ من `/installation/monthly` وحده. تُترك هنا لأن
+ * الأشهر التاريخية مرّت منها، وحذفُها يكسر قراءتها.
  */
 export const CONTEXTUAL_ROUTES: string[] = [
   '/commissions/cycles',

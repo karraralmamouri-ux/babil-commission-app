@@ -13,6 +13,7 @@ import { transferPanel, wireTransfer } from '../ownership/transfer';
 import { classificationPanel, classificationRunPanel, wireClassificationRun } from './classification';
 import { routes as holdRoutes, holdPanel, wireHoldPanel } from './holds';
 import { correctionActionsCell, correctionBox, wireCorrectionActions } from '../finance/paymentCorrections';
+import { routes as monthlyRoutes } from './monthly';
 import { routes as payoutRoutes } from './payout';
 import { routes as invoiceRoutes } from './invoices';
 import { routes as cycleRoutes } from './cycle';
@@ -402,6 +403,7 @@ function financialCorrections(rows: Row[]): string {
 // بالوكيل مع سطورٍ تحته، والثانية صارت تحمل نوع الحجب ومصدره وأجله.
 export const routes: Route[] = [
   controlCenter, subscribers, subscriberCase,
+  ...monthlyRoutes,
   ...invoiceRoutes,
   ...cycleRoutes,
   ...payoutRoutes, ...holdRoutes,
