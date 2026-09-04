@@ -203,3 +203,195 @@ is held and later released resumes at **P3**. Never restarts.
 Financial values may not be silently overwritten — they require an explicit correction
 record carrying before / after / reason / actor / timestamp, and after posting they require
 a reversal or adjustment rather than an edit.
+
+---
+
+## 12. The monthly operational workflow
+
+**APPROVED** — owner-confirmed 2026-09-04, implemented as **ADR-034**. This section governs
+the *operational* workflow. It supersedes the payout-centric assumptions elsewhere in this
+document and in DEC-007 **for that workflow only**; the older path still works and its
+description above still describes it accurately.
+
+### 12.1 One monthly source
+
+**FACT.** After the one-time historical baseline, the operator uploads **one** file per month:
+the SaaS activation/invoice export. `saas_activation_events` remains the single canonical raw
+event source, and both the commission engine and the installation engine read from it. There
+is no second upload for invoice audit, and no separate entitlement build. No second parser and
+no second ingestion path for the same file.
+
+### 12.2 Where a subscriber starts
+
+**APPROVED.**
+- In the historical registry → start from the subscriber's **currently committed** stage.
+- Not in the registry → the **existing** newness/classification rules decide. There is no
+  second NEW/EXISTING classifier. Only a genuinely new and eligible subscriber enters
+  Installation Fees automatically, and starts at **P1** under the active scheme version.
+- `NEEDS_REVIEW` stays reviewable and **never silently generates money**.
+
+### 12.3 Several events for one subscriber in one month
+
+**APPROVED.** Two valid invoices for the same subscriber in one month are **not** a conflict.
+Eligible events are processed chronologically (`event_created_at ASC`, deterministic tie-break
+on event id) and **each valid event consumes the subscriber's next stage**.
+
+| Opening | Events | Awarded | Month total | Closing |
+|---|---|---|---|---|
+| P3 | 1 | P3 | 3,000 | P4 |
+| P3 | 2 | P3, P4 | 7,000 | DONE |
+| P1 | 4 | P1, P2, P3, P4 | 13,000 | DONE |
+| P4 | 2 | P4 only | 4,000 | DONE |
+| DONE | any | — | 0 | DONE |
+
+A stage is never awarded twice, in this month or any other: a unique key on
+(subscriber, stage) across every approved result enforces it. Nothing goes past `DONE`.
+
+### 12.4 Calculation is not payment
+
+**APPROVED.** Calculating a month is a **preview**. It writes only the run and its lines; it
+does not touch `installation_subscribers`, `installation_subscriber_state`,
+`installation_enrollments`, or `installation_payment_history`. Re-running it on the same
+source rebuilds the lines rather than duplicating them.
+
+Lifecycle: `CALCULATED` → `NEEDS_REVIEW` (if blockers) → `READY_TO_APPROVE` → `APPROVED`.
+
+**"اعتماد نتيجة الشهر" is not a payment.** Approving persists the result, registers eligible
+new subscribers, commits each subscriber's resulting stage for the next month, and keeps the
+full audit trail. It creates **no** payment row, **no** payment batch, and **no** financial
+ledger entry, and marks nothing as paid. Approval is idempotent by request id, and the same
+event or the same (subscriber, stage) can never be consumed twice.
+
+Historical paid rows stay historical paid evidence. Post-system calculations live in their own
+tables, so the two are semantically distinct and no fake payment is ever inserted to advance a
+stage.
+
+### 12.5 Eligibility, holds and grace
+
+**APPROVED.** The monthly calculation reuses the **existing** gate — eligibility, newness,
+ownership, holds, package semantics, and the approved grace rule (30 calendar days from the
+first recorded SaaS operation to a qualifying paid activation, with the existing audited
+override). No duplicate rule engine. A blocked subscriber never receives an installment
+silently: **every excluded or review row carries an explicit reason code**.
+
+### 12.6 Reseller identity and the Parent → Print hierarchy
+
+**APPROVED.** Reseller = Print. Identity is a stable id, never display-name equality.
+`agents` gains `parent_agent_id` (self-reference, depth-guarded) so a Parent may have Branch/
+Print children; `agent_aliases` continues to absorb source-name variants. Agents with no
+parent remain valid.
+
+Historical attribution is **preserved as recorded**: the historical file names only the main
+Parent, and no old installment is retroactively reassigned to a guessed branch. For new
+monthly events, the actual Print/Branch is resolved from the source parent/alias and the
+stable id is stored on the calculation evidence. **Stage history belongs to the subscriber,
+not the branch** — changing reseller or Print never resets P1/P2/P3/P4. Reporting gives both
+the Print/Branch result and the Parent aggregate, derived from the same lines so they
+reconcile exactly.
+
+### 12.7 Unknown Print or reseller names
+
+**APPROVED.** An unmapped source parent/Print name **blocks the affected rows from approval**
+and appears in a confirmation queue. An admin resolves it as (a) alias of an existing Print,
+(b) a new Branch/Print under an existing Parent, (c) a genuinely new independent Parent/Print,
+or (d) an existing non-reseller/direct-company classification. The mapping is persisted.
+**Financial ownership is never assigned by fuzzy matching.**
+
+### 12.8 What this does not change
+
+Commission formulas: unchanged. Installation stage amounts (P1 3,000 · P2 3,000 · P3 3,000 ·
+P4 4,000) and the `Remaining → stage` map: unchanged. Historical rows: not rebuilt, not
+redistributed, not reset. The old payout path: not deleted.
+
+### 12.9 Known limit
+
+`installation_subscriber_state` can only store a `Remaining` on the standard ladder. A scheme
+version with other amounts computes correctly but cannot be committed; the preview surfaces it
+as `SCHEME_NOT_REPRESENTABLE_IN_STORAGE` rather than letting a table constraint fail at
+approval. Widening the storage is an open decision, not a silent gap.
+
+### 12.10 The month is a property of the file
+
+The operator does not tell the system which month a result belongs to. The system reads it
+from the source batch and refuses anything it cannot prove.
+
+The month of a batch is derived as
+`to_char(event_created_at at time zone business_timezone(), 'YYYY-MM')` — business time
+(`Asia/Baghdad`), the same clock the commission cycle windows use. An event at
+`2026-07-31 23:30+03` is July, not August.
+
+| batch state | verdict | what the operator sees |
+|---|---|---|
+| every event dated, all in one month | `OK` | the derived month; calculation is enabled |
+| events span two or more months | `MIXED_MONTH_SOURCE` | the months found; split the source and re-upload |
+| any event has no date | `PERIOD_NOT_PROVABLE` | fix the dates in the source |
+| no events | `NO_EVENTS` | an empty batch has no month |
+| not an activation-events batch | `NOT_ACTIVATION_EVENTS` | this screen reads activation events only |
+
+One undated event invalidates the whole proof. The rest of the file cannot vouch for a row
+that carries no date — it could belong to any month. Refusing costs an upload; guessing costs
+a month filed under the wrong name.
+
+Enforcement is a `BEFORE INSERT OR UPDATE` trigger on `installation_calculation_runs`, not a
+precondition inside the preview function. Every writer passes it — the preview, the approval,
+and any writer added later. A period that does not match the derived month is rejected as
+`WRONG_MONTH_PAIRING`.
+
+The proof is re-run on **every** write, so approval re-proves it too: a batch that was a
+single month when it was calculated, and later grew a second month, cannot be approved.
+Updates to an already-`APPROVED` run are left to the existing immutability guard, which
+reports the clearer error.
+
+### 12.11 Uploading the monthly file — read, then commit
+
+The monthly screen uploads the activation-events file in place. It happens in two separate
+steps, and only the second one writes.
+
+**Read and preview** parses the file in the browser and calls nothing on the server. It reports
+the filename and checksum, the source row count, the activation events the parser accepted,
+duplicates, rejected rows, rows whose dates it could not read, the derived month or the reason
+no month can be proved, and per-sheet detail. Nothing has been written at that point, and the
+screen says so.
+
+**Commit the month's source** is a separate button and the only action that writes. It uses the
+same path the import centre uses — the same parser, the same chunked
+`import_saas_activation_events` call with its checksum and row offsets, the same enrolment
+bridge sweep — exported, not duplicated. There is one parser and one calculation source for one
+monthly file. The imported batch then becomes that month's source automatically.
+
+Choosing a different file after a preview discards that preview; the commit button is disabled
+again until the new file has been read.
+
+A source whose month is mixed or unprovable can still be committed. Raw activation events are a
+record, and refusing to store them would lose data the business must keep. The preview says
+plainly what is wrong, and §12.10's server-side gate still refuses to calculate a month it
+cannot prove. Storing the truth and computing on it are separate decisions.
+
+Accepted formats are `.xlsx`, `.xls` and `.csv` — the same three on both screens, read
+through the same vendored SheetJS with the same options.
+
+If the workbook also carries user-snapshot rows, they are reported and left alone; import them
+from the import centre if they are wanted. Nothing is swallowed silently.
+
+### 12.12 Loan-3 spellings
+
+§4 is the rule; this is how it is enforced against real files. `packages.code` is an exact
+match, so `LONA 3` is not `Loan-3`. An unregistered spelling falls to `UNKNOWN_PACKAGE`, which
+also blocks — no money moves either way — but the reason shown to the auditor is wrong: it
+says "unknown package" about a package that is perfectly known, and known never to qualify.
+
+The observed spellings `LONA 3`, `LONA-3`, `Lona 3`, `Loan 3`, `LOAN-3` are therefore
+registered as `DEBT_SERVICE` master data, alongside `Loan-3` itself. This is data
+classification, not a second rule engine: no fuzzy matching and no character normalisation in
+any function — rows an auditor can see and an admin can edit. Moving a code from `UNKNOWN` to
+`DEBT_SERVICE` tightens and never loosens, and `guard_debt_service_never_qualifies` makes a
+qualifying rate for it structurally impossible.
+
+A registered spelling is master data an administrator can edit, so the migration that seeds it
+never overwrites what it finds. Each known spelling is inserted if absent, left untouched if it
+is already `DEBT_SERVICE`, and if it exists under any other classification **the migration
+fails and the deployment stops**. Overwriting an administrator's row silently and continuing
+silently with a financially unsafe classification are both refused: a human resolves the
+conflict before the deploy proceeds.
+
+---

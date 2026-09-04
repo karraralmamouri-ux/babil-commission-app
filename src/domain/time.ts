@@ -45,5 +45,22 @@ export function dateOnly(value: unknown): string {
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
+/**
+ * الشهر الذي يقع فيه الطابع بتوقيت العمل: 2026-07
+ *
+ * نظيرُ `to_char(ts at time zone business_timezone(), 'YYYY-MM')` على الخادم،
+ * وبالمنطقة نفسها المعرَّفة أعلاه — لا ثابتَ ثانٍ. ويُستعمل للمعاينة وحدها:
+ * الخادم يعيد الاشتقاق ويحرسه بزنادٍ على الجدول، وهو وحده الحُجّة.
+ */
+export function businessMonth(value: unknown): string | null {
+  const d = parse(value);
+  if (!d) return null;
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ, year: 'numeric', month: '2-digit',
+  }).formatToParts(d);
+  const get = (t: string) => p.find((x) => x.type === t)?.value ?? '';
+  const y = get('year'); const m = get('month');
+  return y && m ? `${y}-${m}` : null;
+}
 /** يُستعمل حيث يلزم التصريح بالمنطقة، كالتدقيق. */
 export const timezoneLabel = 'بتوقيت بغداد';

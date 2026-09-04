@@ -89,6 +89,10 @@ const ACTION_AR: Record<string, string> = {
   'commission.row.updated': 'تعديل صفّ عمولة',
   'commission.free_p1.threshold_set': 'ضبط حدّ Free P1',
   'commission.free_p1.granted': 'منح Free P1',
+  'master.agent.parent_set': 'ربط وكيل بأبٍ',
+  'master.print.resolved': 'حسم اسم Print',
+  'installation.calculation.previewed': 'حساب نتيجة شهر التنصيب',
+  'installation.calculation.approved': 'اعتماد نتيجة شهر التنصيب',
 };
 
 /** الأفعال التي تحرّك مالاً أو تحسم عائدية تُميَّز بصرياً. */

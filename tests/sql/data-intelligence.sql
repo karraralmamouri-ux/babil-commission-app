@@ -185,9 +185,22 @@ select case when public.bootstrap_master_data_from_settings()
   then 'ok    البذر حتمي على قاعدة بلا إعدادات'
   else 'FAIL  البذر غير حتمي بلا إعدادات' end;
 
-select case when (public.bootstrap_master_data_from_settings() ->> 'packages')::int = 5
-  then 'ok    الباقات الخمس مبذورة بلا إعدادات'
+-- والعدد المُبلَّغ هو الحالة الراهنة لا عدد الإدراج — وهذا هو العيب الذي
+-- ظهر هنا أصلاً. فيُقاس بما في الجدول فعلاً، لا برقمٍ ثابتٍ يشيخ كلّما
+-- سجّل ترحيلٌ باقةً جديدة (20261108090000 سجّل إملاءات Loan-3).
+select case when (public.bootstrap_master_data_from_settings() ->> 'packages')::int
+             = (select count(*) from public.packages)
+  then 'ok    عدد الباقات المُبلَّغ هو الحالة الراهنة بلا إعدادات'
   else 'FAIL  الباقات بلا إعدادات' end;
+
+-- وباقات البذر الخمس قائمةٌ بدلالاتها، لا تنقص منها واحدة.
+select case when (select count(*) from public.packages
+                  where (code, semantic_category) in
+                        (('P-35000','PAID_PACKAGE'), ('P-45000','PAID_PACKAGE'),
+                         ('P-65000','PAID_PACKAGE'), ('Loan-3','DEBT_SERVICE'),
+                         ('Diamond','UNKNOWN'))) = 5
+  then 'ok    الباقات الخمس مبذورة بدلالاتها بلا إعدادات'
+  else 'FAIL  باقات البذر الخمس' end;
 
 -- ومع إعدادات حقيقية.
 insert into public.app_settings (key, value, updated_by)

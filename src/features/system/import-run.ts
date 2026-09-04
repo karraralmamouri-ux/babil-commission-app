@@ -17,6 +17,7 @@ import type { Route, View } from '../../app/router';
 import { href } from '../../app/router';
 import { rpc, can, ApiError } from '../../services/api';
 import { money, count } from '../../domain/money';
+import { businessMonth } from '../../domain/time';
 import { esc, loading, pageHeader, table, chip, kpiRow, type Column } from '../../components/ui';
 import { bridgeSweepAll } from './bridge-sweep';
 
@@ -27,7 +28,7 @@ const str = (r: Row, k: string) => String(r[k] ?? '');
 declare global {
   interface Window {
     XLSX?: {
-      read: (data: ArrayBuffer, opts: { type: string }) => XlsxBook;
+      read: (data: ArrayBuffer, opts: { type: string; cellDates?: boolean }) => XlsxBook;
       utils: { sheet_to_json: (sheet: unknown, opts: { defval: string; header?: number; raw?: boolean }) => Row[] };
     };
     InstallationFees?: {
@@ -42,6 +43,17 @@ declare global {
 }
 
 interface XlsxBook { SheetNames: string[]; Sheets: Record<string, unknown>; }
+
+/** خيارات قراءة المصنَّف — واحدةٌ لكل الشاشات، فلا يُقرأ ملفٌ واحد قراءتين.
+ *
+ *  `cellDates` ليست زينة: الخليةُ المُنسَّقة تاريخاً تصل رقماً تسلسلياً
+ *  (46204.02) لا نصّاً، و`saas-import.js` لا يفهم التسلسل فيَعُدّ التاريخ
+ *  «غير مفهوم». وملفّات CSV تُنسَّق هكذا دائماً، فبدونها تسقط كلُّ تواريخ
+ *  CSV بلا استثناء. ومع `cellDates` يصل الطابع كائنَ Date، وللمحلِّل فرعٌ
+ *  له يقرأ ساعةَ الحائط ثم ينسبها إلى منطقة المصدر — وهو ما كان يفعله
+ *  بالنصّ أصلاً. فالتغيير يوسّع ما يُفهَم ولا يُغيّر تفسير ما كان مفهوماً.
+ */
+const WORKBOOK_READ = { type: 'array', cellDates: true } as const;
 
 /** بصمة الملف: تُحسب من بايتاته لا من اسمه، فالاسم يتغيّر والمحتوى لا. */
 async function checksum(buffer: ArrayBuffer): Promise<string> {
@@ -175,7 +187,7 @@ function wireImport(view: View): void {
     try {
       const buffer = await f.arrayBuffer();
       const sum = await checksum(buffer);
-      const book = xlsx.read(buffer, { type: 'array' });
+      const book = xlsx.read(buffer, WORKBOOK_READ);
 
       if (mode.value === 'SAAS') {
         const sheets = book.SheetNames.map((name) => ({
@@ -464,7 +476,7 @@ function acceptedCount(preview: Row | null, mode: Mode): number {
 }
 
 /** معاينة ملف SaaS: عدّاد لكل ورقة، وما أُسقط بسببه، بلا أي كتابة بعد. */
-function renderSaasPreview(preview: Row): string {
+export function renderSaasPreview(preview: Row): string {
   const sheetResults = Array.isArray(preview['sheetResults']) ? (preview['sheetResults'] as Row[]) : [];
   const events = Array.isArray(preview['events']) ? (preview['events'] as Row[]) : [];
   const users = Array.isArray(preview['users']) ? (preview['users'] as Row[]) : [];
@@ -571,3 +583,144 @@ function insight(tone: 'good' | 'warn' | 'danger', title: string, detail = ''): 
 }
 
 export const routes: Route[] = [importRun];
+
+/* ---- ملفُ الشهر من شاشة الشهر: قراءةٌ ثم اعتماد -------------------------
+ *
+ * شاشة `/installation/monthly` تحتاج أن ترفع ملفَ أحداث التفعيل في مكانها،
+ * لا أن تُخرج المشغّل إلى مركز الاستيراد ثم تُعيده. لكنّ «في مكانها» لا يعني
+ * «بمُحلِّلٍ ثانٍ» ولا «بكتابةٍ فوريّة»:
+ *
+ *   • المحلِّل واحد: `window.SaasImport.parseWorkbook` نفسها التي يستدعيها
+ *     مركز الاستيراد، والتقطيعُ نفسه، والجسرُ نفسه — مُصدَّرةً لا مكرَّرة.
+ *   • والخطوتان منفصلتان: `parseMonthlyActivationFile` تقرأ الملف في المتصفّح
+ *     ولا تكتب حرفاً على الخادم. `commitMonthlyActivationFile` وحدها تكتب،
+ *     ولا تُستدعى إلا بضغطةٍ ثانيةٍ صريحةٍ بعد أن يرى المشغّل ما في يده.
+ *
+ * وسببُ الفصل أنّ ملفاً واحداً خاطئاً يدخل مرّةً ويبقى: الأحداث الخام سجلٌّ
+ * لا يُنسَخ فوقه ولا يُحذف. فالقراءةُ قبل الكتابة ليست رفاهيةَ واجهة. */
+
+/** ما قرأه المتصفّح من الملف — قبل أن يُكتب منه شيء. */
+export interface MonthlyFilePreview {
+  fileName: string;
+  checksum: string;
+  events: Row[];
+  users: Row[];
+  sourceRowCount: number;
+  duplicateCount: number;
+  rejectedCount: number;
+  unparsedDates: number;
+  /** الأشهر التي رُصدت في أحداث الملف، بتوقيت العمل. */
+  months: string[];
+  /** أحداثٌ بلا طابعٍ مفهوم — واحدٌ منها يكفي لإسقاط برهان الشهر. */
+  undatedEvents: number;
+  /** الشهر المتوقَّع، أو `null` حين لا يُثبَت. متوقَّعٌ لا مقطوعٌ به. */
+  period: string | null;
+  verdict: 'OK' | 'MIXED_MONTH_SOURCE' | 'PERIOD_NOT_PROVABLE' | 'NO_EVENTS';
+  /** مخرَج المحلِّل كما هو، ليُعرض بنفس مُصيّر المعاينة في مركز الاستيراد. */
+  raw: Row;
+}
+
+/** نتيجة الاعتماد على الخادم. */
+export interface MonthlyFileImport {
+  batchId: string;
+  accepted: number;
+  duplicates: number;
+  rejected: number;
+  enrolled: number;
+  blocked: number;
+  remaining: number;
+  complete: boolean;
+  /** صفوف لقطة المستخدمين في الملف نفسه — لا تُستورَد من هنا، وتُذكر صراحةً. */
+  usersSkipped: number;
+}
+
+/** يقرأ الملف ويُحلّله في المتصفّح. **لا نداءَ خادمٍ واحد، ولا كتابةَ حرف.**
+ *  و`XLSX.read` هي التي تفصل بين xlsx وxls وcsv بمحتوى الملف لا بامتداده،
+ *  فالصيغ الثلاث تمرّ من هذا الطريق الواحد. */
+export async function parseMonthlyActivationFile(file: File): Promise<MonthlyFilePreview> {
+  const xlsx = window.XLSX;
+  const saas = window.SaasImport;
+  if (!xlsx || !saas) {
+    throw new Error('مكتبة قراءة الملفات غير محمَّلة. أعِد تحميل الصفحة ثم حاول مرّةً أخرى.');
+  }
+
+  const buffer = await file.arrayBuffer();
+  const sum = await checksum(buffer);
+  const book = xlsx.read(buffer, WORKBOOK_READ);
+  const sheets = book.SheetNames.map((name) => ({
+    name, rows: xlsx.utils.sheet_to_json(book.Sheets[name], { defval: '' }) as Row[],
+  }));
+  const preview = saas.parseWorkbook(sheets, {});
+
+  const events = Array.isArray(preview['events']) ? (preview['events'] as Row[]) : [];
+  const users = Array.isArray(preview['users']) ? (preview['users'] as Row[]) : [];
+  const sheetResults = Array.isArray(preview['sheetResults'])
+    ? (preview['sheetResults'] as Row[]) : [];
+
+  // الشهر المتوقَّع، بنفس منطقة الخادم وبنفس القاعدة: حدثٌ واحدٌ بلا طابعٍ
+  // مفهوم يُسقط البرهان كلّه، وشهران في ملفٍ واحد يُسقطانه كذلك. وهذا
+  // إنذارٌ مبكِّر لا حُكم: الزناد على `installation_calculation_runs` هو من
+  // يقطع، ويُعيد الاشتقاق من الصفوف المخزَّنة عند كل كتابة.
+  const months = new Set<string>();
+  let undated = 0;
+  for (const e of events) {
+    const m = businessMonth(e['event_created_at']);
+    if (m) months.add(m); else undated += 1;
+  }
+  const monthList = [...months].sort();
+  const verdict: MonthlyFilePreview['verdict'] = !events.length ? 'NO_EVENTS'
+    : undated > 0 ? 'PERIOD_NOT_PROVABLE'
+      : monthList.length > 1 ? 'MIXED_MONTH_SOURCE' : 'OK';
+
+  return {
+    fileName: file.name,
+    checksum: sum,
+    events,
+    users,
+    sourceRowCount: num(preview, 'sourceRowCount'),
+    duplicateCount: num(preview, 'duplicateCount'),
+    rejectedCount: sheetResults.reduce((n, r) => n + num(r, 'rejected'), 0),
+    unparsedDates: num(preview, 'unparsedDates'),
+    months: monthList,
+    undatedEvents: undated,
+    period: verdict === 'OK' ? monthList[0] || null : null,
+    verdict,
+    raw: preview,
+  };
+}
+
+/** يكتب ما قُرئ: نفسُ `import_saas_activation_events` بتقطيعها وبصمتها
+ *  ومواضع صفوفها، ثم نفسُ جسر التسجيل. لا تُستدعى إلا بعد المعاينة. */
+export async function commitMonthlyActivationFile(
+  preview: MonthlyFilePreview,
+  onProgress: (message: string) => void,
+): Promise<MonthlyFileImport> {
+  if (!preview.events.length) {
+    throw new Error('لا أحداثَ تفعيلٍ في هذا الملف. شاشة الشهر تقرأ ملفّ أحداث التفعيل وحده.');
+  }
+
+  const batch = await importSaasEventsChunked(
+    preview.fileName, preview.checksum, preview.events, (done, total) => {
+      onProgress(total > SAAS_EVENTS_CHUNK_SIZE
+        ? `جارٍ اعتماد أحداث التفعيل… (${count(done)} من ${count(total)})`
+        : 'جارٍ اعتماد أحداث التفعيل…');
+    });
+  const totals = (batch['batch_totals'] as Row) || batch;
+  const batchId = str(batch, 'batch_id');
+
+  const swept = await bridgeSweepAll(batchId || null, (t) => {
+    onProgress(`جارٍ تقييم المرشّحين… (سُجّل ${count(t.enrolled)} · بقي ${count(t.remaining)})`);
+  });
+
+  return {
+    batchId,
+    accepted: num(totals, 'accepted'),
+    duplicates: num(totals, 'duplicates'),
+    rejected: num(totals, 'rejected'),
+    enrolled: swept.enrolled,
+    blocked: swept.blocked,
+    remaining: swept.remaining,
+    complete: swept.complete,
+    usersSkipped: preview.users.length,
+  };
+}
